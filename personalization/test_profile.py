@@ -150,7 +150,7 @@ class ProfileTests(unittest.TestCase):
             response=self.other.post('/api/chat',json={'message':'测试','chat_id':chat_id,'user_id':self.a.id})
             self.assertEqual(response.status_code,400)
 
-    def capture_analysis(self,user_id,snapshot,session='shared',remember=False,images=None):
+    def capture_analysis(self,user_id,snapshot,session='shared',remember=False,images=None,tool_requests=None):
         captured={}
         class KB:
             def search(self,query,top_k): captured['query']=query; return []
@@ -161,9 +161,16 @@ class ProfileTests(unittest.TestCase):
             async def chat(self, messages, max_tokens): return '虚构病历：2020年记录，血压120/80，归属待核对'
         class Coordinator:
             def __init__(self,**kwargs):
-                captured['options']=kwargs; self.worker_pool=[]; self.llm_client=SimpleNamespace(client=Client()); self.long_term_memory=SimpleNamespace(enabled=kwargs['enable_long_term_memory'])
+                from memory.short_term import ShortTermMemory
+                self.short_term_memory = ShortTermMemory()
+                captured['options']=kwargs; self.llm_client=SimpleNamespace(client=Client()); self.long_term_memory=SimpleNamespace(enabled=kwargs['enable_long_term_memory'])
+                async def legacy_execute(name, **arguments):
+                    raise AssertionError('Unscoped legacy memory function must never execute')
+                self.worker_pool=[SimpleNamespace(skill_registry=SimpleNamespace(execute=legacy_execute),llm_client=self.llm_client)]
             async def process(self,question,context,session_id):
+                captured['loop_history'] = self.short_term_memory.get_recent_messages(session_id)
                 captured.update(prompt=question,context=context,session=session_id)
+                captured['tool_results'] = [await self.worker_pool[0].skill_registry.execute(name,**arguments) for name,arguments in (tool_requests or [])]
                 return {'answer':'虚构测试回答','agent_id':'test'}
         job={'owner_user_id':user_id,'started':time.monotonic(),'steps':[]}
         payload={'message':'请分析本次病历，日期尚未确认','images':images or [],'remember':remember,'profile_snapshot':snapshot}
@@ -188,13 +195,37 @@ class ProfileTests(unittest.TestCase):
         self.assertFalse(first['options']['enable_long_term_memory'])
         self.assertTrue(first['result']['memory_suppressed_for_profile'])
         contexts['shared']['history']=[{'role':'assistant','content':'A专属病史'}]
+        from memory.short_term import ShortTermMemory
+        ShortTermMemory().add_message('shared','user','底层缓存：A专属病史')
         second=self.capture_analysis(self.a.id,None)
         self.assertNotIn('A专属病史',second['query']+second['prompt']+str(second['context']))
+        self.assertEqual(second['loop_history'],[])
+        self.assertEqual(ShortTermMemory().get_recent_messages('shared'),[])
         self.assertEqual(self.store.load(self.a.id),before)
 
     def test_queued_profile_cannot_be_used_after_edit_or_clear(self):
         old=self.saved(); self.saved(name='新草稿',confirm=False)
         with self.assertRaises(HTTPException): self.capture_analysis(self.a.id,old)
+
+    def test_opt_out_cannot_bypass_consent_via_memory_skills(self):
+        self.saved(name='仅存在于健康档案的秘密病史')
+        captured = self.capture_analysis(self.a.id,None,tool_requests=[
+            ('search_similar_cases',{'query':'总结当前用户的健康状况'}),
+            ('search_history',{'session_id':'another-user-session','limit':1000})])
+        self.assertEqual(captured['tool_results'][0]['total_found'],0)
+        self.assertEqual(captured['tool_results'][1]['total_messages'],0)
+        self.assertNotIn('秘密病史',str(captured))
+        self.assertFalse(captured['result']['profile_used'])
+        self.assertIn('本轮未授权健康档案',captured['prompt'])
+
+    def test_memory_skill_uses_request_bound_account_client(self):
+        from unittest.mock import Mock
+        from personalization.memory_tools import memory_tool_result
+        memory = Mock(enabled=True)
+        memory.search_similar_sessions.return_value = [{'content':'本账号的虚构摘要'}]
+        result = memory_tool_result('search_similar_cases',{'query':'测试','user_id':self.b.id}, {}, SimpleNamespace(long_term_memory=memory))
+        self.assertEqual(result['total_found'],1)
+        memory.search_similar_sessions.assert_called_once_with(query='测试',limit=3)
 
     def test_report_and_profile_remain_distinct_and_analysis_does_not_update_profile(self):
         snapshot = self.saved()

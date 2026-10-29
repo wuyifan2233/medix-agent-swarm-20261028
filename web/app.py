@@ -32,6 +32,7 @@ from storage.migrate import upgrade_database
 from personalization.router import router as profile_router
 from personalization.store import ProfileStore
 from personalization.middleware import ProfileBodyLimit
+from personalization.memory_tools import memory_tool_result
 from personalization.context import profile_context, retrieval_query, scope as profile_scope
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
@@ -224,6 +225,12 @@ async def analyze(job, payload, session_id, memory_user_id):
                 "excerpt": hit["content"][:220]} for hit in hits]
     enriched = question
     enriched += profile_context(snapshot)
+    if not snapshot:
+        enriched += ("\n\n【本轮未授权健康档案】不得读取或声称已读取保存的健康档案。"
+                     "仅能根据本轮及允许的用户历史消息、附件中明确提供的事实总结个人情况。"
+                     "公共医学资料、相似案例和助手先前的猜测都不是这个用户的病史。"
+                     "没有足够的个人资料时，明确说明无法总结，并请用户提供症状或勾选页面的档案开关后重新发送。"
+                     "聊天里口头说同意不等于开启档案开关，不得承诺凭口头授权读取档案；不得编造年龄、性别、疾病、过敏或用药。")
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
     if hits:
@@ -235,13 +242,18 @@ async def analyze(job, payload, session_id, memory_user_id):
     # The coordinator saves its input in Mem0. Do not duplicate profile data there.
     coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot, memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
+    # AgentLoop has a separate process-wide singleton containing enriched prompts.
+    # Only the sanitized web contexts above may cross request boundaries.
+    coordinator.short_term_memory.clear_session(session_id)
     trace = []
     for worker in coordinator.worker_pool:
         original = worker.skill_registry.execute
         async def tracked(name, _original=original, **arguments):
             entry = {"name": name, "label": LABELS.get(name, name), "status": "running"}
             trace.append(entry)
-            response = await _original(name, **arguments)
+            response = memory_tool_result(name, arguments, previous, coordinator)
+            if response is None:
+                response = await _original(name, **arguments)
             entry["status"] = "failed" if response.get("success") is False or response.get("status") == "error" else "completed"
             return response
         worker.skill_registry.execute = tracked
@@ -266,6 +278,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         contexts[session_id] = {"image_observations": observed, "history": history[-6:],
                                 "profile_scope": profile_scope(snapshot), "updated":time.time()}
     finally:
+        coordinator.short_term_memory.clear_session(session_id)
         clients = {id(obj.llm_client): obj.llm_client for obj in [coordinator, *coordinator.worker_pool]}
         for client in clients.values():
             await client.client.close()

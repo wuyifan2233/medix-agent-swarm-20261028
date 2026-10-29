@@ -17,7 +17,7 @@
   const feedback = text => { el('hpFeedback').textContent = text; };
   function availability() {
     const usable = !!record?.usable && !dirty && !working && !chatBusy;
-    el('hpUse').disabled = !usable; if (!usable) el('hpUse').checked = false;
+    el('hpUse').disabled = !usable; if (!record?.usable || dirty || working) el('hpUse').checked = false;
     el('hpOpen').disabled = chatBusy;
     el('hpConfirm').disabled = !record?.revision || dirty || working || !el('hpAck').checked;
     el('hpForm').querySelectorAll('input,select,button').forEach(node => { node.disabled = working || !identity; });
@@ -80,8 +80,8 @@
   function authChanged(user) { if ((user?.id || null) === identity) return; reset(); identity = user?.id || null; availability(); if (identity) load(); }
   window.addEventListener('medix-signout',reset); window.addEventListener('medix-auth-change',event => authChanged(event.detail)); MedixAuth.ready.then(authChanged).catch(reset);
   window.MedixProfile = {
-    setBusy(value) { chatBusy = value; availability(); },
-    choice() { if (!el('hpUse').checked) return {use_profile:false}; if (!record?.usable || dirty || identity !== MedixAuth.user?.id) throw new Error('请先保存并确认当前账号的档案。'); const result = {use_profile:true,profile_revision:record.revision}; el('hpUse').checked = false; return result; }
+    setBusy(value) { if (chatBusy && !value) el('hpUse').checked = false; chatBusy = value; availability(); },
+    choice() { if (!el('hpUse').checked) return {use_profile:false}; if (!record?.usable || dirty || identity !== MedixAuth.user?.id) throw new Error('请先保存并确认当前账号的档案。'); return {use_profile:true,profile_revision:record.revision}; }
   };
   availability();
 })();
