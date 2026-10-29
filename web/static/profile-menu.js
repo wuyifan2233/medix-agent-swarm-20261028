@@ -74,7 +74,7 @@
   document.addEventListener('click', event => {
     if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
   });
-  document.getElementById('profileSettings').addEventListener('click', close);
+  document.getElementById('profileSettings').addEventListener('click', () => { close(); window.dispatchEvent(new Event('medix-settings-request')); });
   document.getElementById('logoutButton').addEventListener('click', async event => {
     const button = event.currentTarget;
     if (button.disabled) return;

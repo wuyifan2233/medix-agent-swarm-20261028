@@ -147,7 +147,7 @@ def login_page():
 
 @app.get("/account")
 def account_page():
-    return FileResponse(STATIC / "account.html")
+    return RedirectResponse("/?settings=account", status_code=303)
 
 
 @app.get("/api/health")
