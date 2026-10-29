@@ -5,11 +5,13 @@
   text-decoration: none; cursor: pointer; white-space: nowrap;
 }
 .top-login:hover, .top-account:hover { background: #5668db; }
-.topbar .guide-button, .top-login, .top-account {
+.topbar .topbar-action {
   display: inline-flex; align-items: center; justify-content: center;
-  height: 34px; min-height: 34px; padding: 0 12px; line-height: 1;
-  box-sizing: border-box;
+  height: 36px; min-height: 36px; padding: 0 12px; line-height: 1;
+  box-sizing: border-box; border: 1px solid #e8ebf3; border-radius: 9px;
+  font-size: 12px; font-weight: 500; box-shadow: none;
 }
+.topbar .top-login, .topbar .top-account { border-color: #6375e9; }
 .top-account { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
 .profile #profileLogin { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .auth-dialog {
@@ -54,7 +56,7 @@ body.auth-modal-open { overflow: hidden; }
 .auth-dialog .auth-submit:hover { background: #5668db; }
 .auth-dialog button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 520px) {
-  .topbar .guide-button, .top-login, .top-account { height: 32px; min-height: 32px; padding: 0 11px; }
+  .topbar .topbar-action { height: 32px; min-height: 32px; padding: 0 11px; }
   .top-login, .top-account { font-size: 12px; }
   .topbar-right { gap: 8px; }
   .topbar .guide-button { margin-left: 0; }
