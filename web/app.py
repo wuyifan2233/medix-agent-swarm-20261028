@@ -1,5 +1,6 @@
 """Local chat UI backed by the project's real vision, RAG and agent pipeline."""
 import asyncio
+import mimetypes
 import base64
 import binascii
 import io
@@ -18,6 +19,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image, ImageOps, UnidentifiedImageError
 from loguru import logger
+
+# Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
+mimetypes.init()
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).parent / "static"
@@ -265,3 +271,4 @@ def job_status(job_id: str, request: Request):
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")
+
