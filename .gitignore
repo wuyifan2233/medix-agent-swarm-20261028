@@ -59,3 +59,11 @@ memory/agents/
 .medix-model-cache/
 .env.*
 !.env.example
+
+# Account database, uploads and local auth verification environment
+.medix-data/
+.venv-auth/
+*.db-wal
+*.db-shm
+output/playwright/
+.playwright-cli/
