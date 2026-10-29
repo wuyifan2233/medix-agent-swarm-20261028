@@ -33,7 +33,7 @@
   function render(user) {
     if (previousUserId !== (user?.id || null)) close();
     previousUserId = user?.id || null;
-    const name = user?.display_name || user?.username || '登录 / 注册';
+    const name = user?.display_name || user?.username || '登录';
     document.getElementById('profileName').textContent = name;
     document.getElementById('profileMenuName').textContent = name;
     document.getElementById('profileMenuUsername').textContent = user ? `@${user.username}` : '';
