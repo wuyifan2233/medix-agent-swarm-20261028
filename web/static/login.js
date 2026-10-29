@@ -3,7 +3,7 @@
   const el = id => document.getElementById(id);
   const dialog = el('authDialog');
   let registering = false, busy = false, generation = 0, requestController = null;
-  const updatePasswordHints = MedixPasswordPolicy.attachHints(el('password'), el('passwordHint'), () => registering);
+  const updatePasswordHints = MedixPasswordPolicy.attachHints(el('password'), () => registering);
   function fitViewport() {
     const viewport = window.visualViewport;
     dialog.style.setProperty('--auth-height', `${viewport?.height || innerHeight}px`);
@@ -15,7 +15,7 @@
     registering = value;
     el('loginTab').setAttribute('aria-selected', String(!value));
     el('registerTab').setAttribute('aria-selected', String(value));
-    for (const id of ['confirmField', 'passwordHint']) el(id).hidden = !value;
+    el('confirmField').hidden = !value;
     el('confirmPassword').required = value;
     el('password').minLength = value ? MedixPasswordPolicy.min : 1;
     el('password').autocomplete = value ? 'new-password' : 'current-password';

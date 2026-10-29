@@ -16,37 +16,28 @@ window.MedixPasswordPolicy = Object.freeze({
     if (status.count < 3) return `请再加入 ${3 - status.count} 种字符类型。`;
     return '';
   },
-  attachHints(input, anchor, enabled = () => true) {
-    const panel = document.createElement('div');
-    panel.className = 'password-rules'; panel.hidden = true;
-    panel.id = `${input.id}Rules`;
-    const summary = document.createElement('div'); summary.className = 'password-rules-summary';
-    const length = document.createElement('span'), count = document.createElement('span');
-    summary.append(length, count);
-    const types = document.createElement('div'); types.className = 'password-rules-types';
-    const labels = ['大写字母', '小写字母', '数字', '符号'];
-    const chips = labels.map(label => { const chip = document.createElement('span'); chip.textContent = label; types.append(chip); return chip; });
-    panel.append(summary, types); anchor.after(panel);
-    const describedBy = [input.getAttribute('aria-describedby'), anchor.id, panel.id].filter(Boolean).join(' ');
-    input.setAttribute('aria-describedby', describedBy);
-    const update = () => {
-      const on = enabled();
-      const focused = document.activeElement === input ||
-        (input.parentElement.classList.contains('auth-password') && input.parentElement.contains(document.activeElement));
-      panel.hidden = !on || !(input.value || focused);
-      const status = this.status(input.value);
-      length.textContent = `${status.length >= this.min && status.length <= this.max ? '✓ ' : ''}8–20 位`;
-      length.classList.toggle('is-met', status.length >= this.min && status.length <= this.max);
-      count.textContent = `至少 3 类 · ${Math.min(status.count, 3)}/3`;
-      count.classList.toggle('is-met', status.count >= 3);
-      chips.forEach((chip, i) => {
-        chip.textContent = `${status.types[i] ? '✓ ' : ''}${labels[i]}`;
-        chip.classList.toggle('is-met', status.types[i]);
-      });
-    };
-    for (const event of ['input', 'focus', 'blur']) input.addEventListener(event, update);
-    input.parentElement.addEventListener('focusout', () => queueMicrotask(update));
-    input.parentElement.addEventListener('focusin', update);
+  attachHints(input, enabled = () => true) {
+    let wrapper = input.parentElement;
+    if (!wrapper.classList.contains('auth-password')) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'password-tooltip-wrapper';
+      input.before(wrapper); wrapper.append(input);
+    }
+    const tip = document.createElement('div');
+    tip.className = 'password-tooltip'; tip.id = `${input.id}Rules`;
+    tip.setAttribute('role', 'tooltip'); tip.hidden = true;
+    tip.textContent = '8–20 位；大写、小写、数字、符号中任选 3 类。';
+    wrapper.append(tip);
+    input.setAttribute('aria-describedby', [input.getAttribute('aria-describedby'), tip.id].filter(Boolean).join(' '));
+    let dismissed = false;
+    const update = () => { tip.hidden = !enabled() || document.activeElement !== input || dismissed; };
+    input.addEventListener('focus', () => { dismissed = false; update(); });
+    input.addEventListener('blur', update);
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !tip.hidden) {
+        event.preventDefault(); event.stopPropagation(); dismissed = true; update();
+      }
+    });
     update(); return update;
   }
 });

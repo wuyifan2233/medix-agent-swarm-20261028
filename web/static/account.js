@@ -1,5 +1,5 @@
 const byId = id => document.getElementById(id);
-MedixPasswordPolicy.attachHints(byId('newPassword'), byId('newPassword').nextElementSibling);
+MedixPasswordPolicy.attachHints(byId('newPassword'));
 let offset = 0;
 function showError(error) { byId('feedback').textContent = error.message; }
 async function users() {
