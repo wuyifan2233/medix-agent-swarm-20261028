@@ -1,0 +1,558 @@
+{
+  "package": "medix-agent-swarm-20261028",
+  "source_archive_sha256": "8063ad32c84b1650aa5f82838970a3c6f02bfa4fb212c80a274e94651edb379c",
+  "credential_pattern_scan": "passed",
+  "note": "README quick start adapted for standalone repository.",
+  "files": [
+    {
+      "path": ".claude/skills/analyze-symptoms/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/analyze-symptoms/script/symptoms.py",
+      "bytes": 5603,
+      "sha256": "50ea00b514dc2fb5b3a35ae027fab30cb9e0872cae037a72a58c8e1075611930"
+    },
+    {
+      "path": ".claude/skills/analyze-symptoms/SKILL.md",
+      "bytes": 700,
+      "sha256": "c5db7f08bf0e82725cfb543436f2e2f3769a1337952e682934ef9e5072e4826c"
+    },
+    {
+      "path": ".claude/skills/assess-risk/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/assess-risk/script/risk.py",
+      "bytes": 4309,
+      "sha256": "2211ad9fc01cd375a46ac4a2a6a04d223720e0eaad96c57390c14c2e91c334e8"
+    },
+    {
+      "path": ".claude/skills/assess-risk/SKILL.md",
+      "bytes": 684,
+      "sha256": "dc4718dd3a51640112990e617562758255e8b4ff148e76b280a2c85c43cb7c2c"
+    },
+    {
+      "path": ".claude/skills/clinical-guideline/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/clinical-guideline/script/guideline.py",
+      "bytes": 2674,
+      "sha256": "5d2aee89d5ee2d1650fda418fb04c5daedfa4e0d9fdeaceeb69a9049d6506890"
+    },
+    {
+      "path": ".claude/skills/clinical-guideline/SKILL.md",
+      "bytes": 322,
+      "sha256": "8168380b75a7cdd2c4fea343b0a9cd16431821dcfdce564b842359583070d177"
+    },
+    {
+      "path": ".claude/skills/deep-research/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/deep-research/script/research.py",
+      "bytes": 4077,
+      "sha256": "cc22d7a0a3c1b166476066d84c169d10db81ab1b9acd4610d56c0322c4806af0"
+    },
+    {
+      "path": ".claude/skills/deep-research/SKILL.md",
+      "bytes": 715,
+      "sha256": "dcf9489d80bf3c2c83526cecac7d7d1b3ad3177ecb9dad8d70549d5a7705e5af"
+    },
+    {
+      "path": ".claude/skills/disease-code/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/disease-code/script/code.py",
+      "bytes": 2533,
+      "sha256": "9d44283d9f9556c32c7ddf0bd91d327bd8c7af14b62efb42736d743199dd398b"
+    },
+    {
+      "path": ".claude/skills/disease-code/SKILL.md",
+      "bytes": 270,
+      "sha256": "1b26f779f9bdbbe438c385cbab888eec8434be446a050621cf74041b1cc465db"
+    },
+    {
+      "path": ".claude/skills/recommend-lifestyle/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/recommend-lifestyle/script/lifestyle.py",
+      "bytes": 2274,
+      "sha256": "43aa654f13280e5db9e5094cb5173f0f13e912cea8e3c196dd5291293070ab87"
+    },
+    {
+      "path": ".claude/skills/recommend-lifestyle/SKILL.md",
+      "bytes": 638,
+      "sha256": "88035c0cff4ac3aeab9c2dca9e9a1d953e80f46464c03896d00e350b2b785c77"
+    },
+    {
+      "path": ".claude/skills/search-history/script/search.py",
+      "bytes": 3038,
+      "sha256": "982266aafd8a93e25d63a128bc078bf8e2589b03ee4050bb1ae69e9b7964547c"
+    },
+    {
+      "path": ".claude/skills/search-history/SKILL.md",
+      "bytes": 858,
+      "sha256": "ce9f214a1aa71f6748544f792775cafe98899e351c390fb19f0f659dd8fa99bf"
+    },
+    {
+      "path": ".claude/skills/search-knowledge/script/__init__.py",
+      "bytes": 18,
+      "sha256": "25bc3dd3768fa95285f80692a01fa618cc6d852be6f3c3bfcaa1a81a67ff4bf5"
+    },
+    {
+      "path": ".claude/skills/search-knowledge/script/search.py",
+      "bytes": 3216,
+      "sha256": "0fe73f20ac1b97a9cd186f02ce1bdd9b0ca0943f93f706263ee071ea591d25f6"
+    },
+    {
+      "path": ".claude/skills/search-knowledge/SKILL.md",
+      "bytes": 825,
+      "sha256": "f70431902b14d115e2e0a942f9ff59d372754722145de8c69460c3f0e2d081af"
+    },
+    {
+      "path": ".claude/skills/search-similar-cases/script/search.py",
+      "bytes": 3198,
+      "sha256": "4c7bf9b71bc5ac48024b9ee485b4141e9454fc72d1f69d7382e74109f7b99add"
+    },
+    {
+      "path": ".claude/skills/search-similar-cases/SKILL.md",
+      "bytes": 884,
+      "sha256": "e14bfaaf4c00f50296de9ae62d17c3d187cd75e79906a10c488bdbb767f0cf60"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 70,
+      "sha256": "16ed19d7d269adbc2829b08e5e63a15cdf6b6c45759f8246d46dd8d1276d3ea6"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 598,
+      "sha256": "88835eb3e10f17b81c816a3c228f88e15ceb2a5e7990dd8b172feb936d392510"
+    },
+    {
+      "path": "agents/__init__.py",
+      "bytes": 370,
+      "sha256": "eedbbe93166c63d3a5e5a19be5c61ed294ffe932e8937b2e6b73d605fe740c48"
+    },
+    {
+      "path": "agents/base_agent.py",
+      "bytes": 5228,
+      "sha256": "844140d6dbbab8ef8420c6a045440f9d2bc3e0f64bf53ed15a1743c4cb348c19"
+    },
+    {
+      "path": "agents/consultation_agent.py",
+      "bytes": 5220,
+      "sha256": "fa5d792d54ef48ba24cc4cf132e1198f241197fc1f7063841902df947a9cafa4"
+    },
+    {
+      "path": "agents/diagnostic_agent.py",
+      "bytes": 4589,
+      "sha256": "9ef67e946e0104047d47699aaf0cd769844706ee8656c00e843336cc748ec91e"
+    },
+    {
+      "path": "agents/research_agent.py",
+      "bytes": 5203,
+      "sha256": "85f2f4e4ab41c23d1b9b0aca21a9c9015499358f4000bb1ced292aec8a40b78d"
+    },
+    {
+      "path": "agents/skill_registry_mixin.py",
+      "bytes": 2781,
+      "sha256": "23d27d2b083ae221debe69cd3b6b96fa7fd73338aabeb63556c617c483a8d5dc"
+    },
+    {
+      "path": "config.py",
+      "bytes": 1360,
+      "sha256": "c5f85f5ae9e758eb75235d201c90ac0f0ee5c2394450da56503d8d23eae7bd7f"
+    },
+    {
+      "path": "constraints/__init__.py",
+      "bytes": 178,
+      "sha256": "89653ee6c5b7d420eec202d7ca771d8950339d474713a01d44dc194092de1de5"
+    },
+    {
+      "path": "constraints/agent_constraints.yaml",
+      "bytes": 2776,
+      "sha256": "c1526170f67b984070b397bd45ec95c20e6e8edaa5f494ec791a1f1e00bfc25f"
+    },
+    {
+      "path": "constraints/swarm_constraints.yaml",
+      "bytes": 3122,
+      "sha256": "ce8d7060a13ff000ea1c957cc95bc22a089c9d6a2a46a5f2496cb2d3d035e184"
+    },
+    {
+      "path": "constraints/validator.py",
+      "bytes": 9162,
+      "sha256": "38870f8feace04fd5b8b0cc68fa4fc9eb52f83df5c122beae1640b1f7e5bbd90"
+    },
+    {
+      "path": "core/__init__.py",
+      "bytes": 382,
+      "sha256": "c4abb0acf06aa0ff0c487ddf255737ec809d6f85f07848d20270efe09c0315a7"
+    },
+    {
+      "path": "core/agent_loop.py",
+      "bytes": 15422,
+      "sha256": "358b5f28a993610fef2ec4a5916494b9a6d44e0f3ccd6cc28fb86f1e4c072541"
+    },
+    {
+      "path": "core/llm_client.py",
+      "bytes": 7271,
+      "sha256": "4ade9d24b0de390051d89fb50ab73b6f2de1ccf4c56a1ba6e3dcd4641e3b8ce8"
+    },
+    {
+      "path": "core/skill_loader.py",
+      "bytes": 6161,
+      "sha256": "9262cdf275e61d744241678d7bf84345a57b58f3721b3e3603c5c8332ab57009"
+    },
+    {
+      "path": "core/skill_registry.py",
+      "bytes": 4027,
+      "sha256": "0974457d1e743c1e1a15af5a4cc167866344b1d8394146807cf6afea811a3856"
+    },
+    {
+      "path": "core/state_manager.py",
+      "bytes": 4033,
+      "sha256": "2b24a7f3281a634f2399099d3bf6089cbaadac0d6ecb6f7186d18b0c114b6583"
+    },
+    {
+      "path": "DELIVERY.md",
+      "bytes": 1741,
+      "sha256": "88910386b0e84bba9bb221dd617a00e2a0809a00f19cf3d705dd65b039bb7061"
+    },
+    {
+      "path": "demo_basic.py",
+      "bytes": 3166,
+      "sha256": "6126b2a54bba9486b060a6b462d6af10c7b6355a6cbbd87e997ddb7ecc9997ce"
+    },
+    {
+      "path": "docs/RUNTIME.md",
+      "bytes": 7737,
+      "sha256": "fdda72941dbd2999224c0467ba4a7c5e23812bb207941b9001d263829c4a9f14"
+    },
+    {
+      "path": "docs/TESTING.md",
+      "bytes": 5670,
+      "sha256": "a2c752d4cb8cdcb9a30c6917155f2bb8ab3643fcb60f3385e951b7ed79591150"
+    },
+    {
+      "path": "docs/医疗助手代码解读.docx",
+      "bytes": 301179,
+      "sha256": "f37cf314d1b4a7b7e857a28f38a729e5a5600682ced6a04275430fc8d6176564"
+    },
+    {
+      "path": "examples/test_all.py",
+      "bytes": 56049,
+      "sha256": "03ed2f7a61007319b21684164cedc4bd6d44f86584cf61e84168ea6297fbd968"
+    },
+    {
+      "path": "knowledge/__init__.py",
+      "bytes": 156,
+      "sha256": "6173a829429c72d28b82935a1cc716c337317ed58b628fcf16cf26f354643ada"
+    },
+    {
+      "path": "knowledge/data/documents/01_lifestyle_hypertension.txt",
+      "bytes": 1960,
+      "sha256": "63c37933290a6d6e692d64005625b236a6d1f7ac96863376ef481a3017cc1e4f"
+    },
+    {
+      "path": "knowledge/data/documents/02_lifestyle_diabetes.txt",
+      "bytes": 2214,
+      "sha256": "0435726701f17c8140a90cb6ce8a9c0116112173b9b1ecebc2f3dde398ff3554"
+    },
+    {
+      "path": "knowledge/data/documents/03_lifestyle_cold.txt",
+      "bytes": 2264,
+      "sha256": "fe312987875a6ec787e880e9020bc8a786f9146b6a7c74fd7cfd81cc5636b73e"
+    },
+    {
+      "path": "knowledge/data/documents/04_lifestyle_general_health.txt",
+      "bytes": 5272,
+      "sha256": "764dbd03c657d94cd86e682744e8f7fbef3ef5987dd80a7ca5e486cb5bac6944"
+    },
+    {
+      "path": "knowledge/data/documents/05_symptoms_emergency.txt",
+      "bytes": 7056,
+      "sha256": "3f3f40a16ac8da71d27bb945bf3dd27ceeed729fe1db0799f05c9fed49b18d6a"
+    },
+    {
+      "path": "knowledge/data/documents/10_icd10_cardiovascular.txt",
+      "bytes": 1788,
+      "sha256": "b5bc63f2bce5dad897d9800a88d01c64bf1ffec661da28f75f4db326f5491e23"
+    },
+    {
+      "path": "knowledge/data/documents/11_icd10_endocrine.txt",
+      "bytes": 1866,
+      "sha256": "773f62c69c88dbd0eb5900517b8b575a4193e9ef07a2987a46f4c391e07d4ff9"
+    },
+    {
+      "path": "knowledge/data/documents/12_icd10_infectious.txt",
+      "bytes": 5495,
+      "sha256": "8ea472be9b40e7b9a57eeedcf74e45d6087331600bb5ba5646fd8af9f9c5b2b3"
+    },
+    {
+      "path": "knowledge/data/documents/20_guideline_hypertension.txt",
+      "bytes": 13508,
+      "sha256": "bdc3f63cdbb4e0965ce5782e3c3a1b4757ebdc84738f4adea21e608e946f71ed"
+    },
+    {
+      "path": "knowledge/data/documents/21_guideline_diabetes.txt",
+      "bytes": 10938,
+      "sha256": "e74779acb21cabefe4c0833b8dd1fcaddfad3a17d7cc1aecf3e2ecf1c5b5e712"
+    },
+    {
+      "path": "knowledge/data/milvus_lite.db",
+      "bytes": 917504,
+      "sha256": "581a2ba7a1fa23bf1d0c42850d7a9b9d97fd3350cf2c666ebd6df28e1872d499"
+    },
+    {
+      "path": "knowledge/data/milvus_v3.db/collections/medical_knowledge/manifest.json",
+      "bytes": 480,
+      "sha256": "5bbf2d96c705b45a4a732708222dd0d31abc7e96139cea9ad966c695a3b9379e"
+    },
+    {
+      "path": "knowledge/data/milvus_v3.db/collections/medical_knowledge/manifest.json.prev",
+      "bytes": 430,
+      "sha256": "439bced4db104c9bc364e111da83cd0486ba478d9e84a87f4a8b6156ece9130c"
+    },
+    {
+      "path": "knowledge/data/milvus_v3.db/collections/medical_knowledge/partitions/_default/data/data_000001_000180.parquet",
+      "bytes": 338034,
+      "sha256": "07cd0b7273b209e776bd34a150a628ccb2b69d2adca4b116f3ce0bd368143954"
+    },
+    {
+      "path": "knowledge/data/milvus_v3.db/collections/medical_knowledge/schema.json",
+      "bytes": 724,
+      "sha256": "73dd55d3af90e7994e1d510915d412798964e82b747e5c58bfb3217f2aa92723"
+    },
+    {
+      "path": "knowledge/data/milvus_v3.db/LOCK",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "knowledge/milvus_kb.py",
+      "bytes": 8732,
+      "sha256": "89228424d6b312b2c89eb0cdffeeeb41edaf4aac666981cdaedbb054b4758087"
+    },
+    {
+      "path": "knowledge/scripts/__init__.py",
+      "bytes": 28,
+      "sha256": "369afde7abfb1728e9894b03fcb217d255da286353c86e63536940422ce7f421"
+    },
+    {
+      "path": "knowledge/scripts/import_hardcoded_data.py",
+      "bytes": 5481,
+      "sha256": "c837d055fb5d64b9dea02ef1b7c6e86e7f45a1e31ab1613e50051e313e084645"
+    },
+    {
+      "path": "knowledge/scripts/migrate_legacy_db.py",
+      "bytes": 2303,
+      "sha256": "6096a3237365624668847ee20dbe65ac24fef56b922505ab0f7bb0f6d438edf0"
+    },
+    {
+      "path": "main.py",
+      "bytes": 5044,
+      "sha256": "54f94448dbb6e9d0da7044f7f8695009d76f78162c1e7d0304f2d5d2ead741be"
+    },
+    {
+      "path": "memory/__init__.py",
+      "bytes": 1239,
+      "sha256": "36c42021b29dcc8d6acdf3bb39ac11772dc5b2c5dd50b1676fd6b95894eecce2"
+    },
+    {
+      "path": "memory/agent_identity.py",
+      "bytes": 7469,
+      "sha256": "da94a5e26daf884e5682d219e1ea53cd5e65e60039232efeed7be77c7f161e45"
+    },
+    {
+      "path": "memory/entropy_manager.py",
+      "bytes": 10511,
+      "sha256": "b569004da55cd6e552baf5af371dfd6321483b9d0ce6e96fcf2b6d245a8f522e"
+    },
+    {
+      "path": "memory/long_term.py",
+      "bytes": 8627,
+      "sha256": "87add466de4df4c29083547ca97601dde5f7cae64917c2246ae847c1e3f09988"
+    },
+    {
+      "path": "memory/session_summary.py",
+      "bytes": 9667,
+      "sha256": "c10e97106df835112876c4335b1713221dc34628d125b132d81ff40d41d2ee31"
+    },
+    {
+      "path": "memory/short_term.py",
+      "bytes": 10423,
+      "sha256": "8834257012d1db592124e9cfd5437ea1c3bff3ae1591c48bb3bd9ba2c15d4f11"
+    },
+    {
+      "path": "package_project.py",
+      "bytes": 6519,
+      "sha256": "4219e0d45730886298d935858bade4da7220bc1a736653e48e28b277bebef336"
+    },
+    {
+      "path": "README.md",
+      "bytes": 18937,
+      "sha256": "3766894c1475b0a9ef60825c40ae069236a98f99ed176b20d378c7d23739851e"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 602,
+      "sha256": "3df7dc589eae8a47f05aa919c76c6cfe9d46a891f0d76c6e4a335eb251182e69"
+    },
+    {
+      "path": "requirements.verified.txt",
+      "bytes": 1690,
+      "sha256": "1c3fb5dd7ca78b6527919a70e3a260cdf836b2a758d05b236dc96d2c6842e223"
+    },
+    {
+      "path": "requirements.web.txt",
+      "bytes": 77,
+      "sha256": "f4b31c4a48eb36f7131f22f3fff5797f992b1f4f11f56f1ac6149bb8294ca532"
+    },
+    {
+      "path": "research/deep_research_workflow.py",
+      "bytes": 8373,
+      "sha256": "e686daa4e7d41a91ec4eb7b28600aac2ecd30ea75c65ab57ad0263678754b87c"
+    },
+    {
+      "path": "research/evidence_synthesizer.py",
+      "bytes": 10062,
+      "sha256": "b3811f26273d906a8d3fcdada4697e586cc30cb608a3f4f92d99eb89ce7094f4"
+    },
+    {
+      "path": "research/knowledge_base.py",
+      "bytes": 11677,
+      "sha256": "bc2e16cd75db226dd06d7a5b4fe2057e3804594c9aee278a99a8967da44c617f"
+    },
+    {
+      "path": "research/web_search.py",
+      "bytes": 8710,
+      "sha256": "6f9da8772757405398cb0f5df2eb69866956b74c1a6d2a4695531f64cd056df9"
+    },
+    {
+      "path": "run_web.py",
+      "bytes": 688,
+      "sha256": "b75f0793f6a913651ef755f81ece1d072a0a11baccaab4b09825ff06d984ecb0"
+    },
+    {
+      "path": "runtime_paths.py",
+      "bytes": 409,
+      "sha256": "ee6cc5c7f7d017de99ab84f33b8a690b9528160fc6e3a4f1a6b1e0024710194e"
+    },
+    {
+      "path": "setup.py",
+      "bytes": 1025,
+      "sha256": "850a504a903b20ec9235cd538976157d4b9d854320d65c8d6751859c6518b223"
+    },
+    {
+      "path": "start.ps1",
+      "bytes": 1516,
+      "sha256": "d3bd60d1540972a505ba6cb8a6783dbb2710dc503ee5fae7fd80244a70ddfc86"
+    },
+    {
+      "path": "start_web.ps1",
+      "bytes": 96,
+      "sha256": "4a78fcfbdfb9ab06f199a16c977c2d137b884f2d84bd42faf5525c834c890b42"
+    },
+    {
+      "path": "swarm/__init__.py",
+      "bytes": 457,
+      "sha256": "7d032571761d7c9fc6b40a5ba7bb423763640684437f38d19b40c617b4d5538b"
+    },
+    {
+      "path": "swarm/events.py",
+      "bytes": 1853,
+      "sha256": "2a6c30f34856073df2f6af7a7cdbf80e9ed5f0ccf6b879e2c2bcaf1f429f4d1f"
+    },
+    {
+      "path": "swarm/lead_agent.py",
+      "bytes": 12681,
+      "sha256": "9aba2195cca969e09069a64cfedfd7f8b682161a84a68a553cdaefb2682888e8"
+    },
+    {
+      "path": "swarm/shared_context.py",
+      "bytes": 9459,
+      "sha256": "66eb1d38bb0781abcedd8697f65cb37fd390cc8b4d37a0a6af11dbe2b5f4ebd7"
+    },
+    {
+      "path": "swarm/swarm_coordinator.py",
+      "bytes": 18404,
+      "sha256": "6dbb966a0e874f505782349893f8a5600dfca011b3c4a5eeee2d89633d3024e0"
+    },
+    {
+      "path": "validation/__init__.py",
+      "bytes": 155,
+      "sha256": "2682a9f8a653ad72b9e614a557415e3223d197dc9e513da566840a9679c6c8df"
+    },
+    {
+      "path": "validation/auto_fixer.py",
+      "bytes": 3625,
+      "sha256": "69f234a729875a61f158e564e4904d84fe27dbae7f288a59eadf65916e2c8f0e"
+    },
+    {
+      "path": "verify_mem0.py",
+      "bytes": 3311,
+      "sha256": "16c9c4cac966dd4893c050482ad7ad9522c9d75256329a4cee6c1a7439234228"
+    },
+    {
+      "path": "verify_runtime.py",
+      "bytes": 6556,
+      "sha256": "923093e87bb5ad42a56f11888ffd1765cbfcc4c93f4144f391b40725e4600792"
+    },
+    {
+      "path": "web/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "web/app.py",
+      "bytes": 13492,
+      "sha256": "4869e2555b5dac4ab237e75218910dede470dcca35f4054404ec3d1e7745c2c5"
+    },
+    {
+      "path": "web/static/app.js",
+      "bytes": 20652,
+      "sha256": "eef9742a3f32fe84b43fbbdcc6a5acc8fe224b88c722b8441ffd225ae13ee1e9"
+    },
+    {
+      "path": "web/static/companion.svg",
+      "bytes": 1965,
+      "sha256": "8a00936d6c1db780e2ceb9f53dd0f7fa1ba856b733ff98256bfe470878a62112"
+    },
+    {
+      "path": "web/static/demo-report.png",
+      "bytes": 57639,
+      "sha256": "04f028dedfb532da97d5309769548986cb9e27969bb766bd0a4eccf6a453e9e9"
+    },
+    {
+      "path": "web/static/index.html",
+      "bytes": 10321,
+      "sha256": "1701ce526dee288351273e4876fb27046ddfdfad14b839cd681f7d10fe6d7458"
+    },
+    {
+      "path": "web/static/style.css",
+      "bytes": 26307,
+      "sha256": "d3eacf5c6adb6fe85791279c2b955078b979fd198a3367ee05e3235ed4bc1975"
+    },
+    {
+      "path": "web/test_web.py",
+      "bytes": 2919,
+      "sha256": "9a3cfd5cb52d1dbe5a8485b91ad85866332f9b3e02f96cc15da343478de1f077"
+    },
+    {
+      "path": "web-ui-desktop.png",
+      "bytes": 73265,
+      "sha256": "45c850b5548957e0c72b35d6dc38becffd6e4e7818ebea3225ac80199721f37f"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=2"><script src="/assets/app.js?v=2" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true"><defs>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11a9 9 0 0 1-9 9H5l-3 2 1.6-5.5A9 9 0 1 1 21 11Z"/><path d="M8 10h8M8 14h5"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v15M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Z"/></symbol>
+<symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-16a3 3 0 0 1 0 6m3 10v-3a6 6 0 0 0-2-4"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3 11h4l2-3 3 7 2-4h7"/></symbol>
+<symbol id="i-pill" viewBox="0 0 24 24"><path d="m14 3-11 11a5 5 0 0 0 7 7L21 10a5 5 0 0 0-7-7Zm-6 7 7 7"/><path d="m15 6 3 3"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3C7 1 2 7 5 15c7 5 15 0 15-12ZM4 21 15 10"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6L12 2Z"/><path d="m8 12 3 3 5-6"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/></symbol>
+</defs></svg>
+<div class="app-shell">
+<button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="关闭侧栏" hidden></button>
+<aside class="sidebar" id="sidebar" aria-label="工作空间">
+<a class="brand" href="/" aria-label="MediX 首页"><span class="brand-mark"><svg><use href="#i-heart"/></svg></span><span>MediX<small>你的 AI 健康伙伴</small></span></a>
+<button class="new-chat" id="newChat"><svg><use href="#i-plus"/></svg>开启新对话<kbd>＋</kbd></button>
+<p class="nav-caption">我的健康助手</p>
+<nav class="primary-nav" aria-label="快捷功能">
+<button class="nav-item active" id="chatNav" aria-current="page"><svg><use href="#i-chat"/></svg><span>健康咨询</span><span class="nav-indicator"></span></button>
+<button class="nav-item" data-action="upload"><svg><use href="#i-image"/></svg><span>报告解读</span><span class="nav-tag">图文</span></button>
+<button class="nav-item" data-action="knowledge"><svg><use href="#i-book"/></svg><span>医学知识库</span><svg class="nav-chevron"><use href="#i-chevron"/></svg></button>
+</nav>
+<div class="conversation-heading">本次对话<span>仅本次保留</span></div>
+<div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
+<div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
+<div class="sidebar-bottom">
+<div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>
+<div class="service-line"><span class="status-dot" id="modelDot"></span><span>图文理解</span><small id="modelState">检测中</small></div>
+<div class="service-line"><span class="status-dot" id="kbDot"></span><span>医学资料</span><small id="kbState">准备中</small></div>
+<div class="memory-option"><label for="remember"><span><svg><use href="#i-spark"/></svg>记住我们的对话</span><input type="checkbox" id="remember" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p id="memoryHelp">开启后，对话和图片解读摘要将发送至 Mem0，用于后续会话检索。</p></div>
+<div class="profile"><span class="profile-icon">你</span><div>我的本地空间<small>从关心自己开始</small></div><button class="icon-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg></button></div>
+</div>
+</aside>
+<main>
+<header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar"><svg><use href="#i-menu"/></svg></button><span class="workspace-title">健康咨询</span><span class="version">AI 助手</span></div><div class="topbar-right"><span class="top-status"><span></span>文字、图片都可以问</span><button class="guide-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg><span>使用指南</span></button></div></header>
+<div class="conversation" id="conversation">
+<section class="welcome" id="welcome">
+<div class="hero"><div class="hero-copy"><div class="eyebrow"><span></span>让关心，随时在身边</div><h1>你好，我是 <span>MediX</span><br>今天有什么想问的？</h1><p class="welcome-description">身体的小疑问，报告里的看不懂。<br>说给我听，我们一起找到更清楚的答案。</p></div><div class="hero-art" aria-hidden="true"><span class="art-orbit orbit-one"></span><span class="art-orbit orbit-two"></span><span class="art-spark spark-one">✦</span><span class="art-spark spark-two">＋</span><img src="/assets/companion.svg" alt="" class="companion"><span class="hello-bubble">Hi，今天也要照顾好自己</span></div></div>
+<div class="section-heading"><h2>从这里开始聊</h2><span>你关心的，都可以问问</span></div>
+<div class="suggestions">
+<button class="suggestion card-consult" data-prompt="symptom"><span class="example-icon blue"><svg><use href="#i-heart"/></svg></span><div><strong>身体有点不舒服</strong><small>梳理症状，了解该关注什么</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
+<button class="suggestion card-report" data-action="upload"><span class="example-icon lilac"><svg><use href="#i-image"/></svg></span><div><strong>帮我读懂报告</strong><small>上传检查报告、记录或截图</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
+<button class="suggestion card-medicine" data-prompt="medicine"><span class="example-icon peach"><svg><use href="#i-pill"/></svg></span><div><strong>用药前，先问一问</strong><small>了解用法、注意事项和疑问</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
+<button class="suggestion card-life" data-example="knowledge"><span class="example-icon mint"><svg><use href="#i-leaf"/></svg></span><div><strong>把日子过得更健康</strong><small>饮食、运动与日常健康管理</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
+</div>
+<div class="try-heading"><span>还可以这样问</span><button id="refreshPrompts" type="button" aria-label="换一组推荐问题">换一组 <span aria-hidden="true">↻</span></button></div>
+<div class="question-chips" id="questionChips"><button data-question="最近总是睡不好，应该先观察和记录哪些情况？">最近总是睡不好，怎么办？<span>↗</span></button><button data-question="体检报告中的箭头代表什么？读报告时需要关注哪些信息？">体检报告里的箭头怎么看？<span>↗</span></button><button data-question="久坐后肩颈不舒服，日常可以怎样调整习惯？">久坐后肩颈不舒服<span>↗</span></button></div>
+<div class="trust-strip"><span><svg><use href="#i-team"/></svg>专业助手按需协作</span><i></i><span><svg><use href="#i-book"/></svg>结合本地医学资料</span><i></i><button data-example="report">试用图片示例 <span>→</span></button></div>
+</section>
+<div class="messages" id="messages" aria-live="polite"></div>
+</div>
+<div class="composer-region"><div class="drop-hint" id="dropHint"><svg><use href="#i-image"/></svg>松开即可添加图片</div>
+<form class="composer" id="chatForm"><div class="attachments" id="attachments"></div><label class="sr-only" for="message">输入健康问题</label><textarea id="message" placeholder="有健康问题，尽管问我…" rows="2" maxlength="8000"></textarea>
+<div class="composer-bottom"><div class="compose-left"><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">报告、药盒、健康记录</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+<input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></form>
+<p class="disclaimer"><svg><use href="#i-shield"/></svg>AI 回答仅供参考，不能替代医生诊断。紧急不适请及时就医。</p>
+</div>
+</main></div>
+<dialog id="infoDialog" class="info-dialog" aria-labelledby="dialogTitle"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-book"/></svg></span><button id="closeDialog" class="icon-button" aria-label="关闭说明"><svg><use href="#i-close"/></svg></button></div><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div><button id="dialogDone" class="dialog-done">知道了</button></dialog>
+<div id="toast" role="alert" class="toast"></div>
+</body></html>
