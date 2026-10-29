@@ -1,5 +1,80 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · MediX</title><link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/auth.css"><script src="/assets/auth.js" defer></script><script src="/assets/login.js" defer></script></head>
-<body><main class="auth-shell"><section class="auth-story"><a class="wordmark" href="/login"><span>＋</span>MediX</a><div><div class="eyebrow">YOUR HEALTH, YOUR SPACE</div><h1>让每一次关心，<br>都有自己的空间。</h1><p>从身体的小变化，到每天的好习惯。<br>登录你的账号，继续与健康助手的对话。</p></div><img class="story-art" src="/assets/companion.svg" alt="MediX 健康伙伴"><div class="story-foot">健康问答 · 报告解读 · 日常陪伴<br>AI 回答仅供参考，不能替代医生诊断。</div></section>
-<section class="auth-main"><div class="auth-card"><div class="step-label">WELCOME TO MEDIX</div><h2 id="formTitle">欢迎回来</h2><p class="intro" id="formIntro">登录账号，开启今天的健康对话。</p><div class="tabs" role="tablist" aria-label="登录或注册"><button id="loginTab" role="tab" aria-selected="true" aria-controls="authForm">登录</button><button id="registerTab" role="tab" aria-selected="false" aria-controls="authForm">注册账号</button></div>
-<form id="authForm"><label for="username">用户名</label><input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" placeholder="字母、数字或下划线" required><div id="nameField" hidden><label for="displayName">怎么称呼你</label><input id="displayName" name="display_name" autocomplete="nickname" maxlength="60" placeholder="你的展示名称"></div><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required><p class="hint" id="passwordHint" hidden>使用 15–128 个字符，建议选择容易记住的长口令。</p><div id="confirmField" hidden><label for="confirmPassword">确认密码</label><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128"></div><button class="primary auth-submit" id="submitButton" type="submit">登录我的空间 →</button><p class="feedback" id="feedback" role="status" aria-live="polite"></p></form><p class="footnote">建议使用虚构资料进行演示。模型分析可能涉及外部服务，请勿上传未经授权的真实病历。</p></div></section></main></body></html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · MediX</title>
+  <link rel="icon" href="/assets/companion.svg">
+  <link rel="stylesheet" href="/assets/auth.css?v=2">
+  <script src="/assets/auth.js" defer></script>
+  <script src="/assets/login.js?v=2" defer></script>
+</head>
+<body class="login-page">
+  <main class="auth-shell">
+    <header class="auth-header">
+      <a class="wordmark" href="/login" aria-label="MediX 健康助手">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3 11h4l2-3 3 7 2-4h7"/></svg></span>
+        MediX
+      </a>
+      <span class="header-caption">你的 AI 健康伙伴</span>
+    </header>
+
+    <div class="auth-window">
+      <section class="auth-story" aria-label="MediX 健康伙伴">
+        <div class="story-copy">
+          <div class="story-kicker"><span></span>让关心，随时在身边</div>
+          <h1>健康有疑问，<br>随时聊一聊。</h1>
+          <p>读懂报告里的数字，<br>也关心生活里的每一个小变化。</p>
+        </div>
+        <div class="companion-scene" aria-hidden="true">
+          <div class="scene-orbit orbit-outer"></div>
+          <div class="scene-orbit orbit-inner"></div>
+          <span class="scene-spark spark-left">＋</span>
+          <span class="scene-spark spark-right">✦</span>
+          <img class="story-art" src="/assets/companion.svg" alt="">
+          <div class="companion-note"><span class="note-dot"></span>今天，也要照顾好自己</div>
+        </div>
+        <div class="story-features">
+          <span><svg viewBox="0 0 24 24"><path d="M21 11a9 9 0 0 1-9 9H5l-3 2 1.6-5.5A9 9 0 1 1 21 11Z"/><path d="M8 9h8M8 13h5"/></svg>健康问答</span>
+          <span><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>报告解读</span>
+          <span><svg viewBox="0 0 24 24"><path d="M20 3C7 1 2 7 5 15c7 5 15 0 15-12ZM4 21 15 10"/></svg>日常健康</span>
+        </div>
+      </section>
+
+      <section class="auth-main">
+        <div class="auth-card">
+          <div class="step-label">很高兴见到你</div>
+          <h2 id="formTitle">欢迎回来</h2>
+          <p class="intro" id="formIntro">登录 MediX，开启你的健康对话。</p>
+          <div class="tabs" role="tablist" aria-label="登录或注册">
+            <button id="loginTab" role="tab" aria-selected="true" aria-controls="authForm">账号登录</button>
+            <button id="registerTab" role="tab" aria-selected="false" aria-controls="authForm">注册账号</button>
+          </div>
+          <form id="authForm">
+            <label for="username">用户名</label>
+            <input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" placeholder="请输入用户名" required>
+            <div id="nameField" hidden>
+              <label for="displayName">怎么称呼你</label>
+              <input id="displayName" name="display_name" autocomplete="nickname" maxlength="60" placeholder="请输入展示名称">
+            </div>
+            <label for="password">密码</label>
+            <div class="password-field">
+              <input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" placeholder="请输入密码" required>
+              <button id="togglePassword" type="button" aria-label="显示密码" aria-pressed="false">显示</button>
+            </div>
+            <p class="hint" id="passwordHint" hidden>15–128 个字符，建议使用容易记住的长口令。</p>
+            <div id="confirmField" hidden>
+              <label for="confirmPassword">确认密码</label>
+              <input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="请再次输入密码">
+            </div>
+            <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+            <button class="primary auth-submit" id="submitButton" type="submit">登 录</button>
+          </form>
+          <div class="auth-assurance"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>守护每一次健康对话</div>
+        </div>
+      </section>
+    </div>
+    <footer class="auth-footer">AI 回答仅供参考，不能替代医生诊断。紧急不适请及时就医。</footer>
+  </main>
+</body>
+</html>
