@@ -3,6 +3,7 @@
   const el = id => document.getElementById(id);
   const dialog = el('authDialog');
   let registering = false, busy = false, generation = 0, requestController = null;
+  const updatePasswordHints = MedixPasswordPolicy.attachHints(el('password'), el('passwordHint'), () => registering);
   function fitViewport() {
     const viewport = window.visualViewport;
     dialog.style.setProperty('--auth-height', `${viewport?.height || innerHeight}px`);
@@ -17,7 +18,6 @@
     for (const id of ['confirmField', 'passwordHint']) el(id).hidden = !value;
     el('confirmPassword').required = value;
     el('password').minLength = value ? MedixPasswordPolicy.min : 1;
-    el('password').maxLength = value ? MedixPasswordPolicy.max : 128;
     el('password').autocomplete = value ? 'new-password' : 'current-password';
     el('formTitle').textContent = value ? '注册 MediX' : '登录 MediX';
     el('formIntro').textContent = value ? '创建账号，开启你的健康对话。' : '登录后，开始你的健康对话。';
@@ -28,6 +28,7 @@
     el('togglePassword').setAttribute('aria-label', '显示密码');
     el('togglePassword').title = '显示密码';
     el('togglePassword').setAttribute('aria-pressed', 'false');
+    updatePasswordHints();
   }
   function resetBusy() {
     busy = false;
