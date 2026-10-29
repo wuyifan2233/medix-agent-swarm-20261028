@@ -1,6 +1,14 @@
 (() => {
 const dialog = document.getElementById('settingsDialog');
 const byId = id => document.getElementById('settings-' + id);
+const loginUsernameRow=document.createElement('div');
+loginUsernameRow.className='settings-row';
+const loginUsernameLabel=document.createElement('span');loginUsernameLabel.textContent='登录用户名';
+const loginUsernameValue=document.createElement('span');
+loginUsernameRow.append(loginUsernameLabel,loginUsernameValue);
+
+const passwordUsernameHint=document.createElement('p');passwordUsernameHint.className='sms-help';
+byId('passwordForm').before(passwordUsernameHint);
 MedixPasswordPolicy.attachHints(byId('newPassword'));
 let offset = 0, epoch = 0;
 function showError(error) { if (dialog.open) byId('feedback').textContent = error.message; }
@@ -35,16 +43,49 @@ async function users() {
 }
 byId('previous').onclick = () => { offset = Math.max(0, offset - 20); users().catch(showError); };
 byId('next').onclick = () => { offset += 20; users().catch(showError); };
-byId('logout').onclick = () => MedixAuth.logout().catch(showError);
+let setupChallenge='';
+const setupFields=document.createElement('div');
+setupFields.hidden=true;
+setupFields.innerHTML='<p class="sms-help">验证码登录可直接使用。设置密码后，也可用手机号和密码登录。</p><label>手机验证码</label><div class="sms-code-row"><input autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"><button type="button">获取验证码</button></div>';
+byId('passwordForm').prepend(setupFields);
+let setupUntil=0;
+const setupSend=setupFields.querySelector('button');
+let setupSending=false;
+function tickSetup(){const remaining=Math.max(0,Math.ceil((setupUntil-Date.now())/1000));setupSend.disabled=setupSending||remaining>0;setupSend.textContent=setupSending?'发送中…':remaining?`${remaining} 秒后重发`:'获取验证码';}
+const tickSetupTimer=setInterval(tickSetup,250);
+window.addEventListener('pagehide',()=>clearInterval(tickSetupTimer),{once:true});
+setupSend.onclick=async()=>{
+ if(Date.now()<setupUntil)return;
+ setupSending=true;tickSetup();
+ try{const r=await MedixAuth.fetch('/api/auth/password/send',{method:'POST',body:'{}'});if(r.status===429) setupUntil=Date.now()+Math.min(900,Number(r.headers.get('Retry-After'))||60)*1000;if(!r.ok)throw new Error(await MedixAuth.detail(r));const d=await r.json();setupChallenge=d.challenge_id;setupUntil=Date.now()+d.retry_after*1000;byId('feedback').textContent='验证码已发送，5 分钟内有效。';}catch(e){showError(e);}finally{setupSending=false;tickSetup();}
+};
+function renderPasswordMode(user){
+ loginUsernameValue.textContent=user?.username||'';
+ passwordUsernameHint.textContent=user?.phone_masked?'登录手机号：'+user.phone_masked:'';
+ const setup=user?.has_password===false;
+ byId('oldPassword').hidden=setup;byId('oldPassword').required=!setup;
+ dialog.querySelector('label[for="settings-oldPassword"]').hidden=setup;
+ setupFields.hidden=!setup;setupFields.querySelector('input').required=setup;
+ document.querySelector('#settingsSecurity > h3').textContent=setup?'设置密码':'修改密码';
+ dialog.querySelector('label[for="settings-newPassword"]').textContent=setup?'密码':'新密码';
+ dialog.querySelector('label[for="settings-confirmPassword"]').textContent=setup?'确认密码':'确认新密码';
+ byId('passwordForm').querySelector('button[type="submit"],button.settings-primary').textContent=setup?'设置密码':'保存新密码';
+ setupChallenge='';setupFields.querySelector('input').value='';
+}
+MedixAuth.ready.then(renderPasswordMode).catch(()=>{});
+window.addEventListener('medix-auth-change',e=>renderPasswordMode(e.detail));
 byId('passwordForm').onsubmit = async event => {
   const mine = epoch;
   event.preventDefault(); byId('feedback').textContent = '';
   const policyError = MedixPasswordPolicy.error(byId('newPassword').value);
   if (policyError) return showError(new Error(policyError));
   if (byId('newPassword').value !== byId('confirmPassword').value) return showError(new Error('两次输入的新密码不一致。'));
-  const button = event.target.querySelector('button'); button.disabled = true;
+  const button = event.target.querySelector('.settings-primary'); button.disabled = true;
   try {
-    const response = await MedixAuth.fetch('/api/auth/change-password', {method:'POST', body:JSON.stringify({current_password:byId('oldPassword').value, new_password:byId('newPassword').value})});
+    const setup=MedixAuth.user?.has_password===false;
+    if(setup&&!setupChallenge)throw new Error('请先获取验证码。');
+    const payload=setup?{challenge_id:setupChallenge,code:setupFields.querySelector('input').value,new_password:byId('newPassword').value}:{current_password:byId('oldPassword').value,new_password:byId('newPassword').value};
+    const response = await MedixAuth.fetch(setup?'/api/auth/password/set':'/api/auth/change-password', {method:'POST',body:JSON.stringify(payload)});
     if (mine !== epoch) return;
     if (!response.ok) throw new Error(await MedixAuth.detail(response));
     event.target.reset(); MedixAuth.leave(true); MedixAuth.open();

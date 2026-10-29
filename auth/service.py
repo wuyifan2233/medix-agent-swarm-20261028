@@ -33,7 +33,7 @@ class AuthService:
     def register(self, data, role="user"):
         hashed = passwords.hash(data.password)
         with self.sessions() as db:
-            user = User(username=data.username, display_name=data.display_name or data.username,
+            user = User(username=data.username, display_name=data.username,
                         password_hash=hashed, role=role)
             db.add(user)
             try:

@@ -23,6 +23,8 @@ def client_ip(request):
 @router.post("/api/auth/register", status_code=201)
 def register(data: Registration, request: Request):
     auth = service(request)
+    if not auth.settings.password_registration_enabled:
+        raise HTTPException(403, "请使用手机号验证码注册。")
     if not auth.settings.registration_enabled:
         raise HTTPException(403, "当前未开放注册，请联系管理员。")
     auth.limit("register", client_ip(request))
@@ -59,8 +61,9 @@ def me(request: Request, user: CurrentUser = Depends(require_user)):
         row = db.get(User, user.id)
         avatar = row.avatar_data
         phone = row.phone_number
+        has_password = row.has_password
     return {"id": user.id, "username": user.username, "display_name": user.display_name, "role": user.role,
-            "avatar_url": avatar, "phone_masked": phone[:3] + "****" + phone[-4:] if phone else None}
+            "avatar_url": avatar, "has_password": has_password, "phone_masked": phone[:3] + "****" + phone[-4:] if phone else None}
 
 
 @router.put("/api/auth/avatar")

@@ -15,8 +15,8 @@ class Credentials(StrictModel):
     @field_validator("username")
     @classmethod
     def normalized_username(cls, value):
-        if not re.fullmatch(r"[A-Za-z0-9_]{3,32}", value):
-            raise ValueError("用户名须为 3–32 位字母、数字或下划线")
+        if not re.fullmatch(r"[A-Za-z0-9_\u4e00-\u9fff]{3,32}", value):
+            raise ValueError("用户名须为 3–32 位中文、字母、数字或下划线")
         return value.lower()
 
 
@@ -57,6 +57,11 @@ class CurrentUser:
 
 def public_user(user):
     return {"id": user.id, "username": user.username, "display_name": user.display_name,
-            "avatar_url": user.avatar_data,
+            "avatar_url": user.avatar_data, "has_password": user.has_password,
             "phone_masked": user.phone_number[:3] + "****" + user.phone_number[-4:] if user.phone_number else None,
             "role": user.role, "is_active": user.is_active, "created_at": user.created_at}
+
+
+class PhoneCredentials(StrictModel):
+    phone_number: str = Field(pattern=r"^1[3-9][0-9]{9}$")
+    password: str = Field(min_length=1, max_length=128)

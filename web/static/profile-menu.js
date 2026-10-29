@@ -1,6 +1,8 @@
 /* Account identity stays in MedixAuth; this component only renders its menu. */
 (() => {
   const trigger = document.getElementById('profileTrigger');
+  document.addEventListener('pointerdown',()=>{trigger.dataset.keyboardFocus='false';},true);
+  document.addEventListener('keydown',event=>{if(event.key==='Tab')trigger.dataset.keyboardFocus='true';},true);
   const menu = document.getElementById('profileMenu');
   const sidebar = document.getElementById('sidebar');
   let previousUserId = null;

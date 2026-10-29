@@ -77,6 +77,41 @@ body.auth-modal-open { overflow: hidden; }
   .auth-tabs { margin-bottom: 14px; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .auth-dialog[open] { animation: auth-appear .15s ease-out; }
+  .auth-dialog[open] { animation: none; }
   @keyframes auth-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+.auth-dialog input:focus,.auth-dialog input:focus-visible{outline:none;box-shadow:none;border-color:#b8c0cf}
+
+.auth-dialog{height:fit-content;min-height:0;overflow-x:hidden}
+.auth-dialog .auth-intro{margin-bottom:24px}
+.auth-dialog label{margin-top:16px;margin-bottom:8px}
+.auth-dialog .sms-help{margin:12px 0 18px}
+.auth-dialog .sms-login-switch{margin-top:20px}
+
+.auth-password-heading{display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px}
+.auth-dialog .auth-password-heading label{margin:0}
+.auth-dialog .auth-password-heading .sms-login-switch{margin:0;font-size:12px;color:#8993a7}
+.auth-footer-links{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:22px;color:#c0c6d2}
+.auth-dialog .auth-footer-links .sms-login-switch{margin:0;display:inline-block}
+
+.login-method-tabs{display:flex;gap:28px;border-bottom:1px solid #edf0f5;margin:0 0 22px}
+.login-method-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;padding:0 0 12px;font-size:14px;color:#929bad}
+.login-method-tabs button[aria-selected="true"]{color:#6375e9;border-bottom-color:#6375e9;font-weight:600}
+.auth-dialog .auth-footer-links{gap:6px;font-size:12px;color:#929bad}
+.auth-dialog #authForm,.auth-dialog #smsLoginForm{min-height:286px}
+.auth-dialog #smsLoginForm .sms-help{visibility:hidden}
+
+.auth-dialog{scrollbar-width:none;-ms-overflow-style:none}
+.auth-dialog::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* Both login methods occupy exactly the same form tracks. */
+.auth-dialog #authForm,.auth-dialog #smsLoginForm{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:20px 46px 20px 20px 46px 36px 46px;row-gap:6px;height:270px;min-height:270px;margin:0}
+.auth-dialog #authForm>label:first-of-type,.auth-dialog #smsLoginForm>label:first-of-type{grid-row:1;margin:0;align-self:center}
+.auth-dialog #username,.auth-dialog #smsLoginPhone{grid-row:2;margin:0}
+.auth-dialog #authForm>.phone-field-hint,.auth-dialog #smsLoginForm>.phone-field-hint{grid-row:3;margin:0}
+.auth-dialog .auth-password-heading,.auth-dialog #smsLoginForm>label:nth-of-type(2){grid-row:4;margin:0;height:20px;align-self:center}
+.auth-dialog .auth-password,.auth-dialog #smsLoginForm>.sms-code-row{grid-row:5;margin:0}
+.auth-dialog #authForm>.auth-feedback,.auth-dialog #smsLoginForm>.auth-feedback{grid-row:6;margin:0;min-height:0;line-height:16px;align-self:center}
+.auth-dialog #authForm>.auth-submit,.auth-dialog #smsLoginForm>.auth-submit{grid-row:7;margin:0}
+.auth-dialog #smsLoginForm>.sms-help{display:none}

@@ -12,6 +12,8 @@
   window.addEventListener('resize', fitViewport);
   fitViewport();
   function mode(value) {
+    if (value && !registering) el('username').value = '';
+    el('username').autocomplete = 'tel-national';
     registering = value;
     el('loginTab').setAttribute('aria-selected', String(!value));
     el('registerTab').setAttribute('aria-selected', String(value));
@@ -78,7 +80,7 @@
     el('togglePassword').setAttribute('aria-pressed', String(show));
   };
   el('loginTab').onclick = () => mode(false);
-  el('registerTab').onclick = () => mode(true);
+  el('registerTab').onclick = () => mode(false);
   for (const id of ['loginTab', 'registerTab']) el(id).addEventListener('keydown', event => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault(); if (busy) return;
@@ -94,8 +96,8 @@
     el('submitButton').disabled = el('loginTab').disabled = el('registerTab').disabled = true;
     el('submitButton').textContent = isRegister ? '创建中…' : '登录中…'; el('feedback').textContent = '';
     try {
-      const payload = {username:el('username').value, password};
-      const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/login', {
+      const payload = {phone_number:el('username').value, password};
+      const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/phone/login', {
         method:'POST', body:JSON.stringify(payload), signal:requestController.signal
       });
       if (mine !== generation) return;

@@ -46,3 +46,5 @@ td button { border: 1px solid #dce2f6; border-radius: 6px; padding: 6px 10px; ba
 .pagination { display: flex; gap: 15px; align-items: center; justify-content: flex-end; margin-top: 20px; font-size: 13px; }
 
 @media(max-width:760px) { .account-grid { grid-template-columns:1fr; } .panel { padding:22px; } .account-header .wordmark { font-size:22px; } input { font-size:16px; } }
+
+input:focus,input:focus-visible{outline:none;box-shadow:none;border-color:#b8c0cf}

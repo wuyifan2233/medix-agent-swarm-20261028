@@ -83,3 +83,6 @@ html[data-auth-pending] body{visibility:hidden}.profile a{color:inherit}.profile
   .suggestions { gap: 8px; }
   .sidebar-bottom .service-heading { display: none; }
 }
+
+/* Inputs use their own border rather than an outer focus ring. */
+input:focus,input:focus-visible,textarea:focus,textarea:focus-visible{outline:none;box-shadow:none}

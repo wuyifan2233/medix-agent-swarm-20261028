@@ -7,8 +7,11 @@
 .settings-nav { width: 150px; flex-shrink: 0; background: #f8f9fc; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; }
 .settings-nav button { border: 0; background: transparent; padding: 11px 14px; border-radius: 8px; color: #768096; text-align: left; font-size: 13px; }
 .settings-nav button[aria-selected=true] { background: #ebeeff; color: #5b6bd8; }
-.settings-body { flex: 1; min-width: 0; overflow: auto; padding: 26px; }
-.settings-body h3 { margin: 0 0 24px; font-size: 16px; font-weight: 600; }
+.settings-body { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 20px 26px; scrollbar-width: thin; scrollbar-color: #d9deeb transparent; }
+#settingsAccount:has(#settingsPhoneForm:not([hidden])) > :not(h3):not(#settingsPhoneForm) { display: none; }
+#settingsPhoneSubmit { margin-right: 12px; }
+#settingsPhoneForm .sms-help { margin: 0 0 12px; }
+.settings-body h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
 .settings-identity { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
 .settings-identity img { width: 52px; height: 52px; border-radius: 50%; }
 .settings-avatar-button { position: relative; padding: 0; border: 0; background: transparent; width: 52px; height: 52px; flex-shrink: 0; border-radius: 50%; overflow: hidden; }
@@ -31,7 +34,7 @@
 .avatar-crop-actions button { margin: 0; }
 .sms-code-row { display: flex; align-items: center; gap: 8px; }
 .sms-code-row input { min-width: 0; flex: 1; }
-.sms-code-row button { height: 40px; flex-shrink: 0; padding: 0 10px; border: 1px solid #dfe4f2; border-radius: 8px; color: #6375e9; background: #f6f8ff; font-size: 12px; }
+.sms-code-row button { box-sizing: border-box; width: 112px; min-width: 112px; max-width: 112px; flex: 0 0 112px; height: 40px; padding: 0 8px; white-space: nowrap; font-variant-numeric: tabular-nums; border: 1px solid #dfe4f2; border-radius: 8px; color: #6375e9; background: #f6f8ff; font-size: 12px; }
 .sms-code-row button:disabled { color: #929bad; cursor: default; }
 .auth-dialog .sms-code-row button { height: 46px; }
 .sms-login-switch { display: block; margin: 18px auto 0; padding: 0; border: 0; background: transparent; color: #6375e9; font-size: 12px; }
@@ -51,3 +54,73 @@
 .settings-dialog td button { border: 0; background: #f1f3fb; color: #6373bd; padding: 7px; border-radius: 5px; font-size: 11px; }
 .settings-pagination { display: flex; align-items: center; justify-content: space-between; font-size: 11px; gap: 8px; }
 @media(max-width: 560px) { .settings-layout { flex-direction: column; }.settings-nav { width: 100%; flex-direction: row; padding: 10px; }.settings-nav button { flex: 1; text-align: center; padding: 9px; }.settings-body { padding: 20px; }.settings-header { height: 62px; padding: 0 20px; }.settings-layout { height: calc(100% - 62px); } }
+
+.settings-dialog.phone-dialog { position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content; min-height: 0; max-height: calc(100dvh - 48px); padding: 24px; overflow-y: auto; }
+.phone-dialog-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.phone-dialog-heading h2 { margin: 0; font-size: 20px; }
+.phone-dialog-heading button { border: 0; background: transparent; color: #929bad; font-size: 26px; line-height: 1; padding: 4px; }
+.phone-dialog .avatar-crop-actions { margin-top: 24px; gap: 12px; }
+.phone-dialog .avatar-crop-actions button { margin: 0; min-height: 40px; }
+.phone-dialog .sms-help { margin: 0 0 14px; }
+.phone-dialog .settings-feedback { margin-bottom: 0; }
+.phone-dialog input:focus { outline: none; box-shadow: none; border-color: #b8c0cf; }
+
+#settingsSecurity label{margin-top:10px;margin-bottom:6px}
+#settingsSecurity .sms-help{margin:0 0 10px}
+#settingsSecurity .settings-primary{margin-top:16px}
+#settings-feedback:empty{display:none}
+.settings-layout{min-height:0}
+
+.settings-password-wrap{position:relative}
+.settings-password-wrap:has(input[hidden]){display:none}
+.settings-password-wrap input{padding-right:44px}
+.settings-password-eye{position:absolute;right:6px;top:0;height:40px;width:34px;display:grid;place-items:center;border:0;background:transparent;color:#8c99b5;padding:6px;margin:0}
+.settings-password-eye svg{width:20px;height:20px}
+.password-eye-slash{display:none}
+.revealed .password-eye-slash{display:block}
+
+.account-delete-link{display:block;margin-top:24px;padding:0;border:0;background:transparent;color:#b65a64;font-size:12px}
+.account-delete-confirm{background:#b65361;border-color:#b65361}
+
+.account-delete-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #eef0f5;margin-top:18px;padding-top:14px;font-size:12px;color:#68758e}
+.account-delete-row .account-delete-link{display:inline-flex;align-items:center;justify-content:center;margin:0;padding:7px 12px;min-height:32px;border:1px solid #ead9dc;border-radius:8px;background:#fff;color:#ad6570;font:inherit;white-space:nowrap}
+.account-delete-row .account-delete-link:hover{background:#fcf5f6;border-color:#dcbac0}
+
+.phone-field-hint{display:block;color:#b65361;font-size:11px;line-height:16px;min-height:16px;margin-top:4px}
+input[aria-invalid="true"]{border-color:#c88992}
+
+.settings-nav>.account-delete-link{margin-top:auto;padding:9px 14px;border:0;background:transparent;color:#9a8290;font-size:12px;text-align:left;border-radius:8px}
+.settings-nav>.account-delete-link:hover{background:#f5eef1;color:#ad6570}
+#settingsSecurity>.sms-help{margin:0 0 10px}
+.settings-body:has(#settingsSecurity:not([hidden])){padding-top:20px;padding-bottom:16px}
+@media(max-width:560px){.settings-nav>.account-delete-link{margin-top:0;flex:0 0 auto;padding:9px 10px}}
+
+.security-form-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:16px}
+#settingsSecurity .security-form-actions>.settings-primary{margin:0}
+.security-form-actions>.account-delete-link{display:inline-flex;align-items:center;margin:0;padding:8px 0;border:0;background:transparent;font-size:12px;color:#a36d77;white-space:nowrap}
+.security-form-actions>.account-delete-link:hover{color:#a94455;text-decoration:underline}
+
+/* Keep modal scrolling without visible scrollbar tracks. */
+.settings-body,.settings-dialog.phone-dialog,.avatar-crop-dialog{scrollbar-width:none;-ms-overflow-style:none}
+.settings-body::-webkit-scrollbar,.settings-dialog.phone-dialog::-webkit-scrollbar,.avatar-crop-dialog::-webkit-scrollbar{display:none;width:0;height:0}
+
+#settingsSecurity[data-view="overview"]>:not(.security-overview){display:none}
+#settingsSecurity[data-view="password"]>.security-overview{display:none}
+.security-overview{padding:4px 0}
+.security-overview .security-list{border:1px solid #eceef3;border-radius:12px;overflow:hidden;background:#fff;margin-top:18px}
+.security-list .security-list-row{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:12px 16px;border:0;border-radius:0;background:#fff;color:#394254;text-align:left;font-size:13px;margin:0}
+.security-list .security-list-row+.security-list-row{border-top:1px solid #eef0f4}
+.security-list button.security-list-row:hover{background:#f8f9fc}
+.security-row-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#edf0ff;color:#7685d5;flex-shrink:0}
+.security-row-icon svg{width:17px;height:17px}
+.security-row-value{margin-left:auto;font-size:12px;color:#98a0af}
+.security-row-chevron{font-size:21px;line-height:1;color:#c0c6d1}
+.security-delete-row .security-row-icon{background:#fff0f1;color:#cd7d87}
+.security-back{display:block;border:0;background:transparent;color:#7e89a0;padding:0;margin:0 0 14px;font-size:12px}
+
+.security-row-chevron{display:flex;align-items:center;justify-content:center;width:16px;height:20px;flex:0 0 16px}
+.security-row-chevron svg{display:block;width:16px;height:16px;stroke-width:1.8}
+.security-row-value{display:flex;align-items:center;min-height:20px;line-height:20px}
+
+.settings-password-eye[aria-pressed="true"] .password-eye-slash{display:block}
+.settings-password-eye[aria-pressed="false"] .password-eye-slash{display:none}

@@ -28,3 +28,6 @@
 .profile-menu-divider { height: 1px; margin: 5px 8px; background: #eef0f6; }
 .profile-menu .profile-logout { color: #9b6c77; }
 .profile-menu .profile-logout svg { color: #ac8790; }
+
+.profile-trigger:focus,.profile-trigger:focus-visible{outline:none;box-shadow:none}
+.profile-trigger[data-keyboard-focus="true"]:focus-visible{outline:2px solid #9aa9f6;outline-offset:2px}

@@ -12,6 +12,7 @@ class AuthSettings:
     idle_seconds: int = 1800
     absolute_seconds: int = 43200
     namespace: str = "local"
+    password_registration_enabled: bool = False
 
     @property
     def cookie_name(self):
