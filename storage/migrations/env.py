@@ -1,6 +1,7 @@
 from alembic import context
 from auth.settings import AuthSettings
 from auth import models  # noqa: F401 - register model metadata
+from personalization import models as profile_models  # noqa: F401
 from storage.database import Base, make_database
 
 target_metadata = Base.metadata

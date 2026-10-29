@@ -29,6 +29,10 @@ from auth.settings import AuthSettings
 from auth.middleware import AuthBodyLimit
 from storage.database import make_database
 from storage.migrate import upgrade_database
+from personalization.router import router as profile_router
+from personalization.store import ProfileStore
+from personalization.middleware import ProfileBodyLimit
+from personalization.context import profile_context, retrieval_query, scope as profile_scope
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -99,10 +103,12 @@ auth_settings = AuthSettings.from_env()
 auth_engine, auth_sessions = make_database(auth_settings.database_url)
 app.state.auth_service = AuthService(auth_sessions, auth_settings)
 app.add_middleware(AuthBodyLimit)
+app.add_middleware(ProfileBodyLimit)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
     {urlsplit(origin).hostname for origin in auth_settings.origins}
     | ({"testserver"} if not auth_settings.production else set())))
 app.include_router(auth_router)
+app.include_router(profile_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -179,7 +185,16 @@ async def analyze(job, payload, session_id, memory_user_id):
     from swarm import SwarmCoordinator
 
     question = payload["message"] or "请解读图片中的可见信息，并说明不确定之处。"
+    snapshot = payload.get("profile_snapshot")
+    if snapshot:
+        # Re-check after queueing: edits/clearing/reconfirmation invalidate old work.
+        current = ProfileStore(app.state.auth_service.sessions).snapshot(job["owner_user_id"], snapshot["revision"])
+        if profile_scope(current) != profile_scope(snapshot):
+            raise ValueError("档案确认状态已变化，请重新提交问题。")
+        snapshot = current
     previous = contexts.get(session_id, {})
+    if previous.get("profile_scope") != profile_scope(snapshot):
+        previous = {}  # Opt-out/change must not reuse profile-derived answers or report facts.
     observed = previous.get("image_observations", "")
     if payload["images"]:
         stage(job, "vision", "正在读取图片中的文字与可见信息")
@@ -195,7 +210,7 @@ async def analyze(job, payload, session_id, memory_user_id):
 
     stage(job, "knowledge", "正在检索本地医学资料")
     kb = MedicalKnowledgeBase()
-    candidates = kb.search((question + "\n" + observed)[:4000], top_k=10)
+    candidates = kb.search(retrieval_query(question, observed, snapshot), top_k=10)
     hits, seen = [], set()
     for hit in candidates:
         fingerprint = hit["content"].strip()
@@ -208,6 +223,7 @@ async def analyze(job, payload, session_id, memory_user_id):
                 "file": hit["metadata"].get("filename", "本地医学知识库"),
                 "excerpt": hit["content"][:220]} for hit in hits]
     enriched = question
+    enriched += profile_context(snapshot)
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
     if hits:
@@ -216,7 +232,8 @@ async def analyze(job, payload, session_id, memory_user_id):
     enriched += "\n\n请优先直接回答用户问题，总长尽量不超过600字。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
 
     stage(job, "agents", "正在由专业助手分析与整合")
-    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"], memory_user_id=memory_user_id,
+    # The coordinator saves its input in Mem0. Do not duplicate profile data there.
+    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot, memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
     trace = []
     for worker in coordinator.worker_pool:
@@ -239,10 +256,15 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "image_count": len(payload["images"]), "image_observations": observed if payload["images"] else "",
                          "image_context_used": bool(observed) and not payload["images"],
                          "memory_enabled": bool(coordinator.long_term_memory.enabled),
+                         "profile_used": bool(snapshot),
+                         "profile_revision": snapshot["revision"] if snapshot else None,
+                         "profile_confirmed_at": snapshot["confirmed_at"] if snapshot else None,
+                         "memory_suppressed_for_profile": bool(snapshot and payload["remember"]),
                          "elapsed": round(time.monotonic() - job["started"], 1),
                          "partial": bool(result.get("timeout_occurred"))}
         history = previous.get("history", []) + [{"role":"user", "content":question[:1200]}, {"role":"assistant", "content":answer[:1800]}]
-        contexts[session_id] = {"image_observations": observed, "history": history[-6:], "updated":time.time()}
+        contexts[session_id] = {"image_observations": observed, "history": history[-6:],
+                                "profile_scope": profile_scope(snapshot), "updated":time.time()}
     finally:
         clients = {id(obj.llm_client): obj.llm_client for obj in [coordinator, *coordinator.worker_pool]}
         for client in clients.values():
@@ -296,9 +318,18 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
         remember = payload.get("remember", False)
         if not isinstance(remember, bool):
             raise ValueError("记忆选项格式不正确。")
+        use_profile = payload.get("use_profile", False)
+        if not isinstance(use_profile, bool):
+            raise ValueError("档案选项格式不正确。")
+        if any(key in payload for key in ("profile", "profile_data", "profile_snapshot", "user_id")):
+            raise ValueError("用户身份与档案必须由服务端读取。")
+        revision = payload.get("profile_revision")
+        if use_profile and (type(revision) is not int or revision < 1):
+            raise ValueError("请先确认档案并提交对应版本。")
     except (ValueError, TypeError, KeyError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
     owner = user.id
+    snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
     for key, old in list(contexts.items()):
         if time.time() - old["updated"] > 3600:
             contexts.pop(key, None)
@@ -311,7 +342,8 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     job = {"id": job_id, "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
     jobs[job_id] = job
-    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember},
+    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember,
+                                  "profile_snapshot": snapshot},
                     f"web-{owner}-{chat_id}", f"medix:{app.state.auth_service.settings.namespace}:user:{owner}")
     return {"job_id": job_id}
 

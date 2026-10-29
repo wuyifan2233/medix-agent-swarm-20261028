@@ -20,6 +20,7 @@ const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&am
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); clearTimeout(state.toast); state.toast = setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function scrollDown() { $('conversation').scrollTop = $('conversation').scrollHeight; }
 function updateComposer() {
+  window.MedixProfile?.setBusy(state.busy);
   $('sendButton').disabled = state.busy || (!$('message').value.trim() && !state.images.length);
   $('attachButton').disabled = state.busy;
   $('message').disabled = state.busy;
@@ -110,6 +111,11 @@ function pendingMessage() {
 }
 function resultMessage(row, result) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
+  const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
+  profileNote.textContent = result.profile_used
+    ? `本轮参考本人档案 v${result.profile_revision}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
+    : '本轮未使用健康档案。';
+  main.append(profileNote);
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
   const meta = document.createElement('div'); meta.className = 'message-meta';
@@ -141,6 +147,9 @@ function resultMessage(row, result) {
 async function submit(message, images, retryRow) {
   if (!await MedixAuth.requireLogin()) return;
   if (state.busy) return;
+  let profileChoice;
+  try { profileChoice = window.MedixProfile?.choice() || {use_profile:false}; }
+  catch (error) { toast(error.message); return; }
   const epoch = authEpoch;
   state.busy = true; updateComposer();
   closeSidebar();
@@ -149,7 +158,7 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
+    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked, ...profileChoice})});
     const data = await response.json();
     if (epoch !== authEpoch) return;
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
