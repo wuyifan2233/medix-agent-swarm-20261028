@@ -1,4 +1,5 @@
 from typing import Literal
+from datetime import date
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -6,10 +7,18 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class Source(StrictModel):
+    kind: Literal['manual', 'report'] = 'manual'
+    label: str = Field(default='本人填写', max_length=100)
+    report_date: date | None = None
+    excerpt: str = Field(default='', max_length=240)
+
+
 class HealthItem(StrictModel):
     name: str = Field(min_length=1, max_length=80)
     note: str = Field(default="", max_length=160)
-    status: Literal["reported", "historical", "unknown"] = "reported"
+    status: Literal["reported", "historical", "unknown", "current", "stopped"] = "reported"
+    source: Source | None = None
 
 
 class Medication(HealthItem):
@@ -38,6 +47,7 @@ class ProfileData(StrictModel):
     conditions: History = Field(default_factory=History)
     allergies: History = Field(default_factory=History)
     medications: MedicationHistory = Field(default_factory=MedicationHistory)
+    field_sources: dict[Literal['age','sex'], Source] = Field(default_factory=dict)
 
 
 class SaveProfile(StrictModel):
@@ -58,3 +68,7 @@ class ConfirmProfile(StrictModel):
 
 class DeleteProfile(StrictModel):
     expected_revision: int = Field(ge=1, strict=True)
+
+
+class RestoreProfile(DeleteProfile):
+    target_revision: int = Field(ge=1, strict=True)

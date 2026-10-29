@@ -113,7 +113,7 @@ function resultMessage(row, result) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
   profileNote.textContent = result.profile_used
-    ? `本轮参考本人档案 v${result.profile_revision}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
+    ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
     : '本轮未使用健康档案。';
   main.append(profileNote);
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);

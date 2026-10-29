@@ -1,5 +1,9 @@
 # 已确认健康档案与检索增强
 
+> 本文保留第一版的背景说明。当前 `health-profile-evolution` 已增加病历候选、来源日期、
+> 历史恢复、导出和字段授权；最新契约见 [接口文档](PERSONALIZATION-API.md)，
+> 最新架构、迁移与测试步骤见 [技术流程文档](PERSONALIZATION-FLOW.md)。
+
 ## 分支与合入边界
 
 功能分支：`feature/confirmed-health-profile`。基于原 main，同步认证分支

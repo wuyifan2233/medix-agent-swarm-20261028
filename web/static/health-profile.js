@@ -3,9 +3,11 @@
   const tools = document.createElement('section'); tools.className = 'health-profile-tools';
   tools.innerHTML = `<button type="button" id="hpOpen">我的健康档案</button><label><input type="checkbox" id="hpUse" disabled>本次为本人咨询，参考已确认档案</label><small id="hpStatus">登录后可编辑；默认不使用档案</small>`;
   document.querySelector('.composer-region').prepend(tools);
+  const fieldChoices=document.createElement('details');fieldChoices.id='hpFieldChoices';fieldChoices.innerHTML='<summary>本轮允许参考的字段</summary>';
+  for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
   const dialog = document.createElement('dialog'); dialog.id = 'healthProfileDialog'; dialog.className = 'health-profile-dialog'; dialog.setAttribute('aria-labelledby','hpTitle');
   dialog.innerHTML = `<div class="hp-heading"><h2 id="hpTitle">我的健康档案</h2><button type="button" id="hpClose">关闭</button></div>
-  <p>仅记录本人信息。保存后请逐项核对并主动确认。病历图片、模型推断不会自动写入；未知不等于没有疾病、过敏或用药。记录年龄为填写时年龄，不自动推算。</p>
+  <p>仅记录本人信息。保存后请逐项核对并主动确认。病历图片、模型推断不会自动写入；未知不等于没有疾病、过敏或用药。年龄为来源记录时的年龄，请核对病历日期，不自动推算。</p>
   <p>档案保存在本机账号数据库。仅在勾选“本次为本人咨询”时，随问题发给配置的模型服务，并暂停本轮云端记忆。请勿用于他人的报告；历史记录不代表当前诊断或正在用药。</p>
   <form id="hpForm"><div class="hp-basics"><label>记录年龄<input id="hpAge" type="number" min="0" max="130" step="1" placeholder="未知可留空"></label><label>性别<select id="hpSex"><option value="unknown">未知</option><option value="female">女</option><option value="male">男</option><option value="other">其他</option><option value="undisclosed">不愿透露</option></select></label></div><div id="hpGroups"></div><p id="hpMeta"></p><div class="hp-actions"><button type="submit" id="hpSave">保存为待确认草稿</button><button type="button" id="hpReload">重新加载</button></div></form>
   <div class="hp-confirm"><label><input type="checkbox" id="hpAck">我已核对已保存的各项内容，理解它们是自述历史记录，不能代表当前情况。</label><button type="button" id="hpConfirm" disabled>确认已保存的档案</button></div>
@@ -17,7 +19,7 @@
   const feedback = text => { el('hpFeedback').textContent = text; };
   function availability() {
     const usable = !!record?.usable && !dirty && !working && !chatBusy;
-    el('hpUse').disabled = !usable; if (!record?.usable || dirty || working) el('hpUse').checked = false;
+    fieldChoices.querySelectorAll('input').forEach(node=>{node.disabled=!usable;}); el('hpUse').disabled = !usable; if (!record?.usable || dirty || working) el('hpUse').checked = false;
     el('hpOpen').disabled = chatBusy;
     el('hpConfirm').disabled = !record?.revision || dirty || working || !el('hpAck').checked;
     el('hpForm').querySelectorAll('input,select,button').forEach(node => { node.disabled = working || !identity; });
@@ -34,10 +36,12 @@
     const list = el(`hp-${field}-items`); if (list.children.length >= 20) { feedback('每类最多20条记录。'); return; }
     const row = document.createElement('div'); row.className = 'hp-item'; input(row,'name',field === 'medications' ? '药品名称' : '名称',item.name,80);
     const wrap = document.createElement('label'); wrap.textContent = '记录性质'; const select = document.createElement('select'); select.dataset.field = 'status';
-    for (const [value,text] of [['reported','曾报告 / 待核对现状'],['historical','明确为历史记录'],['unknown','不确定']]) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
+    for (const [value,text] of [['reported','曾报告 / 待核对现状'],['historical','明确为历史记录'],['current','本人确认当前使用 / 存在'],['stopped','本人确认已停用'],['unknown','不确定']]) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
     select.value = item.status || 'reported'; wrap.append(select); row.append(wrap);
     if (field === 'medications') { input(row,'dose','记录剂量（可空）',item.dose,60); input(row,'frequency','记录频次（可空）',item.frequency,60); }
     input(row,'note','补充说明 / 病历日期（可空）',item.note);
+    row.dataset.source = item.source ? JSON.stringify(item.source) : '';
+    const source = document.createElement('small'); source.className='hp-source'; source.textContent=item.source ? `来源：${item.source.label} · ${item.source.report_date || '日期未知'} · ${item.source.excerpt || '本人记录'}` : '来源：本人填写'; row.append(source);
     const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '移除条目'; remove.onclick = () => { row.remove(); if (!list.children.length) el(`hp-${field}-status`).value = 'unknown'; changed(); }; row.append(remove); list.append(row);
   }
   for (const [field,label] of Object.entries(names)) {
@@ -48,7 +52,8 @@
   function render(data) {
     record = data; dirty = false; el('hpUse').checked = false; el('hpAck').checked = false; el('hpAge').value = data.data.age ?? ''; el('hpSex').value = data.data.sex;
     for (const field of Object.keys(names)) { el(`hp-${field}-status`).value = data.data[field].status; el(`hp-${field}-items`).replaceChildren(); data.data[field].items.forEach(item => addRow(field,item)); }
-    el('hpMeta').textContent = `版本 ${data.revision} · 保存：${date(data.updated_at)} · 主动确认：${date(data.confirmed_at)}`; availability();
+    const sources=Object.entries(data.data.field_sources || {}).map(([field,source])=>`${field==='age'?'年龄':'性别'}来源：${source.label} / ${source.report_date || '日期未知'}`).join('；');
+    el('hpMeta').textContent = `版本 ${data.revision} · 保存：${date(data.updated_at)} · 主动确认：${date(data.confirmed_at)} ${sources}`; availability();
   }
   async function request(path,options={}) {
     const mine = epoch, actor = identity; if (!actor || actor !== MedixAuth.user?.id) throw new Error('请先登录当前账号。');
@@ -66,22 +71,26 @@
   const mutate = (path,method,body,message) => operate(path,{method,body:JSON.stringify(body)},message);
   el('hpOpen').onclick = async () => { if (!await MedixAuth.requireLogin()) return; dialog.showModal(); await load(); };
   el('hpClose').onclick = () => dialog.close(); el('hpReload').onclick = load;
-  el('hpForm').addEventListener('input',changed); el('hpAck').onchange = availability;
+  el('hpForm').addEventListener('input',event => { const row=event.target.closest('.hp-item'); if(row){row.dataset.source='';row.querySelector('.hp-source').textContent='来源：本人修改（旧来源见历史版本）';} changed(); }); el('hpAck').onchange = availability;
   el('hpForm').onsubmit = event => {
     event.preventDefault(); const data = {age:el('hpAge').value === '' ? null : Number(el('hpAge').value),sex:el('hpSex').value};
-    for (const field of Object.keys(names)) data[field] = {status:el(`hp-${field}-status`).value,items:[...el(`hp-${field}-items`).children].map(row => Object.fromEntries([...row.querySelectorAll('[data-field]')].map(node => [node.dataset.field,node.value.trim()])))};
+    data.field_sources={...record?.data.field_sources};
+    if(data.age !== record?.data.age) delete data.field_sources.age;
+    if(data.sex !== record?.data.sex) delete data.field_sources.sex;
+    for (const field of Object.keys(names)) data[field] = {status:el(`hp-${field}-status`).value,items:[...el(`hp-${field}-items`).children].map(row => ({...Object.fromEntries([...row.querySelectorAll('[data-field]')].map(node => [node.dataset.field,node.value.trim()])),source:row.dataset.source ? JSON.parse(row.dataset.source) : null}))};
     mutate('/api/profile','PUT',{expected_revision:record?.revision || 0,data},'草稿已保存，尚不会用于检索。请核对后主动确认。');
   };
   el('hpConfirm').onclick = () => mutate('/api/profile/confirm','POST',{expected_revision:record.revision,acknowledged:true},'档案已确认。需要时在每次发送前勾选“本次为本人咨询”。');
-  el('hpDelete').onclick = () => { if (record?.revision && confirm('确认清空本人结构化健康档案？旧档案将不能再用于新请求。')) mutate('/api/profile','DELETE',{expected_revision:record.revision},'档案内容已清空，旧确认已作废。'); };
+  el('hpDelete').onclick = () => { if (record?.revision && confirm('确认清空本人结构化健康档案、历史版本及待采纳候选？此操作无法恢复。')) mutate('/api/profile','DELETE',{expected_revision:record.revision},'档案内容、历史版本及候选已清空，旧确认已作废。'); };
   function reset() {
-    epoch++; record = null; identity = null; dirty = false; working = false; el('hpForm').reset(); for (const field of Object.keys(names)) el(`hp-${field}-items`).replaceChildren(); el('hpAck').checked = false; el('hpUse').checked = false; el('hpMeta').textContent = ''; feedback(''); dialog.close(); availability();
+    epoch++; record = null; identity = null; dirty = false; working = false; el('hpForm').reset(); fieldChoices.querySelectorAll('input').forEach(node=>{node.checked=true;}); for (const field of Object.keys(names)) el(`hp-${field}-items`).replaceChildren(); el('hpAck').checked = false; el('hpUse').checked = false; el('hpMeta').textContent = ''; feedback(''); dialog.close(); availability();
   }
   function authChanged(user) { if ((user?.id || null) === identity) return; reset(); identity = user?.id || null; availability(); if (identity) load(); }
   window.addEventListener('medix-signout',reset); window.addEventListener('medix-auth-change',event => authChanged(event.detail)); MedixAuth.ready.then(authChanged).catch(reset);
+  window.addEventListener('medix-profile-updated',()=>{ if(identity) load(); });
   window.MedixProfile = {
     setBusy(value) { if (chatBusy && !value) el('hpUse').checked = false; chatBusy = value; availability(); },
-    choice() { if (!el('hpUse').checked) return {use_profile:false}; if (!record?.usable || dirty || identity !== MedixAuth.user?.id) throw new Error('请先保存并确认当前账号的档案。'); return {use_profile:true,profile_revision:record.revision}; }
+    choice() { if (!el('hpUse').checked) return {use_profile:false}; if (!record?.usable || dirty || identity !== MedixAuth.user?.id) throw new Error('请先保存并确认当前账号的档案。'); const fields=[...fieldChoices.querySelectorAll('input:checked')].map(node=>node.dataset.profileField); if(!fields.length)throw new Error('请至少选择一个本轮可参考的字段。'); return {use_profile:true,profile_revision:record.revision,profile_fields:fields}; }
   };
   availability();
 })();

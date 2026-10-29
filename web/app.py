@@ -33,7 +33,9 @@ from personalization.router import router as profile_router
 from personalization.store import ProfileStore
 from personalization.middleware import ProfileBodyLimit
 from personalization.memory_tools import memory_tool_result
+from personalization.report_imports import router as report_import_router
 from personalization.context import profile_context, retrieval_query, scope as profile_scope
+from personalization.context import select_fields, PROFILE_FIELDS
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -110,6 +112,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
     | ({"testserver"} if not auth_settings.production else set())))
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(report_import_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -190,6 +193,7 @@ async def analyze(job, payload, session_id, memory_user_id):
     if snapshot:
         # Re-check after queueing: edits/clearing/reconfirmation invalidate old work.
         current = ProfileStore(app.state.auth_service.sessions).snapshot(job["owner_user_id"], snapshot["revision"])
+        current = select_fields(current, snapshot.get('selected_fields',PROFILE_FIELDS))
         if profile_scope(current) != profile_scope(snapshot):
             raise ValueError("档案确认状态已变化，请重新提交问题。")
         snapshot = current
@@ -270,6 +274,7 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "memory_enabled": bool(coordinator.long_term_memory.enabled),
                          "profile_used": bool(snapshot),
                          "profile_revision": snapshot["revision"] if snapshot else None,
+                         "profile_fields": list(snapshot.get('selected_fields',PROFILE_FIELDS)) if snapshot else [],
                          "profile_confirmed_at": snapshot["confirmed_at"] if snapshot else None,
                          "memory_suppressed_for_profile": bool(snapshot and payload["remember"]),
                          "elapsed": round(time.monotonic() - job["started"], 1),
@@ -339,10 +344,14 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
         revision = payload.get("profile_revision")
         if use_profile and (type(revision) is not int or revision < 1):
             raise ValueError("请先确认档案并提交对应版本。")
+        fields=payload.get('profile_fields',list(PROFILE_FIELDS))
+        if use_profile and (not isinstance(fields,list) or not fields or any(type(field) is not str or field not in PROFILE_FIELDS for field in fields) or len(fields)!=len(set(fields))):
+            raise ValueError('请选择有效且不重复的档案字段。')
     except (ValueError, TypeError, KeyError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
     owner = user.id
     snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
+    if snapshot: snapshot=select_fields(snapshot,fields)
     for key, old in list(contexts.items()):
         if time.time() - old["updated"] > 3600:
             contexts.pop(key, None)
