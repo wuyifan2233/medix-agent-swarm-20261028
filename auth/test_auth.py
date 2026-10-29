@@ -119,7 +119,10 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
         self.assertEqual(self.client.post("/api/chat", json={}).status_code, 401)
         self.assertEqual(self.client.get("/api/jobs/anything").status_code, 401)
-        self.assertEqual(self.client.get("/", follow_redirects=False).status_code, 303)
+        self.assertEqual(self.client.get("/", follow_redirects=False).status_code, 200)
+        response = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/?login=1")
 
     def test_csrf_all_writes_and_multitab_stability(self):
         self.register(); self.login()

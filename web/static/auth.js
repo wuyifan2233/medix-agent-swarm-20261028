@@ -1,87 +1,93 @@
-/* Shared same-origin API client. No credential is stored in JS or localStorage. */
+/* Cookies stay HttpOnly. The public home shell can be used before authentication. */
 window.MedixAuth = (() => {
-  let csrf = '', currentUser = null, leaving = false;
+  let csrf = '', currentUser = null, revision = 0;
+  const protectedPage = location.pathname === '/account' || location.pathname === '/assets/account.html';
   const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('medix-account') : null;
   function announce() {
     channel?.postMessage('changed');
-    try { localStorage.setItem('medix-account-event', crypto.randomUUID()); } catch (_) { /* Storage may be disabled. */ }
+    try { localStorage.setItem('medix-account-event', crypto.randomUUID()); } catch (_) {}
+  }
+  function open() { window.dispatchEvent(new Event('medix-login-request')); }
+  function setUser(user) {
+    const previous = currentUser;
+    currentUser = user;
+    if (previous && previous.id !== user?.id) {
+      window.dispatchEvent(new Event('medix-signout'));
+      if (protectedPage) {
+        document.documentElement.setAttribute('data-auth-pending', '');
+        location.replace(user ? '/account' : '/?login=1&next=/account');
+      }
+    }
+    window.dispatchEvent(new CustomEvent('medix-auth-change', {detail:user}));
   }
   function leave(notify = false) {
-    if (leaving) return;
-    leaving = true; csrf = ''; currentUser = null;
-    document.documentElement.setAttribute('data-auth-pending', '');
-    window.dispatchEvent(new Event('medix-signout'));
-    if (notify) {
-      announce(); // event only; no secret or user data
-    }
-    location.replace('/login');
+    revision++; csrf = ''; setUser(null);
+    if (notify) announce();
+    if (protectedPage) location.replace('/?login=1&next=/account');
   }
-  if (channel) channel.onmessage = () => leave();
-  window.addEventListener('storage', event => { if (event.key === 'medix-account-event') leave(); });
-  window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
   function headersFor(options) {
     const headers = new Headers(options.headers);
-    const method = (options.method || 'GET').toUpperCase();
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-      headers.set('Content-Type', 'application/json');
-      headers.set('X-Medix-Request', '1');
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase())) {
+      headers.set('Content-Type', 'application/json'); headers.set('X-Medix-Request', '1');
       if (csrf) headers.set('X-CSRF-Token', csrf);
     }
     return headers;
   }
   async function raw(url, options = {}) {
-    return fetch(url, {...options, headers: headersFor(options), credentials: 'same-origin', cache: 'no-store'});
+    return fetch(url, {...options, headers:headersFor(options), credentials:'same-origin', cache:'no-store'});
   }
   async function detail(response) {
     const body = await response.json().catch(() => ({}));
     return typeof body.detail === 'string' ? body.detail : '请检查输入内容后重试。';
   }
-  const isLogin = location.pathname === '/login';
-  const ready = isLogin ? Promise.resolve(null) : (async () => {
+  async function refresh() {
+    const mine = ++revision;
     const response = await raw('/api/auth/me');
-    if (response.status === 401) { leave(); throw new Error('请先登录。'); }
-    if (!response.ok) throw new Error('无法确认登录状态，请刷新页面。');
-    currentUser = await response.json();
-    const tokenResponse = await raw('/api/auth/csrf');
-    if (tokenResponse.status === 401) { leave(); throw new Error('登录已失效。'); }
-    if (!tokenResponse.ok) throw new Error('无法初始化安全校验，请刷新页面。');
-    csrf = (await tokenResponse.json()).csrf_token;
-    document.documentElement.removeAttribute('data-auth-pending');
-    return currentUser;
-  })();
-  ready.catch(error => {
-    if (!leaving) {
-      document.documentElement.removeAttribute('data-auth-pending');
-      document.body.replaceChildren();
-      const message = document.createElement('p'); message.textContent = error.message;
-      const reload = document.createElement('button'); reload.textContent = '重新加载'; reload.onclick = () => location.reload();
-      document.body.append(message, reload);
+    if (mine !== revision) return currentUser;
+    if (response.status === 401) {
+      csrf = ''; setUser(null);
+      if (protectedPage) location.replace('/?login=1&next=/account');
+      return null;
     }
-  });
-  window.addEventListener('focus', async () => {
-    if (!currentUser || leaving) return;
-    try {
-      const response = await raw('/api/auth/me');
-      if (response.status === 401) return leave();
-      if (response.ok && (await response.json()).id !== currentUser.id) leave();
-    } catch (_) { /* A temporary network failure does not clear a valid login. */ }
-  });
+    if (!response.ok) throw new Error('无法确认登录状态，请稍后重试。');
+    const user = await response.json();
+    const tokenResponse = await raw('/api/auth/csrf');
+    if (mine !== revision) return currentUser;
+    if (tokenResponse.status === 401) { leave(); return null; }
+    if (!tokenResponse.ok) throw new Error('无法初始化安全校验，请刷新页面。');
+    const payload = await tokenResponse.json();
+    if (mine !== revision) return currentUser;
+    csrf = payload.csrf_token; setUser(user);
+    return user;
+  }
+  const ready = refresh().finally(() => document.documentElement.removeAttribute('data-auth-pending'));
+  ready.catch(error => window.dispatchEvent(new CustomEvent('medix-auth-error', {detail:error.message})));
+  function resync() { refresh().catch(() => {}); }
+  if (channel) channel.onmessage = resync;
+  window.addEventListener('storage', event => { if (event.key === 'medix-account-event') resync(); });
+  window.addEventListener('focus', resync);
+  window.addEventListener('pageshow', event => { if (event.persisted) resync(); });
   return {
-    ready, raw, detail, leave,
+    ready, raw, detail, leave, open, refresh,
+    get user() { return currentUser; },
+    async requireLogin() {
+      await ready.catch(() => {});
+      if (currentUser) return true;
+      open(); return false;
+    },
+    completeLogin(payload) {
+      revision++; csrf = payload.csrf_token; setUser(payload.user); announce();
+    },
     async fetch(url, options = {}) {
-      await ready;
-      if (leaving) throw new Error('登录已结束。');
+      if (!await this.requireLogin()) throw new Error('请登录后继续。');
       const response = await raw(url, options);
-      if (response.status === 401) { leave(true); throw new Error('登录已失效，请重新登录。'); }
+      if (response.status === 401) { leave(true); open(); throw new Error('登录已失效，请重新登录。'); }
       return response;
     },
     async logout(all = false) {
-      const response = await this.fetch(all ? '/api/auth/logout-all' : '/api/auth/logout', {method: 'POST', body: '{}'});
+      const response = await this.fetch(all ? '/api/auth/logout-all' : '/api/auth/logout', {method:'POST', body:'{}'});
       if (!response.ok) throw new Error(await detail(response));
       leave(true);
-    },
-    announceLogin() {
-      announce();
     }
   };
 })();

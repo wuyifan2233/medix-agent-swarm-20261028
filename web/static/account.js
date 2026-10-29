@@ -44,6 +44,7 @@ byId('passwordForm').onsubmit = async event => {
   } catch (error) { showError(error); } finally { button.disabled = false; }
 };
 MedixAuth.ready.then(user => {
+  if (!user) return;
   byId('displayName').textContent = user.display_name; byId('username').textContent = `@${user.username}`;
   byId('passwordUsername').value = user.username;
   byId('role').textContent = user.role === 'admin' ? '管理员' : '普通用户';

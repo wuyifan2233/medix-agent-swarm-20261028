@@ -131,18 +131,14 @@ async def security_headers_and_origin(request, call_next):
 
 
 @app.get("/")
-def index(request: Request):
-    try:
-        auth = request.app.state.auth_service
-        auth.authenticate(request.cookies.get(auth.settings.cookie_name))
-    except HTTPException:
-        return RedirectResponse("/login", status_code=303)
+def index():
+    # The public shell contains no private records. Business APIs still require authentication.
     return FileResponse(STATIC / "index.html")
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse(STATIC / "login.html")
+    return RedirectResponse("/?login=1", status_code=303)
 
 
 @app.get("/account")
