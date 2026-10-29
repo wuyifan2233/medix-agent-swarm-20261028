@@ -1,5 +1,12 @@
 const $ = (id) => document.getElementById(id);
 const state = {chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0};
+let accountClosed = false;
+window.addEventListener('medix-signout', () => {
+  accountClosed = true; state.images = []; state.chatId = crypto.randomUUID();
+  $('messages').replaceChildren(); $('attachments').replaceChildren(); $('message').value = ''; $('remember').checked = false;
+});
+MedixAuth.ready.then(user => { $('profileName').textContent = user.display_name; }).catch(() => {});
+$('logoutButton').onclick = () => MedixAuth.logout().catch(error => toast(error.message));
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -125,6 +132,8 @@ function resultMessage(row, result) {
   scrollDown();
 }
 async function submit(message, images, retryRow) {
+  await MedixAuth.ready;
+  if (accountClosed) return;
   if (state.busy) return;
   state.busy = true; updateComposer();
   closeSidebar();
@@ -133,16 +142,17 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
+    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
     $('message').value = ''; state.images = []; renderAttachments();
     let errors = 0;
     for (;;) {
       await sleep(1100);
+      if (accountClosed) return;
       let status;
       try {
-        const poll = await fetch(`/api/jobs/${data.job_id}`);
+        const poll = await MedixAuth.fetch(`/api/jobs/${data.job_id}`);
         const body = await poll.json();
         if (!poll.ok) throw new Error(body.detail || '无法读取分析状态。');
         status = body; errors = 0;
@@ -154,6 +164,7 @@ async function submit(message, images, retryRow) {
       if (status.status === 'failed') throw new Error(status.error || '分析未能完成，请稍后重试。');
     }
   } catch (error) {
+    if (accountClosed) return;
     const main = row.querySelector('.message-main'); main.replaceChildren();
     const text = document.createElement('div'); text.className = 'error-text'; text.textContent = error.message;
     const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage()); };

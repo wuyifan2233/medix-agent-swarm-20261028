@@ -1,11 +1,38 @@
 import base64
 import io
 import unittest
+import tempfile
+from pathlib import Path
 from fastapi.testclient import TestClient
 from PIL import Image
 from web.app import app, jobs, normalize_image
+from auth.schemas import Registration
+from auth.service import AuthService
+from auth.settings import AuthSettings
+from storage.database import make_database
+from storage.migrate import upgrade_database
 
 class WebBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.previous_auth = app.state.auth_service
+        self.temp = tempfile.TemporaryDirectory()
+        url = "sqlite:///" + (Path(self.temp.name) / "web.db").as_posix()
+        upgrade_database(url)
+        self.engine, sessions = make_database(url)
+        settings = AuthSettings(url, False, frozenset({"http://testserver"}), True)
+        app.state.auth_service = AuthService(sessions, settings)
+        user = app.state.auth_service.register(Registration(username="alice", display_name="Alice", password="long enough test password"))
+        self.user_id = user.id
+        self.client = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
+        response = self.client.post("/api/auth/login", json={"username":"alice", "password":"long enough test password"})
+        self.client.headers["X-CSRF-Token"] = response.json()["csrf_token"]
+
+    def tearDown(self):
+        self.client.close()
+        app.state.auth_service = self.previous_auth
+        self.engine.dispose()
+        self.temp.cleanup()
+
     def test_image_pixels_are_reencoded(self):
         stream = io.BytesIO()
         Image.new("RGB", (32, 20), "white").save(stream, "PNG")
@@ -23,20 +50,19 @@ class WebBoundaryTests(unittest.TestCase):
             normalize_image({"data": "data:image/svg+xml;base64,PHN2Zz4="})
 
     def test_empty_message_is_rejected(self):
-        client = TestClient(app)
+        client = self.client
         self.assertEqual(client.post("/api/chat", json={"message": "", "images": []}).status_code, 400)
 
     def test_foreign_origin_is_rejected(self):
-        client = TestClient(app)
+        client = self.client
         self.assertEqual(client.post("/api/chat", json={}, headers={"Origin":"https://elsewhere.example"}).status_code, 403)
 
-    def test_other_browser_cannot_read_job(self):
-        jobs["boundary-test"] = {"owner": "a" * 32, "status": "completed"}
+    def test_other_user_cannot_read_job(self):
+        jobs["boundary-test"] = {"owner_user_id": "another-user", "status": "completed"}
         try:
-            client = TestClient(app)
+            client = self.client
             self.assertEqual(client.get("/api/jobs/boundary-test").status_code, 404)
-            client.cookies.clear()
-            client.cookies.set("medix_browser", "a" * 32)
+            jobs["boundary-test"]["owner_user_id"] = self.user_id
             self.assertEqual(client.get("/api/jobs/boundary-test").status_code, 200)
         finally:
             jobs.pop("boundary-test", None)

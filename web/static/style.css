@@ -15,3 +15,5 @@
 @media(max-width:520px){.hero-art{width:145px;right:-9px}.companion{width:145px;height:145px;transform:rotate(6deg) translateX(-6px)}}
 @media(max-width:520px){.hero-art{width:115px;height:145px;right:-7px;top:25px}.companion{width:115px;height:115px;transform:rotate(6deg) translateX(-3px)}.art-orbit{width:105px;height:105px;left:5px;top:20px}}
 @media(max-width:800px){.sidebar{scrollbar-width:none}.sidebar::-webkit-scrollbar{display:none}}
+
+html[data-auth-pending] body{visibility:hidden}.profile a{color:inherit}.profile #logoutButton{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;text-decoration:underline}

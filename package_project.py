@@ -9,9 +9,9 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent
-DIRECTORIES = {'.claude', 'agents', 'constraints', 'core', 'docs', 'examples',
+DIRECTORIES = {'.claude', 'agents', 'auth', 'storage', 'scripts', 'constraints', 'core', 'docs', 'examples',
                'knowledge', 'memory', 'research', 'swarm', 'validation', 'web'}
-ROOT_FILES = {'.gitignore', 'README.md', 'config.py', 'demo_basic.py', 'main.py',
+ROOT_FILES = {'.gitignore', '.env.example', 'alembic.ini', 'README.md', 'config.py', 'demo_basic.py', 'main.py',
               'requirements.txt', 'requirements.verified.txt', 'requirements.web.txt',
               'run_web.py', 'runtime_paths.py', 'setup.py', 'start.ps1', 'start_web.ps1',
               'verify_mem0.py', 'verify_runtime.py', 'package_project.py', 'web-ui-desktop.png'}
