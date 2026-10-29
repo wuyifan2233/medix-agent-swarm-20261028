@@ -105,7 +105,6 @@ function openSettings() {
   pending = false; epoch++; offset = 0;
   renderAvatar(user);
   byId('displayName').textContent = user.display_name || user.username;
-  byId('username').textContent = '@' + user.username;
   byId('passwordUsername').value = user.username;
   byId('role').textContent = user.role === 'admin' ? '管理员' : '普通用户';
   document.getElementById('settingsAdminTab').hidden = user.role !== 'admin';
@@ -119,7 +118,7 @@ dialog.addEventListener('click', event => {
 });
 dialog.addEventListener('close', () => {
   epoch++; byId('passwordForm').reset(); byId('users').replaceChildren(); byId('feedback').textContent='';
-  byId('displayName').textContent=''; byId('username').textContent=''; byId('role').textContent='';
+  byId('displayName').textContent=''; byId('role').textContent='';
   const url=new URL(location.href); url.searchParams.delete('settings'); history.replaceState(null,'',url.pathname+url.search+url.hash);
   document.getElementById('profileTrigger').focus();
 });

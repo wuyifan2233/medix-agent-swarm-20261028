@@ -37,7 +37,6 @@
     const name = user?.display_name || user?.username || '登录';
     document.getElementById('profileName').textContent = name;
     document.getElementById('profileMenuName').textContent = name;
-    document.getElementById('profileMenuUsername').textContent = user ? `@${user.username}` : '';
     trigger.setAttribute('aria-label', user ? `${name}，打开账号菜单` : '登录账号');
     trigger.setAttribute('aria-haspopup', user ? 'menu' : 'dialog');
     trigger.setAttribute('aria-controls', user ? 'profileMenu' : 'authDialog');
