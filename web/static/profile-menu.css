@@ -14,8 +14,8 @@
   border: 1px solid #e6e9f2; border-radius: 14px; padding: 7px;
   background: #fff; color: #3e4961; box-shadow: 0 10px 35px #24345718, 0 2px 8px #24345708;
 }
-.profile-menu:popover-open { display: block; }
 .profile-menu[data-open] { display: block; }
+.profile-menu[hidden] { display: none; }
 .profile-menu-header { display: flex; align-items: center; gap: 11px; padding: 12px 10px 16px; border-bottom: 1px solid #eef0f6; margin-bottom: 5px; }
 .profile-menu-header img { height: 39px; width: 39px; border-radius: 50%; flex-shrink: 0; }
 .profile-menu-header > div { min-width: 0; }

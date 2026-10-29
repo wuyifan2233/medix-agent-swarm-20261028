@@ -3,14 +3,11 @@
   const trigger = document.getElementById('profileTrigger');
   const menu = document.getElementById('profileMenu');
   const sidebar = document.getElementById('sidebar');
-  const nativePopover = typeof menu.showPopover === 'function';
   let previousUserId = null;
-  const open = () => nativePopover ? menu.matches(':popover-open') : menu.hasAttribute('data-open');
+  const open = () => !menu.hidden;
   function close() {
-    if (open()) {
-      if (nativePopover) menu.hidePopover();
-      else menu.removeAttribute('data-open');
-    }
+    menu.hidden = true;
+    menu.removeAttribute('data-open');
     trigger.setAttribute('aria-expanded', 'false');
   }
   function position() {
@@ -27,10 +24,8 @@
   function show(last = false) {
     if (!MedixAuth.user) { MedixAuth.open(); return; }
     position();
-    if (!open()) {
-      if (nativePopover) menu.showPopover();
-      else menu.setAttribute('data-open', '');
-    }
+    menu.hidden = false;
+    menu.setAttribute('data-open', '');
     trigger.setAttribute('aria-expanded', 'true');
     const items = [...menu.querySelectorAll('[role="menuitem"]')];
     items[last ? items.length - 1 : 0]?.focus();
@@ -45,13 +40,9 @@
     trigger.setAttribute('aria-label', user ? `${name}，打开账号菜单` : '登录账号');
     trigger.setAttribute('aria-haspopup', user ? 'menu' : 'dialog');
     trigger.setAttribute('aria-controls', user ? 'profileMenu' : 'authDialog');
-    if (user && nativePopover) trigger.setAttribute('popovertarget', 'profileMenu');
-    else trigger.removeAttribute('popovertarget');
   }
   trigger.addEventListener('click', event => {
     if (!MedixAuth.user) { event.preventDefault(); MedixAuth.open(); return; }
-    // Native invoker handles repeated clicks and light-dismiss as one operation.
-    if (nativePopover) { position(); return; }
     if (open()) close(); else show();
   });
   trigger.addEventListener('keydown', event => {
@@ -72,24 +63,25 @@
     if (event.key === 'End') next = items.length - 1;
     if (next !== undefined) { event.preventDefault(); items[next].focus(); }
   });
-  menu.addEventListener('toggle', () => {
-    trigger.setAttribute('aria-expanded', String(open()));
-    if (open() && document.activeElement === trigger) menu.querySelector('[role="menuitem"]')?.focus();
-  });
   menu.addEventListener('focusout', () => queueMicrotask(() => {
     if (!menu.contains(document.activeElement) && document.activeElement !== trigger) close();
   }));
+  document.addEventListener('pointerdown', event => {
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
+  });
   document.addEventListener('click', event => {
-    if (!nativePopover && !menu.contains(event.target) && !trigger.contains(event.target)) close();
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
   });
   document.getElementById('profileSettings').addEventListener('click', close);
   document.getElementById('logoutButton').addEventListener('click', async event => {
     const button = event.currentTarget;
     if (button.disabled) return;
     button.disabled = true;
-    try { await MedixAuth.logout(); close(); }
+    const label = button.querySelector('span');
+    if (label) label.textContent = '正在退出…';
+    try { await MedixAuth.logout(); close(); trigger.focus(); }
     catch (error) { window.dispatchEvent(new CustomEvent('medix-auth-error', {detail:error.message})); }
-    finally { button.disabled = false; }
+    finally { button.disabled = false; if (label) label.textContent = '退出登录'; }
   });
   sidebar.addEventListener('scroll', close);
   window.addEventListener('resize', () => {
