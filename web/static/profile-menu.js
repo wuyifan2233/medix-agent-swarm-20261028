@@ -63,9 +63,11 @@
     if (event.key === 'End') next = items.length - 1;
     if (next !== undefined) { event.preventDefault(); items[next].focus(); }
   });
-  menu.addEventListener('focusout', () => queueMicrotask(() => {
-    if (!menu.contains(document.activeElement) && document.activeElement !== trigger) close();
-  }));
+  // focusout may run before a pointer click reaches the next menu item.
+  // Wait for the actual new focus target instead of hiding during that gap.
+  document.addEventListener('focusin', event => {
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
+  });
   document.addEventListener('pointerdown', event => {
     if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
   });
