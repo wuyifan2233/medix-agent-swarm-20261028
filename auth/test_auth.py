@@ -314,6 +314,36 @@ class AuthTests(unittest.TestCase):
             self.assertEqual(r.status_code,200,r.text)
             self.assertNotEqual(r.json()["user"]["id"],user.id)
 
+    def test_phone_change_verifies_both_and_preserves_identity(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        with self.sessions() as db:
+            row=db.get(User,alice.id);row.phone_number="13800000001";row.avatar_data="saved-avatar"
+            db.get(User,bob.id).phone_number="13800000003";db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True;sms.verify.return_value=True
+            old=self.client.post("/api/auth/phone/change/old/send",json={}).json()["challenge_id"]
+            proof=self.client.post("/api/auth/phone/change/old/verify",json={"challenge_id":old,"code":"123456"}).json()["proof"]
+            self.assertEqual(self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000003","proof":proof}).status_code,409)
+            self.assertEqual(self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000002","proof":"x"*43}).status_code,400)
+            new=self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000002","proof":proof}).json()["challenge_id"]
+            payload={"challenge_id":new,"code":"123456","proof":proof}
+            sms.verify.return_value=False
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,400)
+            sms.verify.return_value=True
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            with self.sessions() as db:
+                row=db.get(User,alice.id)
+                self.assertEqual(row.phone_number,"13800000002")
+                self.assertEqual(row.avatar_data,"saved-avatar")
+                self.assertEqual(db.query(User).count(),2)
+            r=self.client.post("/api/auth/phone/login",json={"phone_number":"13800000002","password":PASSWORD})
+            self.assertEqual(r.status_code,200,r.text)
+            self.assertEqual(r.json()["user"]["id"],alice.id)
+            self.client.headers["X-CSRF-Token"]=r.json()["csrf_token"]
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,400)
+            self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000001","password":PASSWORD}).status_code,401)
+
     def test_sms_limits_wrong_codes_purpose_and_expiry(self):
         from auth.models import SmsChallenge
         self.register(); self.login()

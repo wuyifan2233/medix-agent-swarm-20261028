@@ -124,3 +124,6 @@ input[aria-invalid="true"]{border-color:#c88992}
 
 .settings-password-eye[aria-pressed="true"] .password-eye-slash{display:block}
 .settings-password-eye[aria-pressed="false"] .password-eye-slash{display:none}
+
+.security-phone-change{cursor:pointer}
+.security-phone-change:hover{background:#f8f9fc}

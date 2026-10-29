@@ -318,3 +318,83 @@ def delete_account(data: AccountDeletion, request: Request, response: Response,
         if job.get("owner_user_id") == user.id:
             jobs.pop(key, None)
     return {"ok": True}
+
+
+class PhoneChangeSend(Phone):
+    proof: str = Field(min_length=43, max_length=43)
+
+
+class PhoneChangeConfirm(SmsVerify):
+    proof: str = Field(min_length=43, max_length=43)
+
+
+def change_proof(db, token, user_id):
+    proof = db.get(SmsChallenge, digest(token))
+    row = db.get(User, user_id)
+    if (not proof or proof.purpose != "chgproof" or proof.user_id != user_id
+            or proof.consumed or proof.expires_at <= time.time()
+            or not row or row.phone_number != proof.phone_number):
+        raise HTTPException(400, "原手机号验证已失效，请重新验证。")
+    return proof, row
+
+
+@router.post("/api/auth/phone/change/old/send")
+def send_old_phone(request: Request, user: CurrentUser = Depends(require_user)):
+    with service(request).sessions() as db:
+        phone = db.get(User, user.id).phone_number
+        if not phone:
+            raise HTTPException(409, "账号未绑定手机号。")
+    return begin(Phone(phone_number=phone), request, "old", user.id)
+
+
+@router.post("/api/auth/phone/change/old/verify")
+def verify_old_phone(data: SmsVerify, request: Request, user: CurrentUser = Depends(require_user)):
+    phone = consume(data, request, "old", user.id)
+    token = new_token()
+    with service(request).sessions() as db:
+        if db.get(User, user.id).phone_number != phone:
+            raise HTTPException(409, "手机号状态已变化。")
+        db.add(SmsChallenge(token_hash=digest(token), phone_number=phone, purpose="chgproof",
+            user_id=user.id, scheme="local-proof", expires_at=time.time()+300, attempts=0, consumed=False))
+        db.commit()
+    return {"proof": token, "expires_in": 300}
+
+
+@router.post("/api/auth/phone/change/new/send")
+def send_new_phone(data: PhoneChangeSend, request: Request, user: CurrentUser = Depends(require_user)):
+    with service(request).sessions() as db:
+        proof, row = change_proof(db, data.proof, user.id)
+        if data.phone_number == row.phone_number:
+            raise HTTPException(400, "新手机号不能与原手机号相同。")
+        if db.scalar(select(User.id).where(User.phone_number == data.phone_number)):
+            raise HTTPException(409, "新手机号已被其他账号使用。")
+    return begin(Phone(phone_number=data.phone_number), request, "new", user.id)
+
+
+@router.post("/api/auth/phone/change")
+def change_phone(data: PhoneChangeConfirm, request: Request, response: Response,
+                 user: CurrentUser = Depends(require_user)):
+    auth = service(request)
+    with auth.sessions() as db:
+        change_proof(db, data.proof, user.id)
+    phone = consume(data, request, "new", user.id)
+    from auth.models import AuthSession
+    with auth.sessions() as db:
+        if db.bind.dialect.name == "sqlite":
+            db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        proof, row = change_proof(db, data.proof, user.id)
+        if phone == row.phone_number:
+            raise HTTPException(400, "新手机号不能与原手机号相同。")
+        row.phone_number = phone
+        row.updated_at = time.time()
+        # Invalidate all outstanding challenges and sessions for this identity.
+        db.execute(update(SmsChallenge).where(SmsChallenge.user_id == user.id).values(consumed=True))
+        db.execute(update(AuthSession).where(AuthSession.user_id == user.id).values(revoked_at=time.time()))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409, "新手机号已被其他账号使用。") from None
+    from auth.router import clear_cookie
+    clear_cookie(response, auth.settings)
+    return {"ok": True}
