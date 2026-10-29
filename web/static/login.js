@@ -42,7 +42,6 @@
   window.addEventListener('medix-login-request', open);
   window.addEventListener('medix-auth-change', event => { if (event.detail && dialog.open) dialog.close(); });
   el('topLoginButton').onclick = open;
-  el('profileLogin').onclick = open;
   el('closeAuth').onclick = () => dialog.close();
   dialog.addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;

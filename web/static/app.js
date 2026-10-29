@@ -8,15 +8,12 @@ window.addEventListener('medix-signout', () => {
   document.body.classList.remove('chatting'); updateComposer();
 });
 function renderAccount(user) {
-  $('profileName').textContent = user?.display_name || '欢迎使用 MediX';
-  $('topLoginButton').hidden = Boolean(user); $('topAccountLink').hidden = !user;
-  $('profileLogin').hidden = Boolean(user); $('profileAccount').hidden = !user;
+  $('topLoginButton').hidden = Boolean(user);
   updateComposer();
 }
 window.addEventListener('medix-auth-change', event => renderAccount(event.detail));
 window.addEventListener('medix-auth-error', event => toast(event.detail));
 MedixAuth.ready.then(renderAccount).catch(() => {});
-$('logoutButton').onclick = () => MedixAuth.logout().catch(error => toast(error.message));
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -208,6 +205,7 @@ refreshHealth();
 
 // The redesigned entry points all use the existing upload and chat pipeline.
 function closeSidebar() {
+  window.dispatchEvent(new Event('medix-sidebar-close'));
   $('sidebar').classList.remove('open');
   $('sidebarBackdrop').hidden = true;
   $('menuButton').setAttribute('aria-expanded', 'false');

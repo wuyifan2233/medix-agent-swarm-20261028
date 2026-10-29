@@ -1,23 +1,21 @@
 /* Login belongs to the chat shell; native dialog keeps the background inert. */
-.top-login, .top-account {
+.top-login {
   flex-shrink: 0; border: 0; border-radius: 9px; padding: 9px 19px;
   background: #6375e9; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.4;
   text-decoration: none; cursor: pointer; white-space: nowrap;
 }
-.top-login:hover, .top-account:hover { background: #5668db; }
+.top-login:hover { background: #5668db; }
 .topbar .topbar-action {
   display: inline-flex; align-items: center; justify-content: center;
   height: 36px; min-height: 36px; padding: 0 12px; line-height: 1;
   box-sizing: border-box; border: 1px solid #e8ebf3; border-radius: 9px;
   font-size: 12px; font-weight: 500; box-shadow: none;
 }
-.topbar .top-login, .topbar .top-account { border-color: #6375e9; }
+.topbar .top-login { border-color: #6375e9; }
 .topbar .guide-button.topbar-action {
   background: #fff; color: #74819d; border-color: #d6ddeb;
 }
 .topbar .guide-button.topbar-action:hover { background: #f1f4fc; color: #6375e9; border-color: #b6c4f0; }
-.top-account { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
-.profile #profileLogin { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .auth-dialog {
   --auth-height: 100dvh;
   position: fixed; inset: 0; width: 420px; max-width: calc(100vw - 32px);
@@ -66,7 +64,7 @@ body.auth-modal-open { overflow: hidden; }
 .auth-dialog button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 520px) {
   .topbar .topbar-action { height: 32px; min-height: 32px; padding: 0 11px; }
-  .top-login, .top-account { font-size: 12px; }
+  .top-login { font-size: 12px; }
   .topbar-right { gap: 8px; }
   .topbar .guide-button { margin-left: 0; }
   .auth-dialog { padding: 27px 24px 25px; border-radius: 18px; }
