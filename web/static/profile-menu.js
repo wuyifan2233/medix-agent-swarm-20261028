@@ -85,7 +85,7 @@
     catch (error) { window.dispatchEvent(new CustomEvent('medix-auth-error', {detail:error.message})); }
     finally { button.disabled = false; if (label) label.textContent = '退出登录'; }
   });
-  sidebar.addEventListener('scroll', close);
+  sidebar.addEventListener('scroll', close, true);
   window.addEventListener('resize', () => {
     if (open()) { if (sidebar.inert) close(); else position(); }
   });

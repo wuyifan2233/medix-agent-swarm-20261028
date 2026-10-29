@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><link rel="stylesheet" href="/assets/auth-modal.css?v=5"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/app.js?v=5" defer></script><script src="/assets/password-policy.js?v=5" defer></script><script src="/assets/login.js?v=8" defer></script>
-<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=2"><script src="/assets/profile-menu.js?v=5" defer></script><link rel="stylesheet" href="/assets/settings.css?v=1"><script src="/assets/settings.js?v=1" defer></script></head>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=4"><link rel="stylesheet" href="/assets/auth-modal.css?v=5"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/app.js?v=5" defer></script><script src="/assets/password-policy.js?v=5" defer></script><script src="/assets/login.js?v=8" defer></script>
+<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=2"><script src="/assets/profile-menu.js?v=6" defer></script><link rel="stylesheet" href="/assets/settings.css?v=1"><script src="/assets/settings.js?v=1" defer></script></head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -27,6 +27,7 @@
 <button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="关闭侧栏" hidden></button>
 <aside class="sidebar" id="sidebar" aria-label="工作空间">
 <a class="brand" href="/" aria-label="MediX 首页"><span class="brand-mark"><svg><use href="#i-heart"/></svg></span><span>MediX<small>你的 AI 健康伙伴</small></span></a>
+<div class="sidebar-scroll">
 <button class="new-chat" id="newChat"><svg><use href="#i-plus"/></svg>开启新对话<kbd>＋</kbd></button>
 <p class="nav-caption">我的健康助手</p>
 <nav class="primary-nav" aria-label="快捷功能">
@@ -37,6 +38,7 @@
 <div class="conversation-heading">本次对话<span>仅本次保留</span></div>
 <div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
+</div>
 <div class="sidebar-bottom">
 <div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>
 <div class="service-line"><span class="status-dot" id="modelDot"></span><span>图文理解</span><small id="modelState">检测中</small></div>
