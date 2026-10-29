@@ -21,10 +21,10 @@ class WebBoundaryTests(unittest.TestCase):
         self.engine, sessions = make_database(url)
         settings = AuthSettings(url, False, frozenset({"http://testserver"}), True)
         app.state.auth_service = AuthService(sessions, settings)
-        user = app.state.auth_service.register(Registration(username="alice", display_name="Alice", password="long enough test password"))
+        user = app.state.auth_service.register(Registration(username="alice", display_name="Alice", password="Test-Password2026!"))
         self.user_id = user.id
         self.client = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
-        response = self.client.post("/api/auth/login", json={"username":"alice", "password":"long enough test password"})
+        response = self.client.post("/api/auth/login", json={"username":"alice", "password":"Test-Password2026!"})
         self.client.headers["X-CSRF-Token"] = response.json()["csrf_token"]
 
     def tearDown(self):

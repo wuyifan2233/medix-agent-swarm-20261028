@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
+from auth.password_policy import MIN_LENGTH, MAX_LENGTH, validate_new_password
 
 
 class StrictModel(BaseModel):
@@ -20,8 +21,10 @@ class Credentials(StrictModel):
 
 
 class Registration(Credentials):
-    password: str = Field(min_length=15, max_length=128)
+    password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     display_name: str | None = Field(default=None, min_length=1, max_length=60)
+
+    _password_policy = field_validator("password")(validate_new_password)
 
     @field_validator("display_name")
     @classmethod
@@ -36,7 +39,8 @@ class Registration(Credentials):
 
 class PasswordChange(StrictModel):
     current_password: str = Field(min_length=1, max_length=128)
-    new_password: str = Field(min_length=15, max_length=128)
+    new_password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
+    _password_policy = field_validator("new_password")(validate_new_password)
 
 
 class StatusChange(StrictModel):

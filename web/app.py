@@ -102,7 +102,11 @@ app.include_router(auth_router)
 @app.exception_handler(RequestValidationError)
 async def safe_validation_error(request, exc):
     # FastAPI's default validation payload includes raw input, which may be a password.
-    return JSONResponse({"detail": "请求参数不符合要求，请检查字段和长度。",
+    from auth.password_policy import PASSWORD_HINT
+    password_error = request.url.path in {"/api/auth/register", "/api/auth/change-password"} and any(
+        error["loc"][-1] == ("password" if request.url.path.endswith("register") else "new_password")
+        for error in exc.errors())
+    return JSONResponse({"detail": PASSWORD_HINT if password_error else "请求参数不符合要求，请检查字段和长度。",
                          "fields": [".".join(str(x) for x in error["loc"]) for error in exc.errors()]},
                         status_code=422)
 

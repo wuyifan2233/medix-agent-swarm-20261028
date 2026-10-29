@@ -16,14 +16,17 @@
     el('registerTab').setAttribute('aria-selected', String(value));
     for (const id of ['confirmField', 'passwordHint']) el(id).hidden = !value;
     el('confirmPassword').required = value;
-    el('password').minLength = value ? 15 : 1;
+    el('password').minLength = value ? MedixPasswordPolicy.min : 1;
+    el('password').maxLength = value ? MedixPasswordPolicy.max : 128;
     el('password').autocomplete = value ? 'new-password' : 'current-password';
     el('formTitle').textContent = value ? '注册 MediX' : '登录 MediX';
     el('formIntro').textContent = value ? '创建账号，开启你的健康对话。' : '登录后，开始你的健康对话。';
     el('submitButton').textContent = value ? '创建账号' : '登录';
     el('feedback').textContent = ''; el('password').value = ''; el('confirmPassword').value = '';
-    el('password').type = 'password'; el('togglePassword').textContent = '显示';
+    el('password').type = 'password';
+    el('togglePassword').classList.remove('is-visible');
     el('togglePassword').setAttribute('aria-label', '显示密码');
+    el('togglePassword').title = '显示密码';
     el('togglePassword').setAttribute('aria-pressed', 'false');
   }
   function resetBusy() {
@@ -68,8 +71,9 @@
   el('togglePassword').onclick = () => {
     const show = el('password').type === 'password';
     el('password').type = show ? 'text' : 'password';
-    el('togglePassword').textContent = show ? '隐藏' : '显示';
+    el('togglePassword').classList.toggle('is-visible', show);
     el('togglePassword').setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+    el('togglePassword').title = show ? '隐藏密码' : '显示密码';
     el('togglePassword').setAttribute('aria-pressed', String(show));
   };
   el('loginTab').onclick = () => mode(false);
@@ -83,6 +87,7 @@
   el('authForm').onsubmit = async event => {
     event.preventDefault(); if (busy) return;
     const mine = generation, isRegister = registering, password = el('password').value;
+    if (isRegister && MedixPasswordPolicy.error(password)) { el('feedback').textContent = MedixPasswordPolicy.error(password); return; }
     if (isRegister && password !== el('confirmPassword').value) { el('feedback').textContent = '两次输入的密码不一致。'; return; }
     busy = true; requestController = new AbortController();
     el('submitButton').disabled = el('loginTab').disabled = el('registerTab').disabled = true;

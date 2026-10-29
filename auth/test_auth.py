@@ -17,8 +17,8 @@ from storage.database import make_database
 from storage.migrate import upgrade_database
 from web.app import app, contexts, jobs
 
-PASSWORD = "a sufficiently long test passphrase"
-NEW_PASSWORD = "another sufficiently long passphrase"
+PASSWORD = "Test-Password2026!"
+NEW_PASSWORD = "New-Password2026!"
 
 
 class AuthTests(unittest.TestCase):
@@ -95,6 +95,33 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(response.json()["display_name"], "alice")
         self.login()
         self.assertEqual(self.client.get("/api/auth/me").json()["display_name"], "alice")
+
+    def test_new_password_length_and_composition(self):
+        invalid = ["Aa1!aaa", "Aa1!" + "a" * 17, "abcd123!", "ABCD123!", "Abcdefg!", "Abcd1234", "Abcd123 "]
+        for password in invalid:
+            response = self.client.post("/api/auth/register", json={"username":"policy", "password":password})
+            self.assertEqual(response.status_code, 422)
+            self.assertIn("8–20", response.json()["detail"])
+            self.assertNotIn(password, response.text)
+        for index, password in enumerate(["Aa1!aaaa", "Aa1!" + "a" * 16]):
+            response = self.client.post("/api/auth/register", json={"username":f"valid_{index}", "password":password})
+            self.assertEqual(response.status_code, 201, response.text)
+        self.register(); self.login()
+        for password in invalid:
+            response = self.client.post("/api/auth/change-password", json={"current_password":PASSWORD, "new_password":password})
+            self.assertEqual(response.status_code, 422)
+        response = self.client.post("/api/auth/change-password", json={"current_password":PASSWORD, "new_password":"Aa1!aaaa"})
+        self.assertEqual(response.status_code, 204)
+        self.login(password="Aa1!aaaa")
+
+    def test_existing_long_password_can_still_log_in(self):
+        from auth.security import passwords
+        user = self.register()
+        legacy = "a previously permitted long passphrase"
+        with self.sessions() as db:
+            db.get(User, user.id).password_hash = passwords.hash(legacy)
+            db.commit()
+        self.login(password=legacy)
 
     def test_registration_can_be_closed(self):
         from dataclasses import replace

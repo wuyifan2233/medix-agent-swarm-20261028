@@ -16,7 +16,7 @@ def main():
     upgrade_database(settings.database_url)
     username = input("Admin username (3-32 letters/digits/underscore): ")
     display_name = input("Display name: ")
-    password = getpass.getpass("Password (15-128 characters): ")
+    password = getpass.getpass("Password (8-20 chars; uppercase, lowercase, digit and symbol): ")
     if password != getpass.getpass("Confirm password: "):
         raise ValueError("Passwords do not match")
     data = Registration(username=username, display_name=display_name, password=password)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     try:
         main()
     except ValidationError:
-        print("Invalid input: username 3-32 ASCII letters/digits/underscore, nonempty name, password 15-128 characters.", file=sys.stderr)
+        print("Invalid input: username 3-32 ASCII letters/digits/underscore, nonempty name, password 8-20 characters including uppercase, lowercase, digit and symbol.", file=sys.stderr)
         sys.exit(1)
     except (ValueError, HTTPException) as exc:
         print(exc.detail if isinstance(exc, HTTPException) else str(exc), file=sys.stderr)

@@ -35,6 +35,8 @@ byId('logout').onclick = () => MedixAuth.logout().catch(showError);
 byId('logoutAll').onclick = () => MedixAuth.logout(true).catch(showError);
 byId('passwordForm').onsubmit = async event => {
   event.preventDefault(); byId('feedback').textContent = '';
+  const policyError = MedixPasswordPolicy.error(byId('newPassword').value);
+  if (policyError) return showError(new Error(policyError));
   if (byId('newPassword').value !== byId('confirmPassword').value) return showError(new Error('两次输入的新密码不一致。'));
   const button = event.target.querySelector('button'); button.disabled = true;
   try {
