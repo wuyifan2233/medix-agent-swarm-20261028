@@ -73,7 +73,7 @@ Worker 通过 [`SkillRegistryMixin`](../agents/skill_registry_mixin.py) 从 `.cl
 ..\.medix-venv\Scripts\python.exe -c "from runtime_paths import DB_PATH; print(DB_PATH)"
 ```
 
-`MEDIX_DB_PATH` 可覆盖该路径。启动迁移只读旧库，目标已存在且记录数不符时会退出。不要直接覆盖有自定义数据的目标，也不要在多个进程中同时打开同一目录。
+`MEDIX_DB_PATH` 可覆盖该路径，通常无需设置。`MedicalKnowledgeBase` 初始化统一调用 `knowledge/bootstrap.py`：默认集合为空时自动只读导入旧库，已有非空集合直接使用并保留自定义文档。迁移脚本复用相同逻辑；导入后数量不符、向量维度不符、源文件缺失等情况会明确失败，不把空库报告为成功。不要把源文件当作V3目录，不要在多个进程中同时打开同一目录。
 
 原文 TXT、旧版向量库和当前向量库是不同数据：直接修改 TXT 不会自动更新旧向量或当前索引。新增文档需调用知识库导入能力并规划索引更新；当前迁移脚本只用于恢复附带的原始 180 条向量，不能充当任意增量数据同步脚本。
 
