@@ -10,11 +10,11 @@ _kb_instance = None
 
 
 def get_knowledge_base():
-    """获取知识库单例"""
+    """获取知识库单例；Milvus 不可用时回落到本地迷你检索。"""
     global _kb_instance
     if _kb_instance is None:
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        _kb_instance = MedicalKnowledgeBase()
+        from knowledge import get_knowledge_base as resolve_knowledge_base
+        _kb_instance = resolve_knowledge_base()
     return _kb_instance
 
 

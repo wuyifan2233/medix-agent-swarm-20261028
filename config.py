@@ -3,6 +3,12 @@ import ast
 import os
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
+
 source = Path(os.environ.get("MEDIX_CONFIG_PATH", "D:/AI training/config.py"))
 settings = {}
 if source.is_file():

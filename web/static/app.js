@@ -176,7 +176,11 @@ async function refreshHealth() {
   try {
     const response = await fetch('/api/health'); if (!response.ok) throw new Error(); const data = await response.json(); state.health = data;
     $('modelState').textContent = data.model_configured ? '已配置' : '待配置'; $('modelDot').className = `status-dot ${data.model_configured ? 'ready' : 'error'}`;
-    $('kbState').textContent = data.knowledge === 'ready' ? `${data.documents} 个片段` : data.knowledge === 'error' ? '初始化失败' : '准备中'; $('kbDot').className = `status-dot ${data.knowledge === 'ready' ? 'ready' : data.knowledge === 'error' ? 'error' : ''}`;
+    const kbReady = data.knowledge === 'ready';
+    const kbLabel = kbReady
+      ? `${data.documents} 个片段${data.knowledge_backend === 'mini' ? ' · 迷你库' : ''}`
+      : data.knowledge === 'error' ? '初始化失败' : '准备中';
+    $('kbState').textContent = kbLabel; $('kbDot').className = `status-dot ${kbReady ? 'ready' : data.knowledge === 'error' ? 'error' : ''}`;
     if (!data.memory_configured) $('memoryHelp').textContent = '服务端未配置 Mem0 Key，当前仅使用本次对话的上下文。'; updateComposer();
     if (data.knowledge === 'loading') setTimeout(refreshHealth, 3000);
   } catch { $('modelState').textContent = '服务未连接'; $('modelDot').className = 'status-dot error'; setTimeout(refreshHealth, 5000); }
@@ -232,7 +236,7 @@ document.querySelectorAll('[data-action]').forEach(button => button.onclick = ()
     $('dialogContent').innerHTML = `<p>提问时，MediX 会检索项目自带的本地医学知识库，帮助你理解相关信息。</p><div class="dialog-stat"><b>${count}</b> 个已加载资料片段</div><p><strong>涵盖方向</strong><br>常见健康问题、生活方式、疾病编码与临床指南类资料。</p><p><strong>怎样查看来源？</strong><br>回答下方的「本地检索参考」会展示实际检索到的文件名及原文片段。</p><p>本地内容尚未完成权威性与时效性审核，请结合医生意见核实。</p>`;
   } else {
     $('dialogTitle').textContent = '把健康问题，说给我听';
-    $('dialogContent').innerHTML = '<p><strong>01 · 描述你的问题</strong><br>可以说说具体症状、持续时间和已经了解的情况。不确定怎么描述，也可以直接问。</p><p><strong>02 · 图片也能一起问</strong><br>上传清晰的报告、药盒或记录；支持粘贴和拖入图片。最多 3 张，每张不超过 8 MB，支持 JPG、PNG、WebP。</p><p><strong>03 · 接着聊，不必重复</strong><br>可根据本轮图片继续追问。开启新对话会重置本轮上下文；刷新页面不会保留聊天记录。</p><p>默认关闭长期记忆。开启后，对话和图片解读摘要会发送至 Mem0，供后续会话检索。</p>';
+    $('dialogContent').innerHTML = '<p><strong>01 · 描述你的问题</strong><br>可以说说具体症状、持续时间和已经了解的情况。不确定怎么描述，也可以直接问。</p><p><strong>02 · 图片也能一起问</strong><br>上传清晰的报告、药盒或记录；支持粘贴和拖入图片。最多 3 张，每张不超过 8 MB，支持 JPG、PNG、WebP。</p><p><strong>03 · 接着聊，不必重复</strong><br>可根据本轮图片继续追问。开启新对话会重置本轮上下文；刷新页面不会保留聊天记录。</p><p>默认关闭长期记忆。开启后，对话和图片解读摘要会发送至 Mem0，供后续会话检索。</p><p>用药、就诊和复诊提醒会在到点后出现在当前页面。刷新后原来的对话不会保留，未读提醒仍会显示。</p>';
   }
   $('infoDialog').showModal();
 });
@@ -263,3 +267,70 @@ $('refreshPrompts').onclick = () => {
     $('questionChips').append(button);
   });
 };
+state.seenReminders = new Set();
+function showReminder(item) {
+  document.body.classList.add('chatting');
+  $('welcome').hidden = true;
+  $('messages').classList.add('active');
+  const row = document.createElement('article');
+  row.className = 'message assistant reminder';
+  row.dataset.sessionId = item.session_id || '';
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.innerHTML = icon(item.kind === 'medication' ? 'pill' : 'heart');
+  const main = document.createElement('div');
+  main.className = 'message-main';
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  label.innerHTML = `${escapeText(item.label)} <small>定时提醒</small>`;
+  const answer = document.createElement('div');
+  answer.className = 'answer';
+  const text = document.createElement('p');
+  text.textContent = item.canonical_text;
+  answer.append(text);
+  main.append(label, answer);
+  row.append(avatar, main);
+  $('messages').append(row);
+  scrollDown();
+}
+function renderUpcoming(items) {
+  const list = $('reminderList');
+  list.replaceChildren();
+  $('reminderCount').textContent = items.length ? String(items.length) : '';
+  $('reminderEmpty').hidden = items.length > 0;
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'reminder-card';
+    const title = document.createElement('strong');
+    title.textContent = item.label;
+    const when = document.createElement('small');
+    when.textContent = item.next_fire_at;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '取消';
+    button.setAttribute('aria-label', `取消${item.label}`);
+    button.onclick = () => cancelReminder(item.id);
+    card.append(title, when, button);
+    list.append(card);
+  });
+}
+async function cancelReminder(id) {
+  const response = await fetch(`/api/reminders/${id}/cancel`, {method: 'POST'});
+  if (!response.ok) { toast('没有取消这条提醒。'); return; }
+  toast('已取消这条提醒。');
+  refreshReminders();
+}
+async function refreshReminders() {
+  try {
+    const response = await fetch('/api/reminders');
+    if (!response.ok) return;
+    const data = await response.json();
+    renderUpcoming(data.upcoming || []);
+    const fresh = (data.unread || []).filter(item => !state.seenReminders.has(item.id));
+    if (!fresh.length) return;
+    fresh.forEach(item => { state.seenReminders.add(item.id); showReminder(item); });
+    await fetch('/api/reminders/read', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids: fresh.map(item => item.id)})});
+  } catch { /* 下一轮轮询再试 */ }
+}
+refreshReminders();
+setInterval(refreshReminders, 15000);

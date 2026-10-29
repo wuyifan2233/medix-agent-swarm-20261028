@@ -26,11 +26,13 @@ MAX_BODY = 34 * 1024 * 1024
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="medix-chat")
 jobs = {}
 contexts = {}
-health = {"knowledge": "loading", "documents": 0}
+health = {"knowledge": "loading", "documents": 0, "knowledge_backend": "loading"}
 LABELS = {"search_knowledge": "检索医学知识库", "recommend_lifestyle": "整理生活方式建议",
           "assess_risk": "评估症状风险", "analyze_symptoms": "分析症状", "disease_code": "查询疾病编码",
           "clinical_guideline": "检索临床指南", "deep_research": "检索与综合文献",
-          "search_history": "查看本轮上下文", "search_similar_cases": "检索长期记忆"}
+          "search_history": "查看本轮上下文", "search_similar_cases": "检索长期记忆",
+          "scheduled_reminder": "设置提醒"}
+COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 
 def normalize_image(item):
@@ -60,20 +62,30 @@ def normalize_image(item):
 
 def warmup():
     try:
-        from knowledge.scripts.migrate_legacy_db import migrate
-        migrate()
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        kb = MedicalKnowledgeBase()
-        health.update(knowledge="ready", documents=kb.count_documents())
+        try:
+            from knowledge.scripts.migrate_legacy_db import migrate
+            migrate()
+        except Exception as exc:
+            logger.warning("Knowledge migrate skipped ({})", type(exc).__name__)
+        from knowledge import get_knowledge_base
+        kb = get_knowledge_base()
+        health.update(knowledge="ready", documents=kb.count_documents(),
+                      knowledge_backend=getattr(kb, "backend", "milvus"))
     except Exception as exc:
-        health.update(knowledge="error", documents=0)
+        health.update(knowledge="error", documents=0, knowledge_backend="none")
         logger.error("Web knowledge initialization failed ({})", type(exc).__name__)
 
 
 @asynccontextmanager
 async def lifespan(app):
+    from reminders.service import get_service
+    reminders = get_service()
+    reminders.start()
     asyncio.get_running_loop().run_in_executor(executor, warmup)
-    yield
+    try:
+        yield
+    finally:
+        reminders.stop()
 
 
 app = FastAPI(title="MediX Chat", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -89,8 +101,7 @@ async def local_session(request, call_next):
     fresh = not re.fullmatch(r"[a-f0-9]{32}", browser_id)
     request.state.browser_id = uuid.uuid4().hex if fresh else browser_id
     response = await call_next(request)
-    if fresh:
-        response.set_cookie("medix_browser", request.state.browser_id, httponly=True, samesite="strict", max_age=86400)
+    response.set_cookie("medix_browser", request.state.browser_id, httponly=True, samesite="strict", max_age=COOKIE_MAX_AGE)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
@@ -121,7 +132,7 @@ async def analyze(job, payload, session_id, memory_user_id):
     if LLM_CONFIG.get("api_key") in {None, "", "not-configured"}:
         raise ValueError("服务端尚未配置模型 API Key，请通过启动脚本配置。")
     from core import LLMClient
-    from knowledge.milvus_kb import MedicalKnowledgeBase
+    from knowledge import get_knowledge_base
     from swarm import SwarmCoordinator
 
     question = payload["message"] or "请解读图片中的可见信息，并说明不确定之处。"
@@ -140,7 +151,7 @@ async def analyze(job, payload, session_id, memory_user_id):
             await client.client.close()
 
     stage(job, "knowledge", "正在检索本地医学资料")
-    kb = MedicalKnowledgeBase()
+    kb = get_knowledge_base()
     candidates = kb.search((question + "\n" + observed)[:4000], top_k=10)
     hits, seen = [], set()
     for hit in candidates:
@@ -196,19 +207,21 @@ async def analyze(job, payload, session_id, memory_user_id):
 
 
 def run_job(job, payload, session_id, memory_user_id):
-    job["status"] = "running"
-    job["started"] = time.monotonic()
-    try:
-        if health["knowledge"] != "ready":
-            raise ValueError("知识库尚未就绪，请检查服务日志后重试。")
-        async def bounded():
-            await asyncio.wait_for(analyze(job, payload, session_id, memory_user_id), timeout=180)
-        asyncio.run(bounded())
-        job.update(status="completed", stage="completed", label="分析完成")
-    except Exception as exc:
-        logger.error("Web chat job failed ({})", type(exc).__name__)
-        message = str(exc) if isinstance(exc, ValueError) else "分析暂时未能完成，请重试；若持续失败，请检查服务端接口配置和网络。"
-        job.update(status="failed", stage="failed", label="分析未完成", error=message)
+    from reminders.context import bind_identity
+    with bind_identity(memory_user_id, session_id):
+        job["status"] = "running"
+        job["started"] = time.monotonic()
+        try:
+            if health["knowledge"] != "ready":
+                raise ValueError("知识库尚未就绪，请检查服务日志后重试。")
+            async def bounded():
+                await asyncio.wait_for(analyze(job, payload, session_id, memory_user_id), timeout=180)
+            asyncio.run(bounded())
+            job.update(status="completed", stage="completed", label="分析完成")
+        except Exception as exc:
+            logger.error("Web chat job failed ({})", type(exc).__name__)
+            message = str(exc) if isinstance(exc, ValueError) else "分析暂时未能完成，请重试；若持续失败，请检查服务端接口配置和网络。"
+            job.update(status="failed", stage="failed", label="分析未完成", error=message)
 
 
 @app.post("/api/chat", status_code=202)
@@ -262,6 +275,38 @@ def job_status(job_id: str, request: Request):
     if not job or job["owner"] != request.state.browser_id:
         raise HTTPException(404, "未找到这次分析，请重新提问。")
     return {key: value for key, value in job.items() if key not in {"owner", "created", "started"}}
+
+
+def browser_user(request):
+    return "web-" + request.state.browser_id
+
+
+@app.get("/api/reminders")
+def list_reminders(request: Request):
+    from reminders.service import get_service
+    return get_service().snapshot(browser_user(request))
+
+
+@app.post("/api/reminders/read")
+async def read_reminders(request: Request):
+    from reminders.service import get_service
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "已读列表格式不正确。") from exc
+    ids = payload.get("ids") if isinstance(payload, dict) else None
+    if not isinstance(ids, list) or any(not isinstance(item, int) for item in ids):
+        raise HTTPException(400, "已读列表格式不正确。")
+    get_service().mark_read(browser_user(request), ids)
+    return {"ok": True}
+
+
+@app.post("/api/reminders/{reminder_id}/cancel")
+def cancel_reminder(reminder_id: str, request: Request):
+    from reminders.service import get_service
+    if not get_service().cancel(browser_user(request), reminder_id):
+        raise HTTPException(404, "没有找到这条提醒。")
+    return {"ok": True}
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")

@@ -9,6 +9,12 @@ swarm:
 
   # 任务分解规则（LeadAgent 使用）
   task_decomposition_rules:
+    - name: "scheduled_reminder"
+      pattern: "提醒我|定时提醒|叫我吃药|用药提醒|就诊提醒|复诊提醒|记得叫我"
+      max_subtasks: 1
+      reason: "设提醒只交给咨询助手，不拆给症状分析或研究助手"
+      example: "提醒我明天早上8点吃阿司匹林"
+
     - name: "simple_query"
       pattern: "单一症状|常见疾病科普|健康建议|如何预防"
       max_subtasks: 1
@@ -37,6 +43,11 @@ swarm:
 
   # Agent 选择规则（强制约束）
   agent_selection_rules:
+    - if_keywords: ["提醒我", "定时提醒", "叫我吃药", "用药提醒", "就诊提醒", "复诊提醒", "记得叫我"]
+      must_include: ["consultation_agent"]
+      reason: "日程提醒只由咨询助手处理，症状分析和研究助手不改日程"
+      priority: high
+
     - if_symptoms: ["胸痛", "呼吸困难", "心悸", "昏厥", "剧烈头痛", "突然视力模糊"]
       must_include: ["diagnostic_agent"]
       reason: "高危症状必须风险评估"

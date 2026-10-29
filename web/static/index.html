@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=2"><script src="/assets/app.js?v=2" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><script src="/assets/app.js?v=4" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -36,6 +36,9 @@
 </nav>
 <div class="conversation-heading">本次对话<span>仅本次保留</span></div>
 <div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
+<div class="conversation-heading">定时提醒<span id="reminderCount"></span></div>
+<div id="reminderList" class="reminder-list" aria-live="polite"></div>
+<p id="reminderEmpty" class="reminder-empty">还没有即将到来的提醒</p>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
 <div class="sidebar-bottom">
 <div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>
