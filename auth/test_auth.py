@@ -89,6 +89,13 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertNotIn("secret-123", response.text)
 
+    def test_registration_defaults_display_name_to_username(self):
+        response = self.client.post("/api/auth/register", json={"username":"Alice", "password":PASSWORD})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["display_name"], "alice")
+        self.login()
+        self.assertEqual(self.client.get("/api/auth/me").json()["display_name"], "alice")
+
     def test_registration_can_be_closed(self):
         from dataclasses import replace
         app.state.auth_service = AuthService(self.sessions, replace(self.settings, registration_enabled=False))

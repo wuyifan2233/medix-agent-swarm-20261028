@@ -14,8 +14,8 @@
     registering = value;
     el('loginTab').setAttribute('aria-selected', String(!value));
     el('registerTab').setAttribute('aria-selected', String(value));
-    for (const id of ['nameField', 'confirmField', 'passwordHint']) el(id).hidden = !value;
-    el('displayName').required = value; el('confirmPassword').required = value;
+    for (const id of ['confirmField', 'passwordHint']) el(id).hidden = !value;
+    el('confirmPassword').required = value;
     el('password').minLength = value ? 15 : 1;
     el('password').autocomplete = value ? 'new-password' : 'current-password';
     el('formTitle').textContent = value ? '注册 MediX' : '登录 MediX';
@@ -89,7 +89,6 @@
     el('submitButton').textContent = isRegister ? '创建中…' : '登录中…'; el('feedback').textContent = '';
     try {
       const payload = {username:el('username').value, password};
-      if (isRegister) payload.display_name = el('displayName').value.trim();
       const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/login', {
         method:'POST', body:JSON.stringify(payload), signal:requestController.signal
       });

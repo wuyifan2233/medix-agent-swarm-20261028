@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><link rel="stylesheet" href="/assets/auth-modal.css?v=4"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/app.js?v=4" defer></script><script src="/assets/login.js?v=3" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><link rel="stylesheet" href="/assets/auth-modal.css?v=4"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/app.js?v=4" defer></script><script src="/assets/login.js?v=4" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -83,7 +83,6 @@
   <form id="authForm">
     <label for="username">用户名</label>
     <input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" placeholder="字母、数字或下划线" required autofocus>
-    <div id="nameField" hidden><label for="displayName">怎么称呼你</label><input id="displayName" name="display_name" autocomplete="nickname" maxlength="60" placeholder="请输入展示名称"></div>
     <label for="password">密码</label>
     <div class="auth-password"><input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" placeholder="请输入密码" required><button id="togglePassword" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div>
     <p id="passwordHint" class="auth-hint" hidden>15–128 个字符，建议使用容易记住的长口令。</p>

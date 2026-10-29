@@ -21,11 +21,13 @@ class Credentials(StrictModel):
 
 class Registration(Credentials):
     password: str = Field(min_length=15, max_length=128)
-    display_name: str = Field(min_length=1, max_length=60)
+    display_name: str | None = Field(default=None, min_length=1, max_length=60)
 
     @field_validator("display_name")
     @classmethod
     def clean_name(cls, value):
+        if value is None:
+            return None
         value = value.strip()
         if not value:
             raise ValueError("请输入展示名称")
