@@ -80,7 +80,14 @@ avatarFile.onchange = () => {
   if(file.size>2*1024*1024) { avatarFile.value=''; return showError(new Error('头像图片不能超过 2 MB。')); }
   if(!['image/png','image/jpeg','image/webp'].includes(file.type)) { avatarFile.value=''; return showError(new Error('请上传 JPG、PNG 或 WebP 图片。')); }
   const reader = new FileReader(), mine = epoch;
-  reader.onload = () => { if(mine===epoch && dialog.open) saveAvatar(reader.result); };
+  reader.onload = async () => {
+    if(mine!==epoch || !dialog.open) return;
+    try {
+      const cropped = await MedixAvatarCrop.open(reader.result);
+      if(cropped && mine===epoch && dialog.open) await saveAvatar(cropped);
+    } catch (error) { if(mine===epoch) showError(new Error('无法读取或裁剪图片，请换一张图片。')); }
+    finally { avatarFile.value=''; }
+  };
   reader.onerror = () => showError(new Error('无法读取图片，请重新选择。'));
   reader.readAsDataURL(file);
 };
