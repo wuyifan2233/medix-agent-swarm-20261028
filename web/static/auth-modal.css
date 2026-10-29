@@ -12,6 +12,10 @@
   font-size: 12px; font-weight: 500; box-shadow: none;
 }
 .topbar .top-login, .topbar .top-account { border-color: #6375e9; }
+.topbar .guide-button.topbar-action {
+  background: #fff; color: #74819d; border-color: #d6ddeb;
+}
+.topbar .guide-button.topbar-action:hover { background: #f1f4fc; color: #6375e9; border-color: #b6c4f0; }
 .top-account { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
 .profile #profileLogin { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .auth-dialog {
