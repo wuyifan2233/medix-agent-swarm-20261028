@@ -85,9 +85,9 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/auth/register", json=payload).status_code, 422)
 
     def test_validation_does_not_echo_passwords(self):
-        response = self.client.post("/api/auth/register", json={"username":"alice", "password":"secret-123", "display_name":"A"})
+        response = self.client.post("/api/auth/register", json={"username":"alice", "password":"short12", "display_name":"A"})
         self.assertEqual(response.status_code, 422)
-        self.assertNotIn("secret-123", response.text)
+        self.assertNotIn("short12", response.text)
 
     def test_registration_defaults_display_name_to_username(self):
         response = self.client.post("/api/auth/register", json={"username":"Alice", "password":PASSWORD})
@@ -97,13 +97,15 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/auth/me").json()["display_name"], "alice")
 
     def test_new_password_length_and_composition(self):
-        invalid = ["Aa1!aaa", "Aa1!" + "a" * 17, "abcd123!", "ABCD123!", "Abcdefg!", "Abcd1234", "Abcd123 "]
+        invalid = ["Aa1!aaa", "Aa1!" + "a" * 17, "abcdefgh", "ABCDEFGH", "12345678", "!!!!@@@@",
+                   "abcd1234", "ABCD1234", "Abcdefgh", "abcd!!!!", "ABCD!!!!", "1234!!!!", "abcd123 "]
         for password in invalid:
             response = self.client.post("/api/auth/register", json={"username":"policy", "password":password})
             self.assertEqual(response.status_code, 422)
             self.assertIn("8–20", response.json()["detail"])
             self.assertNotIn(password, response.text)
-        for index, password in enumerate(["Aa1!aaaa", "Aa1!" + "a" * 16]):
+        for index, password in enumerate(["Aa1!aaaa", "Aa1!" + "a" * 16,
+                                          "Abcd1234", "abcd123!", "ABCD123!", "Abcdefg!"]):
             response = self.client.post("/api/auth/register", json={"username":f"valid_{index}", "password":password})
             self.assertEqual(response.status_code, 201, response.text)
         self.register(); self.login()
