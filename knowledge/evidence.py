@@ -9,11 +9,11 @@ import jieba
 import numpy as np
 from rank_bm25 import BM25Okapi
 from pymilvus import MilvusClient
-from sentence_transformers import SentenceTransformer
+from knowledge.embeddings import create_embedder, normalize_vectors
+from knowledge.reranking import create_reranker, rerank_candidates
 from knowledge.bootstrap import validate_target
 from knowledge.corpus import LOCAL, CHUNK_VERSION, chunk_document, digest, load_corpus
 
-MODEL = 'BAAI/bge-small-zh-v1.5'
 ALIASES = {'扑热息痛': '对乙酰氨基酚', '拉肚子': '腹泻', '流行性感冒': '流感', '血压高': '高血压'}
 
 
@@ -54,17 +54,13 @@ class EvidenceKnowledgeBase:
             if getattr(self, '_initialized', False):
                 return
             docs = load_corpus()
-            cache = Path(os.environ.get('HF_HOME', str(Path.home()/'.cache/huggingface')))
-            snapshots = cache/'hub/models--BAAI--bge-small-zh-v1.5/snapshots'
-            available = sorted(snapshots.glob('*')) if snapshots.exists() else []
-            model_path = str(available[-1]) if available else MODEL
-            self.embedding_model = SentenceTransformer(model_path, device='cpu')
-            self.model_revision = Path(model_path).name if available else MODEL
-            self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
+            self.reranker = create_reranker()
+            self.embedding_model = create_embedder()
+            self.embedding_dim = self.embedding_model.dimension
             self.rows = [chunk for doc in docs for chunk in chunk_document(doc, self.embedding_model.tokenizer)]
             if not self.rows or len({r['id'] for r in self.rows}) != len(self.rows):
                 raise ValueError('Empty corpus or duplicate chunk IDs')
-            self.version = digest(json.dumps({'chunks':[(r['id'],r['metadata']['content_sha256'],r['metadata']['url']) for r in self.rows],'model':MODEL,'model_revision':self.model_revision,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))[:16]
+            self.version = digest(json.dumps({'chunks':[(r['id'],r['metadata']['content_sha256'],r['metadata']['url']) for r in self.rows],'embedding':self.embedding_model.identity,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))[:16]
             # MEDIX_DB_PATH remains the legacy database setting. Evidence uses its own
             # versioned root so migration cannot accidentally insert bundled samples.
             import tempfile
@@ -80,13 +76,19 @@ class EvidenceKnowledgeBase:
                 if count not in (0,len(self.rows)):
                     raise ValueError('Incomplete evidence index; choose a fresh MEDIX_EVIDENCE_ROOT')
                 if count == 0:
-                    vectors = self.embedding_model.encode([r['content'] for r in self.rows],normalize_embeddings=True,show_progress_bar=False)
+                    vectors = self.embedding_model.encode_documents([r['content'] for r in self.rows])
                     self.milvus_client.insert(self.collection_name,[{'id':r['id'],'vector':v.tolist(),'content':r['content'],'metadata':json.dumps(r['metadata'],ensure_ascii=False),'doc_type':r['metadata']['type']} for r,v in zip(self.rows,vectors)])
                     self.milvus_client.flush(self.collection_name)
                 self.milvus_client.load_collection(self.collection_name)
-                actual = self.milvus_client.query(self.collection_name,filter='',output_fields=['id'],limit=len(self.rows)+1)
+                description=self.milvus_client.describe_collection(self.collection_name)
+                field=next(f for f in description['fields'] if f['name']=='vector')
+                if int(field['params']['dim'])!=self.embedding_dim:
+                    raise ValueError('Evidence index dimension does not match embedding backend')
+                actual = self.milvus_client.query(self.collection_name,filter='',output_fields=['id','vector'],limit=len(self.rows)+1)
                 if {r['id'] for r in actual} != {r['id'] for r in self.rows}:
                     raise ValueError('Evidence index identity mismatch')
+                stored=normalize_vectors([r['vector'] for r in actual],self.embedding_dim,len(actual))
+                self.document_vectors={r['id']:v for r,v in zip(actual,stored)}
             except Exception:
                 self.milvus_client.close()
                 raise
@@ -95,7 +97,7 @@ class EvidenceKnowledgeBase:
             self.documents = docs
             self.scope_terms = set(t for doc in docs for t in doc['metadata']['topics']) | {'用药','抗生素','咳嗽','补液盐','退热','退烧','低血糖','胰岛素'}
             self._initialized = True
-            (LOCAL/'index.json').write_text(json.dumps({'version':self.version,'database':self.db_path,'documents':len(docs),'chunks':len(self.rows),'model':MODEL,'model_revision':self.model_revision,'chunk_version':CHUNK_VERSION},ensure_ascii=False,indent=2),encoding='utf-8')
+            (LOCAL/'index.json').write_text(json.dumps({'version':self.version,'database':self.db_path,'documents':len(docs),'chunks':len(self.rows),'embedding':self.embedding_model.identity,'chunk_version':CHUNK_VERSION},ensure_ascii=False,indent=2),encoding='utf-8')
 
     def count_documents(self):
         return int(self.milvus_client.get_collection_stats(self.collection_name)['row_count'])
@@ -105,7 +107,7 @@ class EvidenceKnowledgeBase:
         if not isinstance(query,str) or not query.strip() or len(query)>8000 or not 1<=top_k<=20:
             raise ValueError('Query must be 1–8000 characters and top_k 1–20')
         query = normalize_query(query)
-        trace = {'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version}
+        trace = {'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version,'rerank':{'status':'skipped' if self.reranker else 'disabled'}}
         if insufficient_medication(query):
             return {'status':'needs_information','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库提供基础科普，不能据此确定个人用药、剂量或联合用药。请提供具体制剂、规格、年龄、相关病史及当前用药，并咨询医生或药师。'}
         # This is a deliberately small demo corpus: do not claim general medicine
@@ -114,7 +116,7 @@ class EvidenceKnowledgeBase:
             return {'status':'no_results','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库资料不足，该问题不在本批资料明确覆盖的主题内。'}
         try:
             with self._lock:
-                vector = self.embedding_model.encode([query],normalize_embeddings=True)[0]
+                vector = self.embedding_model.encode_query(query)
                 filt = 'doc_type == '+json.dumps(filter_type) if filter_type else ''
                 found = self.milvus_client.search(collection_name=self.collection_name,data=[vector.tolist()],limit=10,filter=filt,output_fields=['content','metadata'])
                 dense = found[0]
@@ -123,8 +125,7 @@ class EvidenceKnowledgeBase:
                 similarities = {h['id']:float(h['distance']) for h in dense}
                 extra = [self.by_id[cid] for cid in sparse if cid not in similarities]
                 if extra:
-                    extra_vec = self.embedding_model.encode([r['content'] for r in extra],normalize_embeddings=True)
-                    similarities.update({r['id']:float(np.dot(v,vector)) for r,v in zip(extra,extra_vec)})
+                    similarities.update({r['id']:float(np.dot(self.document_vectors[r['id']],vector)) for r in extra})
                 ranks = {}
                 for ids in ([h['id'] for h in dense],sparse):
                     for rank,cid in enumerate(ids,1):ranks[cid]=ranks.get(cid,0)+1/(60+rank)
@@ -137,7 +138,7 @@ class EvidenceKnowledgeBase:
                     if subjects and not any(s in row['content'] or s in row['metadata']['topics'] for s in subjects):continue
                     seen.add(row['content'])
                     hits.append({**row,'score':similarities[cid],'rrf_score':ranks[cid]})
-                    if len(hits)==top_k:break
+                hits,trace['rerank']=rerank_candidates(self.reranker,query,hits,top_k)
                 trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits))
                 return {'status':'ok' if hits else 'no_results','hits':hits,'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'' if hits else '当前知识库资料不足，未找到足够相关的证据。'}
         except Exception as exc:

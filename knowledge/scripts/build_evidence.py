@@ -7,5 +7,7 @@ from knowledge.evidence import EvidenceKnowledgeBase
 
 if __name__ == '__main__':
     kb=EvidenceKnowledgeBase()
-    print(json.dumps({'version':kb.version,'documents':len(kb.documents),'chunks':kb.count_documents(),'path':kb.db_path},ensure_ascii=False))
+    print(json.dumps({'version':kb.version,'documents':len(kb.documents),'chunks':kb.count_documents(),'path':kb.db_path,'embedding':kb.embedding_model.identity},ensure_ascii=False))
     kb.milvus_client.close()
+    kb.embedding_model.close()
+    if kb.reranker:kb.reranker.close()

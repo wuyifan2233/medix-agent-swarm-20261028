@@ -1,0 +1,509 @@
+{
+  "summary": {
+    "version": "c40ff74393ac435d",
+    "documents": 12,
+    "chunks": 56,
+    "chunk_budget_and_offsets_verified": true,
+    "in_domain_hit_at_3": 1.0,
+    "out_of_domain_passed": 5,
+    "needs_information_passed": 5,
+    "retrieval_p95_ms": 931.2,
+    "generation_evaluated": false,
+    "embedding": {
+      "provider": "gitee",
+      "endpoint": "https://ai.gitee.com/v1",
+      "model": "Qwen3-Embedding-8B",
+      "dimension": 4096,
+      "normalization": "l2",
+      "query_instruction": "Given a medical question, retrieve relevant passages that answer the question",
+      "document_instruction": "",
+      "tokenizer": "Qwen/Qwen3-Embedding-8B",
+      "tokenizer_revision": "unversioned"
+    },
+    "reranker": {
+      "provider": "none"
+    }
+  },
+  "cases": [
+    {
+      "id": "d01",
+      "kind": "in_domain",
+      "query": "普通感冒引起的咳嗽需要抗生素吗",
+      "expected_docs": [
+        "cold"
+      ],
+      "evidence_terms": [
+        "抗生素"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "cold",
+        "cold",
+        "paracetamol"
+      ],
+      "elapsed_ms": 633.5
+    },
+    {
+      "id": "d02",
+      "kind": "in_domain",
+      "query": "长期剧烈咳嗽有哪些严重后果",
+      "expected_docs": [
+        "cold"
+      ],
+      "evidence_terms": [
+        "咯血",
+        "晕厥"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "cold",
+        "cold",
+        "cold"
+      ],
+      "elapsed_ms": 664.4
+    },
+    {
+      "id": "d03",
+      "kind": "in_domain",
+      "query": "流感和普通感冒有什么区别",
+      "expected_docs": [
+        "flu"
+      ],
+      "evidence_terms": [
+        "流感",
+        "感冒"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "flu",
+        "flu",
+        "flu"
+      ],
+      "elapsed_ms": 637.4
+    },
+    {
+      "id": "d04",
+      "kind": "in_domain",
+      "query": "流感哪些人容易发生严重并发症",
+      "expected_docs": [
+        "flu"
+      ],
+      "evidence_terms": [
+        "老年",
+        "婴幼儿"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "flu",
+        "flu",
+        "flu"
+      ],
+      "elapsed_ms": 587.0
+    },
+    {
+      "id": "d05",
+      "kind": "in_domain",
+      "query": "儿童过敏性鼻炎有什么表现",
+      "expected_docs": [
+        "rhinitis"
+      ],
+      "evidence_terms": [
+        "鼻塞",
+        "鼻痒"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "rhinitis",
+        "rhinitis",
+        "rhinitis"
+      ],
+      "elapsed_ms": 209.0
+    },
+    {
+      "id": "d06",
+      "kind": "in_domain",
+      "query": "急性胃肠炎腹泻时饮食应该注意什么",
+      "expected_docs": [
+        "diarrhea"
+      ],
+      "evidence_terms": [
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diarrhea",
+        "diarrhea",
+        "diarrhea"
+      ],
+      "elapsed_ms": 586.4
+    },
+    {
+      "id": "d07",
+      "kind": "in_domain",
+      "query": "高血压没有症状是不是就不用管",
+      "expected_docs": [
+        "hypertension"
+      ],
+      "evidence_terms": [
+        "症状"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension",
+        "hypertension",
+        "hypertension"
+      ],
+      "elapsed_ms": 634.5
+    },
+    {
+      "id": "d08",
+      "kind": "in_domain",
+      "query": "高血压患者饮食生活方式怎样改善",
+      "expected_docs": [
+        "hypertension"
+      ],
+      "evidence_terms": [
+        "膳食",
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension",
+        "hypertension",
+        "hypertension"
+      ],
+      "elapsed_ms": 203.4
+    },
+    {
+      "id": "d09",
+      "kind": "in_domain",
+      "query": "糖尿病患者运动对血糖有什么益处",
+      "expected_docs": [
+        "diabetes"
+      ],
+      "evidence_terms": [
+        "胰岛素",
+        "血糖"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes",
+        "diabetes",
+        "diabetes"
+      ],
+      "elapsed_ms": 599.7
+    },
+    {
+      "id": "d10",
+      "kind": "in_domain",
+      "query": "糖尿病患者运动中怎样注意低血糖",
+      "expected_docs": [
+        "diabetes"
+      ],
+      "evidence_terms": [
+        "低血糖"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes",
+        "diabetes",
+        "diabetes"
+      ],
+      "elapsed_ms": 585.5
+    },
+    {
+      "id": "m01",
+      "kind": "in_domain",
+      "query": "对乙酰氨基酚为什么需要警惕重复用药",
+      "expected_docs": [
+        "paracetamol"
+      ],
+      "evidence_terms": [
+        "感冒药"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "paracetamol",
+        "paracetamol",
+        "paracetamol"
+      ],
+      "elapsed_ms": 588.1
+    },
+    {
+      "id": "m02",
+      "kind": "in_domain",
+      "query": "扑热息痛在复方感冒药中也有吗",
+      "expected_docs": [
+        "paracetamol"
+      ],
+      "evidence_terms": [
+        "感冒药"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "paracetamol",
+        "paracetamol",
+        "paracetamol"
+      ],
+      "elapsed_ms": 5716.1
+    },
+    {
+      "id": "m03",
+      "kind": "in_domain",
+      "query": "布洛芬有哪些剂型和使用注意事项",
+      "expected_docs": [
+        "ibuprofen"
+      ],
+      "evidence_terms": [
+        "剂型",
+        "注意事项"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "ibuprofen",
+        "ibuprofen",
+        "ibuprofen"
+      ],
+      "elapsed_ms": 634.3
+    },
+    {
+      "id": "m04",
+      "kind": "in_domain",
+      "query": "氯雷他定属于什么药物，在荨麻疹治疗中有什么作用",
+      "expected_docs": [
+        "loratadine"
+      ],
+      "evidence_terms": [
+        "抗组胺"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "loratadine",
+        "loratadine",
+        "loratadine"
+      ],
+      "elapsed_ms": 653.8
+    },
+    {
+      "id": "m05",
+      "kind": "in_domain",
+      "query": "口服补液盐配制时有哪些常见错误",
+      "expected_docs": [
+        "ors"
+      ],
+      "evidence_terms": [
+        "调配",
+        "浓度"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "ors",
+        "ors",
+        "ors"
+      ],
+      "elapsed_ms": 193.2
+    },
+    {
+      "id": "m06",
+      "kind": "in_domain",
+      "query": "口服补液盐可以直接加热吗",
+      "expected_docs": [
+        "ors"
+      ],
+      "evidence_terms": [
+        "加热"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "ors",
+        "ors",
+        "ors"
+      ],
+      "elapsed_ms": 931.2
+    },
+    {
+      "id": "b01",
+      "kind": "in_domain",
+      "query": "家庭测量血压选择什么血压计",
+      "expected_docs": [
+        "literacy"
+      ],
+      "evidence_terms": [
+        "上臂"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "literacy",
+        "literacy",
+        "hypertension"
+      ],
+      "elapsed_ms": 570.1
+    },
+    {
+      "id": "b02",
+      "kind": "in_domain",
+      "query": "家庭测血压记录哪些信息供医生参考",
+      "expected_docs": [
+        "literacy"
+      ],
+      "evidence_terms": [
+        "时间",
+        "读数"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "literacy",
+        "hypertension",
+        "literacy"
+      ],
+      "elapsed_ms": 280.7
+    },
+    {
+      "id": "b03",
+      "kind": "in_domain",
+      "query": "哮喘患者家里应注意哪些环境因素",
+      "expected_docs": [
+        "medication"
+      ],
+      "evidence_terms": [
+        "室内"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "medication",
+        "medication",
+        "medication"
+      ],
+      "elapsed_ms": 270.7
+    },
+    {
+      "id": "b04",
+      "kind": "in_domain",
+      "query": "哮喘患者就诊时为什么需要告知用药情况",
+      "expected_docs": [
+        "medication"
+      ],
+      "evidence_terms": [
+        "药物",
+        "病史"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "medication",
+        "medication",
+        "medication"
+      ],
+      "elapsed_ms": 639.8
+    },
+    {
+      "id": "o01",
+      "kind": "out_of_domain",
+      "query": "量子计算机纠错算法怎么实现",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "o02",
+      "kind": "out_of_domain",
+      "query": "怎样配置 Kubernetes 网络插件",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "o03",
+      "kind": "out_of_domain",
+      "query": "唐代科举制度的历史演变",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "o04",
+      "kind": "out_of_domain",
+      "query": "红烧肉具体做法和烹饪步骤",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "o05",
+      "kind": "out_of_domain",
+      "query": "行星发动机的设计与制造",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "s01",
+      "kind": "needs_information",
+      "query": "三岁孩子发烧布洛芬吃多少毫升",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "s02",
+      "kind": "needs_information",
+      "query": "怀孕了氯雷他定能吃吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "s03",
+      "kind": "needs_information",
+      "query": "肾功能不好对乙酰氨基酚用多少",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "s04",
+      "kind": "needs_information",
+      "query": "布洛芬和对乙酰氨基酚可以一起吃吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": "s05",
+      "kind": "needs_information",
+      "query": "血压正常了我能停药吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.0
+    }
+  ]
+}

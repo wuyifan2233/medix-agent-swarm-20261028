@@ -264,6 +264,8 @@ function retrievalDetails(trace) {
   const details = document.createElement('details'); details.className = 'observations';
   const summary = document.createElement('summary'); summary.textContent = '查看本次检索过程';
   const text = document.createElement('p'); text.textContent = `语义召回 ${trace.vector_candidates} 段 · 关键词召回 ${trace.keyword_candidates} 段 → 合并 ${trace.merged_candidates} 段 → 相关性过滤后提供 ${trace.selected} 段证据。检索耗时 ${trace.elapsed_ms} 毫秒。分数用于排序，不代表医学可信度。`;
+  if (trace.rerank?.status === 'ok') text.textContent += ` 已对 ${trace.rerank.candidates} 段候选完成相关性重排。`;
+  if (trace.rerank?.status === 'degraded') text.textContent += ` ${trace.rerank.message}`;
   details.append(summary, text); return details;
 }
 function showEvidence(source) {

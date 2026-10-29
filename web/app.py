@@ -67,7 +67,9 @@ def warmup():
         kb = MedicalKnowledgeBase()
         health.update(knowledge="ready", documents=kb.count_documents())
         if os.environ.get('MEDIX_KB_MODE') == 'evidence':
-            health.update(mode='evidence', source_documents=len(kb.documents), version=kb.version)
+            health.update(mode='evidence', source_documents=len(kb.documents), version=kb.version,
+                          embedding=kb.embedding_model.identity,
+                          reranker=kb.reranker.identity if kb.reranker else {'provider':'none'})
     except Exception as exc:
         health.update(knowledge="error", documents=0)
         logger.error("Web knowledge initialization failed ({})", type(exc).__name__)

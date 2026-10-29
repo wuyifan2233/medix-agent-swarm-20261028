@@ -2,13 +2,38 @@
 
 ## 范围与当前数据
 
-这是常见病与基础用药科普演示，不是完整临床知识库或药品说明书系统。12 份来源、71 个独立片段；覆盖感冒咳嗽、流感、儿童鼻炎、胃肠炎、高血压、糖尿病运动管理，以及对乙酰氨基酚、布洛芬、氯雷他定、口服补液盐的基础知识。部分资料为儿童或老年人主题，回答应尊重原文适用范围。
+这是常见病与基础用药科普演示，不是完整临床知识库或药品说明书系统。12 份来源，当前 Gitee Qwen 版为 56 个独立片段，原 BGE 版为 71 个；覆盖感冒咳嗽、流感、儿童鼻炎、胃肠炎、高血压、糖尿病运动管理，以及对乙酰氨基酚、布洛芬、氯雷他定、口服补液盐的基础知识。部分资料为儿童或老年人主题，回答应尊重原文适用范围。
 
 原定部分政府网站返回 403/412/445，故改用可下载的专业机构来源：11 份来自中华医学会科学普及部，1 份为新疆大学药学院转载科普中国的布洛芬资料。不是国家药监局核准说明书，没有将科普包装成临床指南。页面保留发布机构、日期与链接；布洛芬转载页未核定发布日期，显示“日期未注明”。
 
 `knowledge/sources.json` 是版本控制中的来源清单。`knowledge/.local/` 保存正文 Markdown、HTML 快照、哈希、获取日期及使用条件，已忽略提交。全文的再分发许可未确认，不能把本地快照直接加入 GitHub 或交付包；其他成员按脚本获取。来源核对仅表示 URL、机构与正文对应，不代表临床审核。旧版 TXT/SQLite 保持不变。
 
 ## 安装、构建与运行
+
+### Gitee Qwen3-Embedding-8B（证据版默认后端）
+
+嵌入接口为 `POST https://ai.gitee.com/v1/embeddings`，使用独立的 `GITEE_AI_API_KEY`，不要复用或覆盖聊天模型的 `OPENAI_API_KEY`。请求使用 `model=Qwen3-Embedding-8B`、`encoding_format=float`、显式 `dimensions=4096`，并严格校验响应。2026-10-29 实测省略 dimensions 时 Gitee 返回 1024 维，因此不能依赖原生模型维度推断服务端默认值。配置模板见根目录 `.env.example`；可复制成被 Git 忽略的 `.env.local` 保存本机默认凭据。嵌入后端只读取其中的 `GITEE_AI_API_KEY`，进程环境变量优先；其他开关仍用环境变量。
+
+在本机 PowerShell 通过隐藏输入设置凭据，再执行下方构建和运行命令：
+
+```powershell
+$secret = Read-Host 'Gitee AI API Key' -AsSecureString
+$env:GITEE_AI_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password
+$secret = $null
+$env:MEDIX_EMBEDDING_PROVIDER = 'gitee'
+```
+
+默认每批 8 段，使用 30 秒请求超时及 SDK 的两次重试；`MEDIX_EMBEDDING_BATCH_SIZE` 可调整为 1–1000。Qwen 只下载 tokenizer 用于分块，不下载 8B 权重；可用 `MEDIX_EMBEDDING_TOKENIZER_PATH` 指向提前下载的 tokenizer。查询按 Qwen 官方建议添加 `Instruct: ...\nQuery: ...`，文档不加查询指令。向量按响应 `index` 重排，检查条数、4096 维、有限值及非零范数，然后 L2 归一化。
+
+新索引版本包含后端、模型、维度、归一化方式、tokenizer revision 和查询指令，必须重建，不能复用旧的 512 维 BGE 向量。关键词召回使用已入库向量计算相似度，不重复向 API 发送文档。API 失败或缺 Key 时明确报错，不自动回退到 BGE，以免混用向量。
+
+**数据流变化：选择 Gitee 后，入库的公开资料片段和实际检索问题会发往 Gitee AI；本地仍保存语料与索引。远程向量检索需要联网。** 不要向 demo 输入真实个人健康资料。`HF_HUB_OFFLINE=1` 只影响本地 tokenizer 下载，不会使 Gitee API 离线运行。
+
+需要保留本地离线演示时，显式设置 `$env:MEDIX_EMBEDDING_PROVIDER='local'`，仍使用 BGE 和独立模型索引。普通旧库入口的模型与同事迁移逻辑不受影响。本节为新增接入；下文 2026-10-29 的 20/20 命中率、71 片段和延迟是此前 BGE 的验证记录，不是 Qwen 的效果结论。Qwen 重建后的 chunk 数与相似度分布可能变化，0.4 阈值需使用同一固定测试集重新核验。
+
+官方参考：[Gitee 嵌入接口](https://ai.gitee.com/docs/openapi/v1#tag/特征抽取/post/embeddings)、[官方 OpenAPI YAML](https://ai.gitee.com/v1/yaml)、[Gitee 向量化示例](https://ai.gitee.com/docs/products/apis/embeddings/)、[Qwen 模型与查询指令](https://github.com/QwenLM/Qwen3-Embedding)。
+
+2026-10-29 已使用本机默认配置完成真实 Gitee 构建与 30 题检索：56 个独立 chunk，4096 维，库内命中 20/20，库外和信息不足各 5/5，预热检索 p95 为 931.2 ms。记录见 `docs/qwen-evaluation.json`；没有调用聊天生成模型，也没有启用硅基流动重排。相同语料重启复用既有索引，不再次编码全部文档。
 
 在本分支根目录执行，使用 Python 3.12：
 
@@ -21,7 +46,7 @@ python knowledge/scripts/evaluate_evidence.py
 python run_kb_demo.py --port 8766
 ```
 
-打开 http://127.0.0.1:8766/，点击“医学知识库”，输入问题检索原文。无需模型 Key 即可检索和查看证据；聊天也会明确返回“本地原文检索结果，未调用模型生成回答”。图像理解、Agent 综合回答仍需模型 API 配置。
+打开 http://127.0.0.1:8766/，点击“医学知识库”，输入问题检索原文。无需聊天模型 Key 即可检索和查看证据，但默认 Gitee 后端需要嵌入 Key；聊天会明确返回“本地原文检索结果，未调用模型生成回答”。图像理解、Agent 综合回答仍需聊天模型 API 配置。
 
 模型由 `HF_HOME` 决定缓存位置，首次下载后可设置 `HF_HUB_OFFLINE=1`；不要在模型未缓存时开启离线模式。若复用旧工作区缓存，先将 `HF_HOME` 指向该目录。
 
@@ -46,7 +71,15 @@ python run_kb_demo.py --port 8766
 
 ## 检索与接口
 
-按标题/段落切分，用 BGE tokenizer 限制含标题块最长 384 tokens，长段落按句子边界拆分并最多重叠 48 tokens；保存 Markdown 原文字符区间。中文分词使用 jieba，关键词检索使用 rank-bm25。语义和关键词各召回最多 10 个候选，按 RRF 融合，余弦相似度至少 0.4，内容去重，默认返回 3 段。
+### 可选硅基流动重排（不是 embedding）
+
+`Qwen/Qwen3-Reranker-8B` 通过 `POST https://api.siliconflow.cn/v1/rerank` 对已召回的证据排序，不产生向量。填入 `.env.local` 中 `SILICONFLOW_API_KEY=xxx` 的占位值后，设置 `$env:MEDIX_RERANK_PROVIDER='siliconflow'` 并重启；默认 `none`，不发送重排请求。Key 的环境变量优先级与 Gitee 一致，两个凭据独立，均不提交 Git。
+
+顺序为：向量与 BM25 召回 → RRF → 相关性/主题过滤及去重 → 前 10 段候选重排 → 最多 3 段证据。请求含 `model`、`query`、`documents`、`instruction`、`top_n` 和 `return_documents=false`；不发送文档规定不适用于该模型的 `max_chunks_per_doc/overlap_tokens` 参数。按响应 `index` 映射回原文，校验完整索引和有限分数，绝不采用服务端回传文本替换本地证据。
+
+开启重排不改变 embedding 或索引版本，无需重新向量化。响应分数仅用于排序，不是医学可信度；接口超时、鉴权或响应错误时保留 RRF 顺序，并在检索过程展示降级状态，不伪报重排成功。开启后会将问题与最多 10 段候选原文发送至硅基流动。占位 Key 不能调用接口，真实服务效果需填 Key 后另行评测。官方文档：[重排接口](https://api-docs.siliconflow.cn/docs/api/rerank-post)。
+
+按标题/段落切分，用当前嵌入后端的 tokenizer 限制含标题块最长 384 tokens，长段落按句子边界拆分并最多重叠 48 tokens；保存 Markdown 原文字符区间。中文分词使用 jieba，关键词检索使用 rank-bm25。语义和关键词各召回最多 10 个候选，按 RRF 融合，余弦相似度至少 0.4，内容去重，默认返回 3 段。
 
 这是小型显式覆盖库：按来源主题和少量医疗术语做范围检查，库外问题不因偶然的向量相似度而返回证据。此规则会保守拒绝未覆盖的同义表达，不承诺通用医疗分类。具体用药、剂量、停换药与联合用药问题走保守提示规则，不进行个人剂量计算。
 
@@ -62,7 +95,7 @@ python run_kb_demo.py --port 8766
 ## 验证与路演
 
 ```powershell
-python -m unittest knowledge.test_bootstrap knowledge.test_evidence web.test_web -v
+python -m unittest knowledge.test_embeddings knowledge.test_reranking knowledge.test_bootstrap knowledge.test_evidence web.test_web -v
 python knowledge/scripts/evaluate_evidence.py
 ```
 
@@ -76,4 +109,4 @@ python knowledge/scripts/evaluate_evidence.py
 2. 输入“口服补液盐配制时有哪些常见错误”，点击证据，展示关键词高亮和官方原始发布链接。
 3. 输入“三岁孩子发烧布洛芬吃多少毫升”，展示知识库不从泛化科普计算个人剂量；再输入库外问题，展示资料不足。
 
-若已配置图文与工具调用模型，可改在聊天区展示带编号的真实生成回答；无 Key 时只展示原文检索，不能将其宣称为模型问答成功。路演前预热并检查 `knowledge=ready`，本地断网仍可检索和展开证据，外部原文链接和模型生成需要联网。
+若已配置图文与工具调用模型，可改在聊天区展示带编号的真实生成回答；无聊天 Key 时只展示原文检索，不能将其宣称为模型问答成功。路演前预热并检查 `knowledge=ready`。仅本地 BGE 模式可断网检索；已返回的证据可在页面展开，Gitee 查询编码、外部原文链接和模型生成需要联网。

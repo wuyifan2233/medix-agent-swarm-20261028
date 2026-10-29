@@ -15,7 +15,7 @@ ROOT_FILES = {'.gitignore', 'README.md', 'config.py', 'demo_basic.py', 'main.py'
               'requirements.txt', 'requirements.verified.txt', 'requirements.web.txt',
               'run_web.py', 'runtime_paths.py', 'setup.py', 'start.ps1', 'start_web.ps1',
               'verify_mem0.py', 'verify_runtime.py', 'package_project.py', 'web-ui-desktop.png',
-              'run_kb_demo.py', 'requirements.kb.txt', 'AGENTS.md'}
+              'run_kb_demo.py', 'requirements.kb.txt', 'AGENTS.md', '.env.example'}
 PATTERNS = [rb'sk-(?:proj-|ws-)?[A-Za-z0-9_.-]{16,}', rb'm0-[A-Za-z0-9]{16,}',
             rb'gh[pousr]_[A-Za-z0-9]{20,}', rb'AKIA[0-9A-Z]{16}',
             rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----']

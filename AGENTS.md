@@ -1,6 +1,8 @@
 # MediX 项目协作指南
 
 ## 本分支的证据库交付
+- 证据版默认嵌入后端为 Gitee `Qwen3-Embedding-8B`，通过 `GITEE_AI_API_KEY` 配置；`MEDIX_EMBEDDING_PROVIDER=local` 可显式使用 BGE。两种模型必须使用独立版本索引，不允许自动回退或迁入旧向量。真实 Gitee 验证需有 Key；`knowledge.test_embeddings` 使用模拟 HTTP。
+- `.env.local` 保存本机默认 `GITEE_AI_API_KEY` 和 `SILICONFLOW_API_KEY`，环境变量优先；该文件不得提交或展示。`MEDIX_RERANK_PROVIDER=none` 默认关闭可选硅基流动 Qwen 重排；填 Key 后显式设为 `siliconflow`，不是 embedding 后端。
 - 先读 `docs/KNOWLEDGE_DELIVERY.md`。本分支基于同事 `feature/rag`，保留默认集合的空库自动初始化。
 - 新证据演示使用 `requirements.kb.txt`，依次执行 `knowledge/scripts/fetch_sources.py`、`build_evidence.py`，通过 `run_kb_demo.py` 启动，默认 8766；普通 `run_web.py` 保持旧库兼容。
 - `MEDIX_KB_MODE=evidence` 为显式开关；`MEDIX_EVIDENCE_ROOT` 与原 `MEDIX_DB_PATH` 分离。不要对证据库运行旧版迁移或样例导入。

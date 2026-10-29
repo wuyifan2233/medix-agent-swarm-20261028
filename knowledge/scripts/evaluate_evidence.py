@@ -29,9 +29,13 @@ def main():
     durations=sorted(r['elapsed_ms'] for r in results if r['kind']!='needs_information')
     summary={'version':kb.version,'documents':len(kb.documents),'chunks':len(kb.rows),'chunk_budget_and_offsets_verified':True,'in_domain_hit_at_3':sum(r['passed'] for r in regular)/len(regular),'out_of_domain_passed':sum(r['passed'] for r in results if r['kind']=='out_of_domain'),'needs_information_passed':sum(r['passed'] for r in results if r['kind']=='needs_information'),'retrieval_p95_ms':durations[min(len(durations)-1,__import__('math').ceil(.95*len(durations))-1)],'generation_evaluated':False}
     report={'summary':summary,'cases':results}
+    summary['embedding']=kb.embedding_model.identity
+    summary['reranker']=kb.reranker.identity if kb.reranker else {'provider':'none'}
     Path('verification_evidence.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
     kb.milvus_client.close()
+    kb.embedding_model.close()
+    if kb.reranker:kb.reranker.close()
     return int(summary['in_domain_hit_at_3']<.9 or summary['out_of_domain_passed']!=5 or summary['needs_information_passed']!=5 or summary['retrieval_p95_ms']>2000)
 
 if __name__=='__main__':raise SystemExit(main())
