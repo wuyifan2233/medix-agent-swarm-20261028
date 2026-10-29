@@ -11,6 +11,11 @@
 .settings-body h3 { margin: 0 0 24px; font-size: 16px; font-weight: 600; }
 .settings-identity { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
 .settings-identity img { width: 52px; height: 52px; border-radius: 50%; }
+.settings-avatar-button { position: relative; padding: 0; border: 0; background: transparent; width: 52px; height: 52px; flex-shrink: 0; border-radius: 50%; overflow: hidden; }
+.settings-avatar-button img { display: block; object-fit: cover; }
+.settings-avatar-button span { position: absolute; bottom: 0; left: 0; right: 0; background: #29344999; color: #fff; font-size: 10px; line-height: 18px; }
+.settings-avatar-help { font-size: 11px; color: #8a94a6; line-height: 1.8; margin: -12px 0 24px; }
+.settings-avatar-help button { display: block; padding: 0; border: 0; color: #6375e9; background: transparent; margin-top: 8px; font-size: 11px; }
 .settings-identity strong { font-size: 16px; }.settings-identity p { margin: 6px 0 0; font-size: 12px; color: #8a94a6; }
 .settings-row { display: flex; justify-content: space-between; padding: 18px 0; border-top: 1px solid #eef0f5; font-size: 13px; color: #768096; }
 .settings-row span:last-child { color: #39465e; }

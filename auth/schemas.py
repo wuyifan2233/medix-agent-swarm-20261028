@@ -57,4 +57,5 @@ class CurrentUser:
 
 def public_user(user):
     return {"id": user.id, "username": user.username, "display_name": user.display_name,
+            "avatar_url": user.avatar_data,
             "role": user.role, "is_active": user.is_active, "created_at": user.created_at}

@@ -4,6 +4,7 @@ from sqlalchemy import func, select, update
 
 from auth.dependencies import require_admin, require_user, service
 from auth.models import AuthSession, User
+from auth.avatar import AvatarUpload, normalize_avatar
 from auth.schemas import Credentials, CurrentUser, PasswordChange, Registration, StatusChange, public_user
 
 router = APIRouter()
@@ -47,8 +48,34 @@ def login(data: Credentials, request: Request, response: Response):
 
 
 @router.get("/api/auth/me")
-def me(user: CurrentUser = Depends(require_user)):
-    return {"id": user.id, "username": user.username, "display_name": user.display_name, "role": user.role}
+def me(request: Request, user: CurrentUser = Depends(require_user)):
+    with service(request).sessions() as db:
+        avatar = db.get(User, user.id).avatar_data
+    return {"id": user.id, "username": user.username, "display_name": user.display_name, "role": user.role,
+            "avatar_url": avatar}
+
+
+@router.put("/api/auth/avatar")
+def update_avatar(data: AvatarUpload, request: Request, user: CurrentUser = Depends(require_user)):
+    try:
+        avatar = normalize_avatar(data.data)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    with service(request).sessions() as db:
+        row = db.get(User, user.id)
+        row.avatar_data = avatar
+        row.updated_at = time.time()
+        db.commit()
+    return {"avatar_url": avatar}
+
+
+@router.delete("/api/auth/avatar", status_code=204)
+def reset_avatar(request: Request, user: CurrentUser = Depends(require_user)):
+    with service(request).sessions() as db:
+        row = db.get(User, user.id)
+        row.avatar_data = None
+        row.updated_at = time.time()
+        db.commit()
 
 
 @router.get("/api/auth/csrf")

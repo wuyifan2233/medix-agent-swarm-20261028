@@ -11,12 +11,13 @@ class AuthBodyLimit:
         if scope["type"] != "http" or not protected or scope.get("method") not in {"POST", "PUT", "PATCH", "DELETE"}:
             return await self.app(scope, receive, send)
         body = bytearray()
+        maximum = 2_800_100 if scope.get("path") == "/api/auth/avatar" else self.maximum
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
                 return
             body.extend(message.get("body", b""))
-            if len(body) > self.maximum:
+            if len(body) > maximum:
                 return await JSONResponse({"detail": "请求内容过大。"}, status_code=413)(scope, receive, send)
             if not message.get("more_body", False):
                 break

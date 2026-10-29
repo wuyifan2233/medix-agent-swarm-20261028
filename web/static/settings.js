@@ -36,7 +36,6 @@ async function users() {
 byId('previous').onclick = () => { offset = Math.max(0, offset - 20); users().catch(showError); };
 byId('next').onclick = () => { offset += 20; users().catch(showError); };
 byId('logout').onclick = () => MedixAuth.logout().catch(showError);
-byId('logoutAll').onclick = () => MedixAuth.logout(true).catch(showError);
 byId('passwordForm').onsubmit = async event => {
   const mine = epoch;
   event.preventDefault(); byId('feedback').textContent = '';
@@ -50,6 +49,40 @@ byId('passwordForm').onsubmit = async event => {
     if (!response.ok) throw new Error(await MedixAuth.detail(response));
     event.target.reset(); MedixAuth.leave(true); MedixAuth.open();
   } catch (error) { if (mine === epoch) showError(error); } finally { button.disabled = false; }
+};
+
+const avatarButton = document.getElementById('settingsAvatarButton');
+const avatarFile = document.getElementById('settingsAvatarFile');
+const avatarReset = document.getElementById('settingsAvatarReset');
+let avatarBusy = false;
+function renderAvatar(user) {
+  document.getElementById('settingsAvatar').src = user?.avatar_url || '/assets/default-avatar.svg';
+  avatarReset.hidden = !user?.avatar_url;
+}
+async function saveAvatar(data) {
+  if (avatarBusy) return;
+  const mine = epoch;
+  avatarBusy = true; avatarButton.disabled = avatarReset.disabled = true;
+  byId('feedback').textContent = '正在保存头像…';
+  try {
+    const response = await MedixAuth.fetch('/api/auth/avatar', {method:data ? 'PUT' : 'DELETE', body:JSON.stringify(data ? {data} : {})});
+    if (mine !== epoch) return;
+    if (!response.ok) throw new Error(await MedixAuth.detail(response));
+    await MedixAuth.refresh();
+    if (mine === epoch) byId('feedback').textContent = '头像已更新。';
+  } catch (error) { if (mine === epoch) showError(error); }
+  finally { avatarBusy=false; avatarButton.disabled=avatarReset.disabled=false; avatarFile.value=''; }
+}
+avatarButton.onclick = () => avatarFile.click();
+avatarReset.onclick = () => saveAvatar(null);
+avatarFile.onchange = () => {
+  const file=avatarFile.files[0]; if(!file) return;
+  if(file.size>2*1024*1024) { avatarFile.value=''; return showError(new Error('头像图片不能超过 2 MB。')); }
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)) { avatarFile.value=''; return showError(new Error('请上传 JPG、PNG 或 WebP 图片。')); }
+  const reader = new FileReader(), mine = epoch;
+  reader.onload = () => { if(mine===epoch && dialog.open) saveAvatar(reader.result); };
+  reader.onerror = () => showError(new Error('无法读取图片，请重新选择。'));
+  reader.readAsDataURL(file);
 };
 
 let pending = false;
@@ -70,6 +103,7 @@ function openSettings() {
   if (!user) { pending = true; MedixAuth.open(); return; }
   if (dialog.open) return;
   pending = false; epoch++; offset = 0;
+  renderAvatar(user);
   byId('displayName').textContent = user.display_name || user.username;
   byId('username').textContent = '@' + user.username;
   byId('passwordUsername').value = user.username;
@@ -91,6 +125,6 @@ dialog.addEventListener('close', () => {
 });
 window.addEventListener('medix-settings-request', openSettings);
 window.addEventListener('medix-signout', () => { pending=false; epoch++; if(dialog.open) dialog.close(); });
-window.addEventListener('medix-auth-change', event => { if (pending && event.detail) queueMicrotask(openSettings); });
+window.addEventListener('medix-auth-change', event => { renderAvatar(event.detail); if (pending && event.detail) queueMicrotask(openSettings); });
 MedixAuth.ready.then(() => { if(new URL(location.href).searchParams.get('settings') === 'account') openSettings(); }).catch(() => {});
 })();

@@ -33,6 +33,7 @@
   function render(user) {
     if (previousUserId !== (user?.id || null)) close();
     previousUserId = user?.id || null;
+    trigger.querySelector('img').src = menu.querySelector('img').src = user?.avatar_url || '/assets/default-avatar.svg';
     const name = user?.display_name || user?.username || '登录';
     document.getElementById('profileName').textContent = name;
     document.getElementById('profileMenuName').textContent = name;

@@ -183,6 +183,32 @@ class AuthTests(unittest.TestCase):
         self.client.cookies.set(self.settings.cookie_name, stolen)
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
 
+    def test_avatar_persistence_normalization_and_account_isolation(self):
+        import base64
+        import io
+        from PIL import Image
+        self.register(); self.login()
+        output = io.BytesIO()
+        Image.new("RGB", (400, 200), "red").save(output, format="PNG")
+        data = "data:image/png;base64," + base64.b64encode(output.getvalue()).decode()
+        response = self.client.put("/api/auth/avatar", json={"data": data})
+        self.assertEqual(response.status_code, 200, response.text)
+        avatar = response.json()["avatar_url"]
+        with Image.open(io.BytesIO(base64.b64decode(avatar.split(",")[1]))) as image:
+            self.assertEqual(image.size, (256, 256))
+            self.assertEqual(image.format, "WEBP")
+        self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"], avatar)
+        self.register("bob")
+        with self.client_for() as other:
+            self.login(other, "bob")
+            self.assertIsNone(other.get("/api/auth/me").json()["avatar_url"])
+            self.assertEqual(other.put("/api/auth/avatar", json={"data":"data:image/png;base64,bad"}).status_code, 400)
+        csrf = self.client.headers.pop("X-CSRF-Token")
+        self.assertEqual(self.client.request("DELETE", "/api/auth/avatar", json={}).status_code, 403)
+        self.client.headers["X-CSRF-Token"] = csrf
+        self.assertEqual(self.client.request("DELETE", "/api/auth/avatar", json={}).status_code, 204)
+        self.assertIsNone(self.client.get("/api/auth/me").json()["avatar_url"])
+
     def test_login_replaces_previous_browser_session(self):
         self.register(); self.login()
         previous = self.client.cookies.get(self.settings.cookie_name)
