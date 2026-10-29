@@ -29,6 +29,7 @@
     el('togglePassword').title = '显示密码';
     el('togglePassword').setAttribute('aria-pressed', 'false');
     updatePasswordHints();
+    window.dispatchEvent(new CustomEvent('medix-auth-mode', {detail:value}));
   }
   function resetBusy() {
     busy = false;

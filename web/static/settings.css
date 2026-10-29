@@ -29,6 +29,14 @@
 .avatar-crop-controls button { background: transparent; border: 0; color: #6375e9; font-size: 12px; }
 .avatar-crop-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .avatar-crop-actions button { margin: 0; }
+.sms-code-row { display: flex; align-items: center; gap: 8px; }
+.sms-code-row input { min-width: 0; flex: 1; }
+.sms-code-row button { height: 40px; flex-shrink: 0; padding: 0 10px; border: 1px solid #dfe4f2; border-radius: 8px; color: #6375e9; background: #f6f8ff; font-size: 12px; }
+.sms-code-row button:disabled { color: #929bad; cursor: default; }
+.auth-dialog .sms-code-row button { height: 46px; }
+.sms-login-switch { display: block; margin: 18px auto 0; padding: 0; border: 0; background: transparent; color: #6375e9; font-size: 12px; }
+.sms-help { color: #8993a7; font-size: 11px; line-height: 1.7; }
+.settings-phone-link { padding: 0; border: 0; color: #6375e9; background: transparent; font-size: 12px; }
 .settings-identity strong { font-size: 16px; }.settings-identity p { margin: 6px 0 0; font-size: 12px; color: #8a94a6; }
 .settings-row { display: flex; justify-content: space-between; padding: 18px 0; border-top: 1px solid #eef0f5; font-size: 13px; color: #768096; }
 .settings-row span:last-child { color: #39465e; }

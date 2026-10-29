@@ -78,6 +78,18 @@ class AuthService:
                 db.commit()
             return user, record
 
+    def phone_session(self, user_id):
+        with self.sessions() as db:
+            user = db.get(User, user_id)
+            if not user or not user.is_active:
+                raise HTTPException(401, "账号不可用，请联系管理员。")
+            now, token = time.time(), new_token()
+            csrf = digest("csrf:" + token)
+            db.add(AuthSession(token_hash=digest(token), user_id=user.id, csrf_token_hash=digest(csrf),
+                created_at=now, last_seen_at=now, expires_at=now + self.settings.absolute_seconds))
+            db.commit()
+            return user, token, csrf
+
     def revoke(self, user_id, session_id=None):
         with self.sessions() as db:
             query = update(AuthSession).where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))

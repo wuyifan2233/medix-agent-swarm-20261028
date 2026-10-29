@@ -216,3 +216,5 @@ $env:MEDIX_DB_PATH = 'D:\medix-data\milvus_v3.db'
 - 运行时约束及输出修复：[`constraints/`](constraints/)、[`validation/`](validation/)
 
 原项目 README 声明使用 MIT License；本次整理未修改授权声明。
+
+手机号验证码登录使用阿里云 PNVS，已有账号先在设置中绑定手机号。配置与最小 RAM 权限见 [短信登录配置](docs/SMS-SETUP.md)，未配置时仍可使用账号密码登录。

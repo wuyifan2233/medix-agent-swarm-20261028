@@ -34,6 +34,12 @@ def login(data: Credentials, request: Request, response: Response):
     auth = service(request)
     auth.limit("login", client_ip(request), data.username)
     user, token, csrf = auth.login(data)
+    return login_response(request, response, (user, token, csrf))
+
+
+def login_response(request, response, payload):
+    auth = service(request)
+    user, token, csrf = payload
     # Logging in again in the same browser replaces and revokes its previous credential.
     previous = request.cookies.get(auth.settings.cookie_name)
     if previous:
@@ -50,9 +56,11 @@ def login(data: Credentials, request: Request, response: Response):
 @router.get("/api/auth/me")
 def me(request: Request, user: CurrentUser = Depends(require_user)):
     with service(request).sessions() as db:
-        avatar = db.get(User, user.id).avatar_data
+        row = db.get(User, user.id)
+        avatar = row.avatar_data
+        phone = row.phone_number
     return {"id": user.id, "username": user.username, "display_name": user.display_name, "role": user.role,
-            "avatar_url": avatar}
+            "avatar_url": avatar, "phone_masked": phone[:3] + "****" + phone[-4:] if phone else None}
 
 
 @router.put("/api/auth/avatar")

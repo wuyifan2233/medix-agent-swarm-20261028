@@ -6,6 +6,8 @@ import uvicorn
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parent
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env.sms", override=False)
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("HF_HOME", str(ROOT.parent / ".medix-model-cache"))
 os.chdir(ROOT)

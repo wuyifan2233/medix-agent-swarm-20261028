@@ -42,8 +42,8 @@ class AuthTests(unittest.TestCase):
         self.warmup_patch = patch("web.app.warmup")
         self.warmup_patch.start()
         with self.sessions() as db:
-            from auth.models import AuthAttempt
-            for model in [AuthAttempt, AuthSession, User]:
+            from auth.models import AuthAttempt, SmsChallenge
+            for model in [SmsChallenge, AuthAttempt, AuthSession, User]:
                 db.query(model).delete()
             db.commit()
         app.state.auth_service = AuthService(self.sessions, self.settings)
@@ -182,6 +182,90 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/auth/logout", json={}).status_code, 204)
         self.client.cookies.set(self.settings.cookie_name, stolen)
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+
+    def test_sms_binding_and_login_keep_identity_and_reject_replay(self):
+        phone = "13800000001"
+        alice = self.register(); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = True
+            sms.verify.return_value = True
+            sent = self.client.post("/api/auth/phone/send", json={"phone_number":phone})
+            self.assertEqual(sent.status_code, 200, sent.text)
+            challenge = sent.json()["challenge_id"]
+            bound = self.client.post("/api/auth/phone/bind", json={"challenge_id":challenge,
+                "code":"123456", "current_password":PASSWORD})
+            self.assertEqual(bound.status_code, 200, bound.text)
+            self.assertEqual(self.client.get("/api/auth/me").json()["phone_masked"], "138****0001")
+            self.client.post("/api/auth/logout", json={})
+            # Expire only the send cooldown in this isolated test.
+            from auth.models import AuthAttempt
+            with self.sessions() as db:
+                db.query(AuthAttempt).delete(); db.commit()
+            sent = self.client.post("/api/auth/sms/send", json={"phone_number":phone})
+            challenge = sent.json()["challenge_id"]
+            result = self.client.post("/api/auth/sms/login", json={"challenge_id":challenge,"code":"123456"})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()["user"]["id"], alice.id)
+            self.assertEqual(self.client.get("/api/auth/me").json()["id"], alice.id)
+            self.assertEqual(self.client.post("/api/auth/sms/login", json={"challenge_id":challenge,"code":"123456"}).status_code, 400)
+
+    def test_sms_limits_wrong_codes_purpose_and_expiry(self):
+        from auth.models import SmsChallenge
+        self.register(); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = True
+            sms.verify.return_value = False
+            data = {"phone_number":"13800000002"}
+            sent = self.client.post("/api/auth/sms/send", json=data)
+            self.assertEqual(sent.status_code, 200)
+            self.assertEqual(self.client.post("/api/auth/sms/send", json=data).status_code, 429)
+            challenge = sent.json()["challenge_id"]
+            payload = {"challenge_id":challenge,"code":"123456"}
+            self.assertEqual(self.client.post("/api/auth/phone/bind", json={**payload,"current_password":PASSWORD}).status_code,400)
+            sms.verify.assert_not_called()
+            for _ in range(5):
+                self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+            self.assertEqual(sms.verify.call_count,5)
+            self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+            self.assertEqual(sms.verify.call_count,5)
+            with self.sessions() as db:
+                record=db.get(SmsChallenge,digest(challenge));record.attempts=0;record.expires_at=time.time()-1;db.commit()
+            self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+
+    def test_sms_binding_cannot_take_another_users_number(self):
+        self.register(); bob = self.register("bob"); self.login()
+        with self.sessions() as db:
+            row=db.get(User,bob.id);row.phone_number="13800000003";db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True; sms.verify.return_value=True
+            challenge=self.client.post("/api/auth/phone/send",json={"phone_number":"13800000003"}).json()["challenge_id"]
+            payload={"challenge_id":challenge,"code":"123456","current_password":"wrong"}
+            self.assertEqual(self.client.post("/api/auth/phone/bind",json=payload).status_code,400)
+            sms.verify.assert_not_called()
+            payload["current_password"]=PASSWORD
+            self.assertEqual(self.client.post("/api/auth/phone/bind",json=payload).status_code,409)
+            self.assertIsNone(self.client.get("/api/auth/me").json()["phone_masked"])
+
+    def test_sms_unconfigured_fails_closed_and_send_requires_origin(self):
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=False
+            self.assertEqual(self.client.post("/api/auth/sms/send",json={"phone_number":"13800000001"}).status_code,503)
+            sms.send.assert_not_called()
+        self.assertEqual(self.client.post("/api/auth/sms/send",json={"phone_number":"13800000001"},headers={"Origin":"https://evil.example"}).status_code,403)
+
+    def test_phone_binding_needs_csrf_and_cannot_use_another_users_challenge(self):
+        self.register(); self.register("bob"); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True; sms.verify.return_value=True
+            token=self.client.headers.pop("X-CSRF-Token")
+            self.assertEqual(self.client.post("/api/auth/phone/send",json={"phone_number":"13800000004"}).status_code,403)
+            sms.send.assert_not_called()
+            self.client.headers["X-CSRF-Token"]=token
+            challenge=self.client.post("/api/auth/phone/send",json={"phone_number":"13800000004"}).json()["challenge_id"]
+            with self.client_for() as other:
+                self.login(other,"bob")
+                self.assertEqual(other.post("/api/auth/phone/bind",json={"challenge_id":challenge,"code":"123456","current_password":PASSWORD}).status_code,400)
+                sms.verify.assert_not_called()
 
     def test_avatar_persistence_normalization_and_account_isolation(self):
         import base64

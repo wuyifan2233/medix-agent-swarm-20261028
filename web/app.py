@@ -22,6 +22,7 @@ from loguru import logger
 from urllib.parse import urlsplit
 from auth.dependencies import require_user, WRITE_METHODS
 from auth.router import router as auth_router
+from auth.sms_router import router as sms_router
 from auth.schemas import CurrentUser
 from auth.service import AuthService
 from auth.settings import AuthSettings
@@ -97,6 +98,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
     {urlsplit(origin).hostname for origin in auth_settings.origins}
     | ({"testserver"} if not auth_settings.production else set())))
 app.include_router(auth_router)
+app.include_router(sms_router)
 
 
 @app.exception_handler(RequestValidationError)
