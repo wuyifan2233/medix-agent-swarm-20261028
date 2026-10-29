@@ -1,0 +1,59 @@
+"""Fetch only the reviewed registry; snapshots stay local, not redistributed."""
+import concurrent.futures
+import datetime
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import requests
+from bs4 import BeautifulSoup
+from knowledge.corpus import LOCAL, REGISTRY, digest
+
+
+def fetch(source):
+    response = requests.get(source['url'], timeout=45)
+    response.raise_for_status()
+    if urlparse(response.url).hostname != urlparse(source['url']).hostname:
+        raise ValueError('Unexpected redirect: ' + response.url)
+    response.encoding = response.apparent_encoding
+    soup = BeautifulSoup(response.text, 'html.parser')
+    for tag in soup(['script', 'style', 'nav', 'footer']):
+        tag.decompose()
+    selectors = ['.TRS_Editor', '.view.TRS_UEDITOR', '.pages_content', '#UCAP-CONTENT', '.article-content', '.article_content', '#vsb_content', '.v_news_content', '.content', '#zoom']
+    nodes = [soup.select_one(s) for s in selectors]
+    nodes = [n for n in nodes if n and len(n.get_text(strip=True)) > 150]
+    if not nodes:
+        raise ValueError('Article body selector missing: ' + source['id'])
+    node = nodes[0]
+    paragraphs = [re.sub(r'[ \t\xa0\u3000]+', ' ', line).strip() for line in node.get_text('\n').splitlines()]
+    paragraphs = [p for p in paragraphs if p]
+    text = '\n\n'.join(paragraphs)
+    if any(term not in text for term in source['required_terms']):
+        raise ValueError('Content verification failed: ' + source['id'])
+    # Mark only genuine short section labels; do not invent medical summaries.
+    paragraphs = [('## ' + p if len(p) < 65 and re.match(r'^(?:[一二三四五六七八九十]+[、．.]|[（(][一二三四五六七八九十]+[）)])', p) else p) for p in paragraphs]
+    text = '# ' + source['title'] + '\n\n' + '\n\n'.join(paragraphs) + '\n'
+    html_path = LOCAL / 'snapshots' / (source['id'] + '.html')
+    html_path.write_bytes(response.content)
+    (LOCAL / 'documents' / (source['id'] + '.md')).write_text(text, encoding='utf-8')
+    return {**source, 'retrieved_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'content_sha256': digest(text), 'snapshot_sha256': __import__('hashlib').sha256(response.content).hexdigest(),
+            'source_checked': True, 'clinical_reviewed': False,
+            'use_conditions': '公开可读；未确认再分发许可，仅本地演示使用，不随仓库分发。',
+            'document_kind': '官方发布或官方转载科普，非药品说明书；不代表最新临床指南'}
+
+
+def main():
+    for folder in ['documents', 'snapshots']:
+        (LOCAL / folder).mkdir(parents=True, exist_ok=True)
+    sources = json.loads(REGISTRY.read_text(encoding='utf-8'))['documents']
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        docs = list(pool.map(fetch, sources))
+    manifest = {'documents': sorted(docs, key=lambda d: d['id'])}
+    (LOCAL / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(json.dumps({'fetched': len(docs), 'directory': str(LOCAL)}, ensure_ascii=False))
+
+if __name__ == '__main__':
+    main()

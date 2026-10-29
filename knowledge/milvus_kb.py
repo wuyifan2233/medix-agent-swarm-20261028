@@ -26,6 +26,10 @@ class MedicalKnowledgeBase:
     _instance = None
 
     def __new__(cls, *args, **kwargs):
+        # Explicit opt-in keeps the colleague's legacy bootstrap intact.
+        if os.environ.get('MEDIX_KB_MODE') == 'evidence' and not args and not kwargs:
+            from knowledge.evidence import EvidenceKnowledgeBase
+            return EvidenceKnowledgeBase()
         """实现单例模式"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)

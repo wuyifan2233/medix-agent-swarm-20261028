@@ -96,10 +96,15 @@ function pendingMessage() {
 }
 function resultMessage(row, result) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
-  const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
+  const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.generation === 'not_called' ? '本地证据检索 · 未调用模型' : result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
+  if (result.retrieval) {
+    answer.innerHTML = answer.innerHTML.replace(/\[(\d+)\]/g, (match, n) => result.sources.some(s => s.citation === Number(n)) ? `<button type="button" class="citation" data-citation="${n}" aria-label="查看证据 ${n}">[${n}]</button>` : match);
+    answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => showEvidence(result.sources.find(s => s.citation === Number(button.dataset.citation))));
+    main.append(retrievalDetails(result.retrieval));
+  }
   const meta = document.createElement('div'); meta.className = 'message-meta';
-  const tags = [result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
   const elapsed = document.createElement('span'); elapsed.textContent = `${result.elapsed} 秒`; meta.append(elapsed); main.append(meta);
   if (result.image_observations) {
@@ -112,9 +117,10 @@ function resultMessage(row, result) {
     const summary = document.createElement('summary'); summary.textContent = `本地检索参考 · ${result.sources.length} 个片段`;
     const grid = document.createElement('div'); grid.className = 'source-grid';
     result.sources.forEach(source => {
-      const card = document.createElement('div'); card.className = 'source-card';
+      const card = document.createElement(source.content ? 'button' : 'div'); card.className = 'source-card';
+      if (source.content) { card.type = 'button'; card.onclick = () => showEvidence(source); }
       const title = document.createElement('strong'); title.textContent = source.title.trim().length < 3 ? '本地医学资料片段' : source.title;
-      const file = document.createElement('small'); file.textContent = source.file;
+      const file = document.createElement('small'); file.textContent = source.publisher ? `[${source.citation}] ${source.publisher} · ${source.published_at || '日期未注明'} · 查看原文 ↗` : source.file;
       const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt; card.append(title, file, excerpt); grid.append(card);
     }); block.append(summary, grid); main.append(block);
   }
@@ -227,6 +233,7 @@ document.querySelectorAll('[data-action]').forEach(button => button.onclick = ()
     return;
   }
   if (action === 'knowledge') {
+    if (state.health?.mode === 'evidence') { openKnowledge(); return; }
     $('dialogTitle').textContent = '回答背后的医学资料';
     const count = Number(state.health?.documents || 0);
     $('dialogContent').innerHTML = `<p>提问时，MediX 会检索项目自带的本地医学知识库，帮助你理解相关信息。</p><div class="dialog-stat"><b>${count}</b> 个已加载资料片段</div><p><strong>涵盖方向</strong><br>常见健康问题、生活方式、疾病编码与临床指南类资料。</p><p><strong>怎样查看来源？</strong><br>回答下方的「本地检索参考」会展示实际检索到的文件名及原文片段。</p><p>本地内容尚未完成权威性与时效性审核，请结合医生意见核实。</p>`;
@@ -252,6 +259,57 @@ $('questionChips').onclick = event => {
   const button = event.target.closest('[data-question]');
   if (button) fillQuestion(button.dataset.question);
 };
+
+function retrievalDetails(trace) {
+  const details = document.createElement('details'); details.className = 'observations';
+  const summary = document.createElement('summary'); summary.textContent = '查看本次检索过程';
+  const text = document.createElement('p'); text.textContent = `语义召回 ${trace.vector_candidates} 段 · 关键词召回 ${trace.keyword_candidates} 段 → 合并 ${trace.merged_candidates} 段 → 相关性过滤后提供 ${trace.selected} 段证据。检索耗时 ${trace.elapsed_ms} 毫秒。分数用于排序，不代表医学可信度。`;
+  details.append(summary, text); return details;
+}
+function showEvidence(source) {
+  if (!source) return;
+  $('dialogTitle').textContent = source.title;
+  const content = $('dialogContent'); content.replaceChildren();
+  const provenance = document.createElement('p'); provenance.textContent = `${source.publisher} · ${source.published_at || '日期未注明'}\n来源已核对（机构、链接与原文），未作临床审核。`;
+  const section = document.createElement('p'); section.textContent = `章节：${source.section} · 本地原文字符位置：${source.start_char}`;
+  const excerpt = document.createElement('pre'); excerpt.className = 'evidence-text';
+  const terms = (source.highlight_terms || []).filter(t => t.length >= 2);
+  if (terms.length) {
+    const pattern = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+    String(source.content).split(pattern).forEach(part => { const node = document.createElement(terms.includes(part) ? 'mark' : 'span'); node.textContent = part; excerpt.append(node); });
+  } else excerpt.textContent = source.content;
+  const link = document.createElement('a'); link.textContent = '查看机构发布页面 ↗';
+  try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) link.href = url.href; } catch {}
+  link.target = '_blank'; link.rel = 'noopener noreferrer';
+  const version = document.createElement('small'); version.textContent = `来源快照 SHA-256：${source.content_sha256}`;
+  content.append(provenance, section, excerpt, link, document.createElement('hr'), version);
+  if (!$('infoDialog').open) $('infoDialog').showModal();
+}
+async function openKnowledge() {
+  $('dialogTitle').textContent = '医学证据库';
+  const content = $('dialogContent'); content.innerHTML = '<p>检索常见病与基础用药科普，点击证据查看出处。当前资料不等于完整药品说明书或最新临床指南。</p><form id="evidenceForm" class="evidence-search"><label for="evidenceQuery">查找问题或药品</label><input id="evidenceQuery" maxlength="8000" required placeholder="例如：口服补液盐有哪些使用误区？"><button class="dialog-done" type="submit">查找证据</button></form><div id="evidenceResults" aria-live="polite"></div><details><summary>查看收录来源</summary><div id="sourceCatalog">正在加载来源…</div></details>';
+  if (!$('infoDialog').open) $('infoDialog').showModal();
+  const results = $('evidenceResults'), catalogNode = $('sourceCatalog');
+  $('evidenceForm').onsubmit = async event => {
+    event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; results.textContent = '正在检索本地资料…';
+    try {
+      const response = await fetch('/api/knowledge/retrieve?q=' + encodeURIComponent($('evidenceQuery').value));
+      const data = await response.json(); if (!response.ok) throw new Error(data.detail || '检索失败');
+      results.replaceChildren(); if (data.message) { const p = document.createElement('p'); p.textContent = data.message; results.append(p); }
+      data.sources.forEach(source => { const card = document.createElement('button'); card.type = 'button'; card.className = 'source-card evidence-hit';
+        const title = document.createElement('strong'); title.textContent = `[${source.citation}] ${source.title}`;
+        const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt;
+        card.append(title, excerpt); card.onclick = () => showEvidence(source); results.append(card); });
+      results.append(retrievalDetails(data.trace));
+    } catch (error) { results.textContent = error.message; } finally { button.disabled = false; }
+  };
+  try {
+    const response = await fetch('/api/knowledge/catalog'); const data = await response.json(); if (!response.ok) throw new Error(data.detail);
+    catalogNode.replaceChildren();
+    const count = document.createElement('p'); count.textContent = `${data.documents.length} 份来源 · ${data.chunks} 个独立片段 · 版本 ${data.version}`; catalogNode.append(count);
+    data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}`; catalogNode.append(p); });
+  } catch (error) { catalogNode.textContent = error.message; }
+}
 $('refreshPrompts').onclick = () => {
   questionGroup = (questionGroup + 1) % questionGroups.length;
   $('questionChips').replaceChildren();

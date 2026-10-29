@@ -120,7 +120,9 @@ class EvidenceSynthesizer:
             for i, doc in enumerate(kb_results[:5], 1):
                 metadata = doc.get('metadata', {})
                 prompt += f"{i}. {metadata.get('title', '医学知识')}\n"
-                prompt += f"   内容: {doc.get('content', '')[:300]}...\n"
+                prompt += f"   内容: {doc.get('content', '')}\n"
+                if metadata.get('url'):
+                    prompt += f"   出处: {metadata['url']}；日期: {metadata.get('published_at') or '未注明'}\n"
                 prompt += f"   相似度: {doc.get('score', 0):.2f}\n\n"
 
         prompt += """
@@ -250,7 +252,10 @@ class EvidenceSynthesizer:
             report.sources.append({
                 "type": "knowledge_base",
                 "title": metadata.get("title", "医学知识"),
-                "id": doc.get('id', 'unknown')
+                "id": doc.get('id', 'unknown'),
+                "url": metadata.get('url', ''),
+                "publisher": metadata.get('publisher', ''),
+                "published_at": metadata.get('published_at')
             })
 
         return report

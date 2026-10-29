@@ -1,5 +1,7 @@
 # MediX · 多 Agent 健康助手
 
+> 知识库负责人交付的可选证据版：见 [构建、运行、评测与合入说明](docs/KNOWLEDGE_DELIVERY.md)。使用 `requirements.kb.txt` 和 `run_kb_demo.py`（默认端口 8766）；普通入口继续兼容原有样例库。
+
 MediX 是一个本地运行的健康问答项目，支持文字提问、图片解读、多轮追问、按需多 Agent 协作，以及本地医学资料检索。网页采用蓝紫色健康助手界面，也保留命令行入口。
 
 回答由模型 API 生成；知识库使用本地向量模型进行检索。**项目没有模型训练或微调模块，启动和使用均不需要训练。** `torch`、`transformers` 和 `sentence-transformers` 用于检索向量的推理计算。

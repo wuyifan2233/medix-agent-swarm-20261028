@@ -55,6 +55,8 @@ async def search_knowledge(query: str, max_results: int = 5) -> Dict[str, Any]:
             "score": doc["score"],
             "type": doc["metadata"].get("type")
         })
+        if doc['metadata'].get('url'):
+            formatted_results[-1]['content'] += '\n出处：'+doc['metadata']['title']+' '+doc['metadata']['url']
 
     # Skill 的格式化输出
     if formatted_results:
@@ -92,7 +94,7 @@ def format_results(results: list) -> str:
         # 显示相关度分数（如果有）
         score = doc.get("score", 0)
         if score > 0:
-            output.append(f"相关度: {score:.2%}")
+            output.append(f"检索相似度（不代表医学可信度）: {score:.3f}")
 
         output.append("")  # 空行分隔
 
