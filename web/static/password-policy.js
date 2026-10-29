@@ -25,19 +25,11 @@ window.MedixPasswordPolicy = Object.freeze({
     }
     const tip = document.createElement('div');
     tip.className = 'password-tooltip'; tip.id = `${input.id}Rules`;
-    tip.setAttribute('role', 'tooltip'); tip.hidden = true;
-    tip.textContent = '8–20 位；大写、小写、数字、符号中任选 3 类。';
+    tip.hidden = true;
+    tip.textContent = this.hint;
     wrapper.append(tip);
     input.setAttribute('aria-describedby', [input.getAttribute('aria-describedby'), tip.id].filter(Boolean).join(' '));
-    let dismissed = false;
-    const update = () => { tip.hidden = !enabled() || document.activeElement !== input || dismissed; };
-    input.addEventListener('focus', () => { dismissed = false; update(); });
-    input.addEventListener('blur', update);
-    input.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && !tip.hidden) {
-        event.preventDefault(); event.stopPropagation(); dismissed = true; update();
-      }
-    });
+    const update = () => { tip.hidden = !enabled(); };
     update(); return update;
   }
 });
