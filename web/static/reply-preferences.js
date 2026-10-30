@@ -20,7 +20,9 @@
   const form=dialog.querySelector('form'),status=dialog.querySelector('#rpStatus');
   let revision=0,epoch=0,actor=null,busy=false,loaded=false;
   const defaults={enabled:false,nickname:'',tone:'neutral',detail:'standard',format:'summary_first',terminology:'plain',communication_note:'',daily_context:''};
-  function render(data){for(const [key,value] of Object.entries(data)){const node=form.elements.namedItem(key);if(node.type==='checkbox')node.checked=value;else node.value=value;}}
+  function saveLabel(){dialog.querySelector('#rpSave').textContent=form.elements.namedItem('enabled').checked?'保存并启用回答偏好':'仅保存设置（尚未启用）';}
+  form.elements.namedItem('enabled').addEventListener('change',saveLabel);
+  function render(data){for(const [key,value] of Object.entries(data)){const node=form.elements.namedItem(key);if(node.type==='checkbox')node.checked=value;else node.value=value;}saveLabel();}
   function lock(value){busy=value;form.querySelectorAll('input,select,textarea,button').forEach(node=>{node.disabled=value;});}
   async function request(options={}){
     const mine=epoch,owner=actor;
@@ -32,7 +34,7 @@
   async function persist(data){
     if(!loaded)return;
     const mine=epoch;lock(true);status.textContent='正在保存…';
-    try{const result=await request({method:'PUT',body:JSON.stringify({expected_revision:revision,data})});revision=result.revision;render(result.data);status.textContent=data.enabled?'已保存，下一次提问将使用这些表达偏好。':'已保存，后续问答不使用回答偏好。';}
+    try{const result=await request({method:'PUT',body:JSON.stringify({expected_revision:revision,data})});revision=result.revision;render(result.data);status.textContent=data.enabled?'已启用 v'+result.revision+'，下一次提问生效；已有回答不会改写。':'设置已保存，但偏好开关关闭：昵称和详略不会用于回答。请勾选开关，再点击“保存并启用回答偏好”。';}
     catch(error){if(mine===epoch)status.textContent=error.message;}
     finally{if(mine===epoch)lock(false);}
   }
