@@ -208,3 +208,26 @@ POST /api/profile/conversation-candidates 新增可选 job_id：不传时只整�
 档案新增“建议与待核实事项（非病情事实）”分区。后续问答仅把它当待核实建议，不作为病史或已执行事项；公共知识检索不把建议当作症状关键词。
 测试：本人描述“我这两天头痛”，本轮回答含观察或就医建议，选择参考回答→筛选→仅选建议→额外核对→保存；检查仅followups变化且档案为草稿。
 同时验证关闭参考回答不生成助手建议、他人任务404、不匹配原话409、未额外确认422、未选候选不保存。
+
+
+## 回答偏好（与健康档案独立）
+
+GET /api/profile/reply-preferences 返回 {data, revision, updated_at}；首次默认enabled=false。
+PUT 同路径，提交 {expected_revision, data}，需要登录、可信Origin及CSRF；版本冲突409、非法字段422。
+data字段：enabled(bool)、nickname(最多20字)、tone(neutral/supportive/direct)、detail(brief/standard/detailed)、
+format(summary_first/steps/explanation)、terminology(plain/professional)、communication_note及daily_context(各最多200字)。
+用户身份只来自服务端会话；不同账号互不可见。恢复默认通过PUT保存默认值、清空文本并关闭enabled，版本继续递增。
+使用独立reply_preferences表，迁移20261030_04；旧用户默认为关闭，不改变健康档案或其确认状态。
+后端分析时读取当前账号偏好，只影响表达与执行建议的安排，不用于医学知识检索，不作为病史，不能绕过档案开关。
+自由文本作为低优先级数据处理，本轮明确要求和必要风险提示优先；不提供真人医生角色或诊断身份设定。
+启用时暂停云端记忆，避免将称呼、日常安排等随增强提示保存到Mem0；修改或关闭偏好时隔离旧上下文。
+任务结果新增reply_preferences_used、reply_preferences_revision和memory_suppressed_for_preferences；不返回偏好文本。
+前端入口“回答偏好”，默认不开启，显式保存后下次提问生效。设置页面不在localStorage保存文本；切换账号会清理弹窗。
+验收：分别设置“简短重点＋分步骤”和“详细说明＋解释原因”，同一问题比较；再关闭偏好、换账号和关闭档案验证隔离。
+自动化覆盖持久化、版本冲突、身份/CSRF、字段校验、真实提示注入链路、检索排除、档案不写入和关闭后历史隔离；实际模型风格需单独验收。
+
+
+回答偏好真实验收（2026-10-30）：独立虚构账号保存“小林／温和鼓励／简短重点／分步骤／每次5分钟”。
+浏览器发问“如何把日常散步安排进繁忙的工作日？”，真实模型回答采用“小林”称呼，并围绕5分钟安排给出三个步骤；
+结果注明未使用健康档案、已使用回答偏好。简短模式是长度目标，模型包装及必要说明可能超出目标字数。
+桌面与390px窄屏显示、保存后重新读取已验证；验收后恢复默认并关闭测试账号偏好。

@@ -37,6 +37,7 @@ from personalization.report_imports import router as report_import_router
 from personalization.conversation_updates import router as conversation_profile_router
 from personalization.context import profile_context, retrieval_query, scope as profile_scope
 from personalization.context import select_fields, PROFILE_FIELDS
+from personalization.preferences import router as preferences_router, load_preferences, preference_context
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -115,6 +116,7 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(report_import_router)
 app.include_router(conversation_profile_router)
+app.include_router(preferences_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -199,7 +201,12 @@ async def analyze(job, payload, session_id, memory_user_id):
         if profile_scope(current) != profile_scope(snapshot):
             raise ValueError("档案确认状态已变化，请重新提交问题。")
         snapshot = current
+    preferences = load_preferences(app.state.auth_service.sessions,job["owner_user_id"])
+    preferences_used = preferences["data"]["enabled"]
+    preference_scope = preferences["revision"] if preferences_used else None
     previous = contexts.get(session_id, {})
+    if previous.get("preference_scope") != preference_scope:
+        previous = {}
     if previous.get("profile_scope") != profile_scope(snapshot):
         previous = {}  # Opt-out/change must not reuse profile-derived answers or report facts.
     observed = previous.get("image_observations", "")
@@ -246,11 +253,12 @@ async def analyze(job, payload, session_id, memory_user_id):
     if hits:
         enriched += "\n\n【本地检索参考；不相关的信息请忽略，不得将其当成用户病史】\n"
         enriched += "\n\n".join(hit["content"][:750] for hit in hits)
-    enriched += "\n\n请优先直接回答用户问题，总长尽量不超过600字。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
+    enriched += "\n\n请优先直接回答用户问题。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
+    enriched += preference_context(preferences) if preferences_used else "\n回答总长尽量不超过600字。"
 
     stage(job, "agents", "正在由专业助手分析与整合")
     # The coordinator saves its input in Mem0. Do not duplicate profile data there.
-    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot, memory_user_id=memory_user_id,
+    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot and not preferences_used, memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
     # AgentLoop has a separate process-wide singleton containing enriched prompts.
     # Only the sanitized web contexts above may cross request boundaries.
@@ -279,15 +287,18 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "image_context_used": bool(observed) and not payload["images"],
                          "memory_enabled": bool(coordinator.long_term_memory.enabled),
                          "profile_used": bool(snapshot),
+                         "reply_preferences_used": preferences_used,
+                         "reply_preferences_revision": preference_scope,
                          "profile_revision": snapshot["revision"] if snapshot else None,
                          "profile_fields": list(snapshot.get('selected_fields',PROFILE_FIELDS)) if snapshot else [],
                          "profile_confirmed_at": snapshot["confirmed_at"] if snapshot else None,
                          "memory_suppressed_for_profile": bool(snapshot and payload["remember"]),
+                         "memory_suppressed_for_preferences": bool(preferences_used and payload["remember"]),
                          "elapsed": round(time.monotonic() - job["started"], 1),
                          "partial": bool(result.get("timeout_occurred"))}
         history = previous.get("history", []) + [{"role":"user", "content":question[:1200]}, {"role":"assistant", "content":answer[:1800]}]
         contexts[session_id] = {"image_observations": observed, "history": history[-6:],
-                                "profile_scope": profile_scope(snapshot), "updated":time.time()}
+                                "profile_scope": profile_scope(snapshot), "preference_scope":preference_scope, "updated":time.time()}
     finally:
         coordinator.short_term_memory.clear_session(session_id)
         clients = {id(obj.llm_client): obj.llm_client for obj in [coordinator, *coordinator.worker_pool]}

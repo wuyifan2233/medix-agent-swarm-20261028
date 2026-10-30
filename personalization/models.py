@@ -31,3 +31,11 @@ class ProfileImport(Base):
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
     expires_at: Mapped[float] = mapped_column(Float, nullable=False)
     consumed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class ReplyPreferences(Base):
+    __tablename__ = 'reply_preferences'
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON,nullable=False)
+    revision: Mapped[int] = mapped_column(Integer,nullable=False)
+    updated_at: Mapped[float] = mapped_column(Float,nullable=False)
