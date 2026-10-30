@@ -1,9 +1,9 @@
 /* Independent feature; identity/CSRF are owned by MedixAuth. No health data in localStorage. */
 (() => {
   const tools = document.createElement('section'); tools.className = 'health-profile-tools';
-  tools.innerHTML = `<button type="button" id="hpOpen">我的健康档案</button><label><input type="checkbox" id="hpUse" disabled>本次为本人咨询，参考已确认档案</label><small id="hpStatus">登录后可编辑；默认不使用档案</small>`;
+  tools.innerHTML = `<button type="button" id="hpOpen">我的健康档案</button><label><input type="checkbox" id="hpUse" aria-describedby="hpStatus" disabled>本次为本人咨询，参考已确认档案</label><small id="hpStatus">登录后可编辑；默认不使用档案</small>`;
   document.querySelector('.composer-region').prepend(tools);
-  const fieldChoices=document.createElement('details');fieldChoices.id='hpFieldChoices';fieldChoices.innerHTML='<summary>本轮允许参考的字段</summary>';
+  const fieldChoices=document.createElement('details');fieldChoices.id='hpFieldChoices';fieldChoices.innerHTML='<summary>参考字段</summary>';
   for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
   const dialog = document.createElement('dialog'); dialog.id = 'healthProfileDialog'; dialog.className = 'health-profile-dialog'; dialog.setAttribute('aria-labelledby','hpTitle');
   dialog.innerHTML = `<div class="hp-heading"><h2 id="hpTitle">我的健康档案</h2><button type="button" id="hpClose">关闭</button></div>

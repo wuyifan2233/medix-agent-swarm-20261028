@@ -105,3 +105,20 @@
   #healthProfileDialog .hp-item>label:has([data-field]),#healthProfileDialog .hp-item>.hp-source{grid-column:1;grid-row:auto}
   #healthProfileDialog .hp-item>button{grid-column:1;grid-row:auto;justify-self:end}
 }
+
+/* Compact composer toolbar, aligned with the chat input instead of a full-width card. */
+.health-profile-tools{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:7px 14px;max-width:860px;margin:0 auto 9px;padding:0 6px;border:0;border-radius:0;background:transparent;box-sizing:border-box}
+.health-profile-tools #hpOpen{grid-column:1;grid-row:1}
+.health-profile-tools>label{grid-column:2;grid-row:1;font-size:12px;line-height:1.5;min-width:0}
+.health-profile-tools>label input{flex-shrink:0;width:15px;height:15px;margin:0 2px 0 0}
+.health-profile-tools #rpOpen{grid-column:4;grid-row:1;background:transparent;border-color:#dfe5ee;color:#687994}
+.health-profile-tools button{padding:6px 10px;font-size:12px;white-space:nowrap}
+.health-profile-tools #hpStatus{grid-column:1/-1;grid-row:2;width:auto;font-size:10px;line-height:1.5;color:#84909f}
+.health-profile-tools #hpFieldChoices{grid-column:3;grid-row:1;margin:0;font-size:11px;color:#73839c;min-width:0}
+.health-profile-tools #hpFieldChoices summary{padding:5px 0;white-space:nowrap}
+.health-profile-tools #hpFieldChoices[open]{display:block;grid-column:1/-1;grid-row:3;padding:10px 12px;background:#f3f6fb;border:1px solid #e4e9f3;border-radius:10px}
+.health-profile-tools #hpFieldChoices label{font-size:11px;line-height:1.6;margin:8px 16px 0 0}
+@media(max-width:760px){.health-profile-tools{gap:7px 10px}.health-profile-tools>label{font-size:11px}.health-profile-tools button{font-size:11px;padding:6px 8px}}
+@media(max-width:600px){.health-profile-tools{grid-template-columns:auto 1fr auto;padding:0 3px;gap:7px 9px}.health-profile-tools #hpOpen{grid-column:1;grid-row:1}.health-profile-tools #rpOpen{grid-column:3;grid-row:1}.health-profile-tools>label{grid-column:1/-1;grid-row:2}.health-profile-tools #hpStatus{grid-column:1/-1;grid-row:3;font-size:10px}.health-profile-tools #hpFieldChoices{grid-column:2;grid-row:1;justify-self:end;font-size:10px}.health-profile-tools #hpFieldChoices[open]{grid-column:1/-1;grid-row:4;justify-self:stretch}.health-profile-tools #hpFieldChoices[open] summary{white-space:normal}}
+
+@media(min-width:1500px){.health-profile-tools{max-width:920px}}
