@@ -20,6 +20,16 @@ MediX 是一个本地运行的健康问答项目，支持文字提问、图片�
 
 ## 快速启动（Windows / Python 3.12）
 
+### 账号与基础权限（本功能分支新增）
+
+网页现在需要账号登录。首次运行前安装更新后的 `requirements.web.txt`，可运行 `python scripts/create_admin.py` 交互创建管理员；开发环境支持在 `/login` 注册普通账号。数据库迁移在网页启动前自动执行，也可手动运行 `python -m storage.migrate`。账号数据库默认保存到被 Git 忽略的 `.medix-data/app.db`。
+
+首页可直接浏览，登录后才能提问。未登录时右上角显示“登录”；登录后通过左下角头像和用户名打开账号菜单，再进入账号设置或退出登录。注册时使用默认头像，可在设置中点击头像上传 JPG、PNG、WebP（最大 2 MB），选图后可拖动、缩放并预览裁剪区域，确认保存后更新，也可恢复默认头像。图片压缩后按用户保存到本地数据库，刷新和重新登录后保留。
+
+登录采用服务端可撤销 Session、Argon2id 密码哈希、HttpOnly Cookie 和 CSRF 防护。账号设置及管理员用户启停通过左下角账号菜单打开居中弹窗，旧地址 `/account` 会转到首页弹窗。当前聊天任务、短期上下文和 Mem0 已按账号身份接入；完整历史持久化和私人知识库隔离仍需业务模块实现。每位开发者应设置独立 `MEDIX_IDENTITY_NAMESPACE`，防止共用 Mem0 环境时混用身份。
+
+接口、迁移规则、配置、安全边界和各模块接入方式见 [用户认证对接文档](docs/AUTH-INTEGRATION.md)。以下原版功能说明中“无账户系统/按浏览器”等描述属于原版背景，以该对接文档中的本分支实现为准。
+
 克隆本仓库后，在仓库根目录的 PowerShell 中执行：
 
 ```powershell
@@ -206,3 +216,5 @@ $env:MEDIX_DB_PATH = 'D:\medix-data\milvus_v3.db'
 - 运行时约束及输出修复：[`constraints/`](constraints/)、[`validation/`](validation/)
 
 原项目 README 声明使用 MIT License；本次整理未修改授权声明。
+
+手机号验证码登录使用阿里云 PNVS，已有账号先在设置中绑定手机号。配置与最小 RAM 权限见 [短信登录配置](docs/SMS-SETUP.md)，未配置时仍可使用账号密码登录。

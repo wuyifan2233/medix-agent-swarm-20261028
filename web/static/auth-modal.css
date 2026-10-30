@@ -1,0 +1,117 @@
+/* Login belongs to the chat shell; native dialog keeps the background inert. */
+.top-login {
+  flex-shrink: 0; border: 0; border-radius: 9px; padding: 9px 19px;
+  background: #6375e9; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.4;
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.top-login:hover { background: #5668db; }
+.topbar .topbar-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; min-height: 36px; padding: 0 12px; line-height: 1;
+  box-sizing: border-box; border: 1px solid #e8ebf3; border-radius: 9px;
+  font-size: 12px; font-weight: 500; box-shadow: none;
+}
+.topbar .top-login { border-color: #6375e9; }
+.topbar .guide-button.topbar-action {
+  background: #fff; color: #74819d; border-color: #d6ddeb;
+}
+.topbar .guide-button.topbar-action:hover { background: #f1f4fc; color: #6375e9; border-color: #b6c4f0; }
+.auth-dialog {
+  --auth-height: 100dvh;
+  position: fixed; inset: 0; width: 420px; max-width: calc(100vw - 32px);
+  max-height: calc(var(--auth-height) - 32px); margin: auto;
+  border: 1px solid #eceef4; border-radius: 20px; padding: 32px;
+  background: #fff; color: #293449; box-shadow: 0 20px 80px #10182826;
+  overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+.auth-dialog::backdrop {
+  background: #20253538;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+body.auth-modal-open { overflow: hidden; }
+.auth-dialog .auth-close {
+  position: absolute; top: 17px; right: 17px; display: grid; place-items: center;
+  width: 30px; height: 30px; border: 0; border-radius: 7px; padding: 5px;
+  color: #9097a6; background: transparent;
+}
+.auth-dialog .auth-close:hover { background: #f2f4f8; color: #4c556a; }
+.auth-dialog .auth-close svg { width: 18px; height: 18px; }
+.auth-dialog h2 { font-size: 23px; font-weight: 600; line-height: 1.4; margin: 3px 30px 9px 0; }
+.auth-dialog .auth-intro { color: #8992a5; font-size: 12px; line-height: 1.7; margin: 0 0 23px; }
+.auth-tabs { display: flex; gap: 24px; border-bottom: 1px solid #eceef4; margin-bottom: 23px; }
+.auth-tabs button { padding: 0 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #969eae; font-size: 13px; }
+.auth-tabs button[aria-selected=true] { border-bottom-color: #6375e9; color: #6375e9; font-weight: 550; }
+.auth-dialog label { display: block; margin: 17px 0 8px; font-size: 12px; color: #58647d; }
+.auth-dialog input {
+  width: 100%; height: 46px; padding: 11px 13px; border: 1px solid #e4e7ef;
+  border-radius: 9px; background: #f9fafc; color: #293449; font: inherit; font-size: 14px;
+}
+.auth-dialog input::placeholder { font-size: 12px; color: #a1a9ba; }
+.auth-dialog input:focus { outline: none; border-color: #9eacf4; box-shadow: 0 0 0 3px #6375e90b; background: #fff; }
+.auth-password { position: relative; }
+.auth-dialog .auth-password input { padding-right: 57px; }
+.auth-password button { position: absolute; right: 8px; top: 8px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: #8996b6; font-size: 11px; padding: 0 7px; }
+.auth-password button:hover { background: #eef1fb; }
+.auth-password button { display: grid; place-items: center; width: 32px; padding: 6px; }
+.auth-password button svg { width: 18px; height: 18px; }
+.auth-password .eye-closed { display: none; }
+.auth-password .is-visible .eye-open { display: none; }
+.auth-password .is-visible .eye-closed { display: block; }
+.auth-dialog .auth-hint { font-size: 11px; line-height: 1.7; color: #939db1; margin: 6px 0 0; }
+.auth-dialog .auth-feedback { min-height: 18px; margin: 11px 0; color: #bc5964; font-size: 12px; line-height: 1.6; }
+.auth-dialog .auth-submit { width: 100%; height: 46px; border: 0; border-radius: 9px; background: #6375e9; color: #fff; font-size: 14px; font-weight: 550; }
+.auth-dialog .auth-submit:hover { background: #5668db; }
+.auth-dialog button:disabled { opacity: .55; cursor: default; }
+@media (max-width: 520px) {
+  .topbar .topbar-action { height: 32px; min-height: 32px; padding: 0 11px; }
+  .top-login { font-size: 12px; }
+  .topbar-right { gap: 8px; }
+  .topbar .guide-button { margin-left: 0; }
+  .auth-dialog { padding: 27px 24px 25px; border-radius: 18px; }
+  .auth-dialog h2 { font-size: 22px; }
+  .auth-dialog input { font-size: 16px; } /* Avoid automatic iOS focus zoom. */
+}
+@media (max-height: 560px) {
+  .auth-dialog { padding-top: 24px; padding-bottom: 24px; }
+  .auth-dialog .auth-intro { margin-bottom: 15px; }
+  .auth-tabs { margin-bottom: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-dialog[open] { animation: none; }
+  @keyframes auth-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+}
+
+.auth-dialog input:focus,.auth-dialog input:focus-visible{outline:none;box-shadow:none;border-color:#b8c0cf}
+
+.auth-dialog{height:fit-content;min-height:0;overflow-x:hidden}
+.auth-dialog .auth-intro{margin-bottom:24px}
+.auth-dialog label{margin-top:16px;margin-bottom:8px}
+.auth-dialog .sms-help{margin:12px 0 18px}
+.auth-dialog .sms-login-switch{margin-top:20px}
+
+.auth-password-heading{display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px}
+.auth-dialog .auth-password-heading label{margin:0}
+.auth-dialog .auth-password-heading .sms-login-switch{margin:0;font-size:12px;color:#8993a7}
+.auth-footer-links{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:22px;color:#c0c6d2}
+.auth-dialog .auth-footer-links .sms-login-switch{margin:0;display:inline-block}
+
+.login-method-tabs{display:flex;gap:28px;border-bottom:1px solid #edf0f5;margin:0 0 22px}
+.login-method-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;padding:0 0 12px;font-size:14px;color:#929bad}
+.login-method-tabs button[aria-selected="true"]{color:#6375e9;border-bottom-color:#6375e9;font-weight:600}
+.auth-dialog .auth-footer-links{gap:6px;font-size:12px;color:#929bad}
+.auth-dialog #authForm,.auth-dialog #smsLoginForm{min-height:286px}
+.auth-dialog #smsLoginForm .sms-help{visibility:hidden}
+
+.auth-dialog{scrollbar-width:none;-ms-overflow-style:none}
+.auth-dialog::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* Both login methods occupy exactly the same form tracks. */
+.auth-dialog #authForm,.auth-dialog #smsLoginForm{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:20px 46px 20px 20px 46px 36px 46px;row-gap:6px;height:270px;min-height:270px;margin:0}
+.auth-dialog #authForm>label:first-of-type,.auth-dialog #smsLoginForm>label:first-of-type{grid-row:1;margin:0;align-self:center}
+.auth-dialog #username,.auth-dialog #smsLoginPhone{grid-row:2;margin:0}
+.auth-dialog #authForm>.phone-field-hint,.auth-dialog #smsLoginForm>.phone-field-hint{grid-row:3;margin:0}
+.auth-dialog .auth-password-heading,.auth-dialog #smsLoginForm>label:nth-of-type(2){grid-row:4;margin:0;height:20px;align-self:center}
+.auth-dialog .auth-password,.auth-dialog #smsLoginForm>.sms-code-row{grid-row:5;margin:0}
+.auth-dialog #authForm>.auth-feedback,.auth-dialog #smsLoginForm>.auth-feedback{grid-row:6;margin:0;min-height:0;line-height:16px;align-self:center}
+.auth-dialog #authForm>.auth-submit,.auth-dialog #smsLoginForm>.auth-submit{grid-row:7;margin:0}
+.auth-dialog #smsLoginForm>.sms-help{display:none}

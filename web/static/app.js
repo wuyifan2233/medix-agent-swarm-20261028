@@ -1,5 +1,19 @@
 const $ = (id) => document.getElementById(id);
 const state = {chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0};
+let authEpoch = 0;
+window.addEventListener('medix-signout', () => {
+  authEpoch++; state.busy = false; state.images = []; state.chatId = crypto.randomUUID(); state.count = 0;
+  $('messages').replaceChildren(); $('attachments').replaceChildren(); $('message').value = ''; $('remember').checked = false;
+  $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话';
+  document.body.classList.remove('chatting'); updateComposer();
+});
+function renderAccount(user) {
+  $('topLoginButton').hidden = Boolean(user);
+  updateComposer();
+}
+window.addEventListener('medix-auth-change', event => renderAccount(event.detail));
+window.addEventListener('medix-auth-error', event => toast(event.detail));
+MedixAuth.ready.then(renderAccount).catch(() => {});
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -11,7 +25,7 @@ function updateComposer() {
   $('message').disabled = state.busy;
   $('newChat').disabled = state.busy;
   document.querySelectorAll('[data-action="upload"], [data-prompt], [data-example], #refreshPrompts').forEach(button => { button.disabled = state.busy; });
-  $('remember').disabled = state.busy || !state.health?.memory_configured;
+  $('remember').disabled = state.busy || !MedixAuth.user || !state.health?.memory_configured;
   $('message').style.height = 'auto';
   $('message').style.height = Math.min($('message').scrollHeight, 155) + 'px';
 }
@@ -125,7 +139,9 @@ function resultMessage(row, result) {
   scrollDown();
 }
 async function submit(message, images, retryRow) {
+  if (!await MedixAuth.requireLogin()) return;
   if (state.busy) return;
+  const epoch = authEpoch;
   state.busy = true; updateComposer();
   closeSidebar();
   document.body.classList.add('chatting');
@@ -133,17 +149,20 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
+    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
     const data = await response.json();
+    if (epoch !== authEpoch) return;
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
     $('message').value = ''; state.images = []; renderAttachments();
     let errors = 0;
     for (;;) {
       await sleep(1100);
+      if (epoch !== authEpoch) return;
       let status;
       try {
-        const poll = await fetch(`/api/jobs/${data.job_id}`);
+        const poll = await MedixAuth.fetch(`/api/jobs/${data.job_id}`);
         const body = await poll.json();
+        if (epoch !== authEpoch) return;
         if (!poll.ok) throw new Error(body.detail || '无法读取分析状态。');
         status = body; errors = 0;
       } catch (error) { if (++errors < 4) continue; throw error; }
@@ -154,11 +173,12 @@ async function submit(message, images, retryRow) {
       if (status.status === 'failed') throw new Error(status.error || '分析未能完成，请稍后重试。');
     }
   } catch (error) {
+    if (epoch !== authEpoch) return;
     const main = row.querySelector('.message-main'); main.replaceChildren();
     const text = document.createElement('div'); text.className = 'error-text'; text.textContent = error.message;
     const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage()); };
     main.append(text, button); scrollDown();
-  } finally { state.busy = false; updateComposer(); $('message').focus(); }
+  } finally { if (epoch === authEpoch) { state.busy = false; updateComposer(); $('message').focus(); } }
 }
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
 $('newChat').onclick = () => { if (state.busy) return; state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
@@ -185,6 +205,7 @@ refreshHealth();
 
 // The redesigned entry points all use the existing upload and chat pipeline.
 function closeSidebar() {
+  window.dispatchEvent(new Event('medix-sidebar-close'));
   $('sidebar').classList.remove('open');
   $('sidebarBackdrop').hidden = true;
   $('menuButton').setAttribute('aria-expanded', 'false');

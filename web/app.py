@@ -12,12 +12,23 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image, ImageOps, UnidentifiedImageError
 from loguru import logger
+from urllib.parse import urlsplit
+from auth.dependencies import require_user, require_admin, WRITE_METHODS
+from auth.router import router as auth_router
+from auth.sms_router import router as sms_router
+from auth.schemas import CurrentUser
+from auth.service import AuthService
+from auth.settings import AuthSettings
+from auth.middleware import AuthBodyLimit
+from storage.database import make_database
+from storage.migrate import upgrade_database
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).parent / "static"
@@ -72,34 +83,78 @@ def warmup():
 
 @asynccontextmanager
 async def lifespan(app):
+    # Upgrade once before serving; use a dedicated migration step for multi-process deployment.
+    upgrade_database(app.state.auth_service.settings.database_url)
     asyncio.get_running_loop().run_in_executor(executor, warmup)
     yield
 
 
 app = FastAPI(title="MediX Chat", lifespan=lifespan, docs_url=None, redoc_url=None)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
+auth_settings = AuthSettings.from_env()
+auth_engine, auth_sessions = make_database(auth_settings.database_url)
+app.state.auth_service = AuthService(auth_sessions, auth_settings)
+app.add_middleware(AuthBodyLimit)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
+    {urlsplit(origin).hostname for origin in auth_settings.origins}
+    | ({"testserver"} if not auth_settings.production else set())))
+app.include_router(auth_router)
+app.include_router(sms_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_error(request, exc):
+    # FastAPI's default validation payload includes raw input, which may be a password.
+    from auth.password_policy import PASSWORD_HINT
+    password_error = request.url.path in {"/api/auth/register", "/api/auth/change-password"} and any(
+        error["loc"][-1] == ("password" if request.url.path.endswith("register") else "new_password")
+        for error in exc.errors())
+    return JSONResponse({"detail": PASSWORD_HINT if password_error else "请求参数不符合要求，请检查字段和长度。",
+                         "fields": [".".join(str(x) for x in error["loc"]) for error in exc.errors()]},
+                        status_code=422)
 
 
 @app.middleware("http")
-async def local_session(request, call_next):
-    origin = request.headers.get("origin")
-    if request.method == "POST" and origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
-        return JSONResponse({"detail": "请从本地聊天页面发起请求。"}, status_code=403)
-    browser_id = request.cookies.get("medix_browser", "")
-    fresh = not re.fullmatch(r"[a-f0-9]{32}", browser_id)
-    request.state.browser_id = uuid.uuid4().hex if fresh else browser_id
-    response = await call_next(request)
-    if fresh:
-        response.set_cookie("medix_browser", request.state.browser_id, httponly=True, samesite="strict", max_age=86400)
+async def security_headers_and_origin(request, call_next):
+    settings = request.app.state.auth_service.settings
+    origin = request.headers.get("origin", "")
+    if request.url.path.startswith("/api/") and request.method in WRITE_METHODS and (
+        origin not in settings.origins or request.headers.get("x-medix-request") != "1"
+        or request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json"
+    ):
+        response = JSONResponse({"detail": "请求来源或格式不受信任。"}, status_code=403)
+    else:
+        response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+    if settings.production:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response
 
 
 @app.get("/")
 def index():
+    # The public shell contains no private records. Business APIs still require authentication.
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/login")
+def login_page():
+    return RedirectResponse("/?login=1", status_code=303)
+
+
+@app.get("/admin")
+def admin_page(user=Depends(require_admin)):
+    return FileResponse(STATIC / "admin.html")
+
+
+@app.get("/account")
+def account_page():
+    return RedirectResponse("/?settings=account", status_code=303)
 
 
 @app.get("/api/health")
@@ -199,6 +254,12 @@ def run_job(job, payload, session_id, memory_user_id):
     job["status"] = "running"
     job["started"] = time.monotonic()
     try:
+        # Tasks can wait in the executor; a disabled account must not start queued work.
+        from auth.models import User
+        with app.state.auth_service.sessions() as db:
+            owner = db.get(User, job["owner_user_id"])
+            if not owner or not owner.is_active:
+                raise ValueError("账号已停用，分析未执行。")
         if health["knowledge"] != "ready":
             raise ValueError("知识库尚未就绪，请检查服务日志后重试。")
         async def bounded():
@@ -212,7 +273,7 @@ def run_job(job, payload, session_id, memory_user_id):
 
 
 @app.post("/api/chat", status_code=202)
-async def chat(request: Request):
+async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     chunks, size = [], 0
     async for chunk in request.stream():
         size += len(chunk)
@@ -238,7 +299,7 @@ async def chat(request: Request):
             raise ValueError("记忆选项格式不正确。")
     except (ValueError, TypeError, KeyError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
-    owner = request.state.browser_id
+    owner = user.id
     for key, old in list(contexts.items()):
         if time.time() - old["updated"] > 3600:
             contexts.pop(key, None)
@@ -248,20 +309,20 @@ async def chat(request: Request):
     if sum(job["status"] in {"running", "queued"} for job in jobs.values()) >= 6:
         raise HTTPException(429, "正在处理的请求较多，请稍后重试。")
     job_id = uuid.uuid4().hex
-    job = {"id": job_id, "owner": owner, "created": time.time(), "status": "queued", "stage": "queued",
+    job = {"id": job_id, "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
     jobs[job_id] = job
     executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember},
-                    f"web-{owner}-{chat_id}", f"web-{owner}")
+                    f"web-{owner}-{chat_id}", f"medix:{app.state.auth_service.settings.namespace}:user:{owner}")
     return {"job_id": job_id}
 
 
 @app.get("/api/jobs/{job_id}")
-def job_status(job_id: str, request: Request):
+def job_status(job_id: str, user: CurrentUser = Depends(require_user)):
     job = jobs.get(job_id)
-    if not job or job["owner"] != request.state.browser_id:
+    if not job or job["owner_user_id"] != user.id:
         raise HTTPException(404, "未找到这次分析，请重新提问。")
-    return {key: value for key, value in job.items() if key not in {"owner", "created", "started"}}
+    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started"}}
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")
