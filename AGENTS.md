@@ -1,6 +1,6 @@
 # main_copy 集成入口（优先阅读）
 
-启动与团队验收先阅读 docs/TEAM-VALIDATION.md，代码接入阅读 docs/INTEGRATION.md 与 docs/AUTH-INTEGRATION.md。统一安装 requirements.integration.txt，启动 run_web.py；本机验证 Python3.10。业务数据库只有一份，本功能分支 Alembic 单一 head 20261031_17，公共向量索引和云端 Mem0 用途独立。禁止重新引入匿名浏览器身份或独立业务 SQLite。请勿直接运行旧版 main.py 的未隔离记忆逻辑作为网页入口。集成回归执行 python scripts/verify_integration.py。以下原模块交付说明作为历史/模块背景，和本节冲突时以本节及当前代码为准。
+启动与团队验收先阅读 docs/TEAM-VALIDATION.md，代码接入阅读 docs/INTEGRATION.md 与 docs/AUTH-INTEGRATION.md。统一安装 requirements.integration.txt，启动 run_web.py；本机验证 Python3.10。业务数据库只有一份，Alembic 单一 head 20261030_14，公共向量索引和云端 Mem0 用途独立。禁止重新引入匿名浏览器身份或独立业务 SQLite。请勿直接运行旧版 main.py 的未隔离记忆逻辑作为网页入口。集成回归执行 python scripts/verify_integration.py。以下原模块交付说明作为历史/模块背景，和本节冲突时以本节及当前代码为准。
 
 # MediX 项目协作指南
 
@@ -44,7 +44,7 @@
 - Mem0 默认可选，使用独立 `MEM0_API_KEY`；不要为启动网页额外部署 Redis/Qdrant。
 - 保留 `knowledge/data/documents/` 与旧库 `knowledge/data/milvus_lite.db`。迁移脚本只读旧库，不要反复运行原始导入脚本或删除数据库来解决锁冲突。
 - 当前向量库默认位于系统临时目录的项目路径哈希目录；`MEDIX_DB_PATH` 可改为 ASCII 路径。同一数据库只能由一个运行实例占用。
-- 本功能分支按用户要求将校验/去元数据/压缩后的 JPEG 随完整聊天存入统一账号业务库；不保存原图文件。删除会话级联清理消息、压缩图、上下文、事件和用量；独立病例/档案/Mem0分开管理。保持任务归属、来源校验、图片限制和本地监听。
+- 不落盘上传图片；网页没有完整历史聊天恢复。保持 Cookie/任务归属检查、来源校验、图片大小限制和本地监听。
 - 医学回答及随附资料未构成医学准确性认证；验证使用虚构数据。
 
 ## 修改与验证

@@ -1,6 +1,6 @@
 # 会话持久化、流式响应与用量统计
 
-分支：`codex/chat-streaming-wallet`，基于 `main_copy`。更新：2026-10-31。
+分支：`feature/chat-streaming-wallet`，基于 `main_copy`。更新：2026-10-31。
 
 ## 启动与配置
 
