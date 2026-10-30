@@ -8,10 +8,15 @@ ROOT = Path(__file__).resolve().parent
 REGISTRY = ROOT / 'sources.json'
 LOCAL = ROOT / '.local'
 CHUNK_VERSION = 'heading-token384-overlap48-v1'
+MINIMUM_DOCUMENTS = 3000
 
 
 def digest(value):
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
+
+
+def registry_digest(sources):
+    return digest(json.dumps(sources,sort_keys=True,ensure_ascii=False))
 
 
 def load_corpus():
@@ -22,8 +27,13 @@ def load_corpus():
     registry = json.loads(REGISTRY.read_text(encoding='utf-8'))['documents']
     labels=json.loads((ROOT/'applicability.json').read_text(encoding='utf-8'))['documents']
     expected = {d['id']: d for d in registry}
-    if {d['id'] for d in manifest['documents']} != set(expected):
-        raise ValueError('Local corpus does not match source registry; fetch sources again')
+    actual={d['id'] for d in manifest['documents']}
+    if len(actual)!=len(manifest['documents']):raise ValueError('Duplicate corpus document IDs')
+    if actual != set(expected):
+        partial=(actual < set(expected) and {d['id'] for d in manifest.get('missing_sources',[])}==set(expected)-actual
+                 and manifest.get('registry_sha256')==registry_digest(registry)
+                 and len(actual)>=max(min(MINIMUM_DOCUMENTS,len(expected)),manifest.get('minimum_originals',0)))
+        if not partial:raise ValueError('Local corpus does not match source registry; fetch sources again')
     docs = []
     for metadata in manifest['documents']:
         source = expected[metadata['id']]
@@ -34,6 +44,25 @@ def load_corpus():
             raise ValueError('Snapshot hash mismatch: ' + metadata['id'])
         docs.append({'id': metadata['id'], 'content': text, 'metadata': {**metadata,**labels.get(metadata['id'],{})}})
     return docs
+
+
+def cached_chunks(docs,tokenizer,identity):
+    """Avoid re-tokenizing thousands of unchanged originals on every startup."""
+    key=digest(json.dumps({'documents':[d['metadata'] | {'retrieved_at':''} for d in docs],
+                           'embedding':identity,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))
+    folder=LOCAL/'chunks';folder.mkdir(parents=True,exist_ok=True)
+    path=folder/(key+'.json')
+    if path.exists():
+        payload=json.loads(path.read_text(encoding='utf8'))
+        text=json.dumps(payload['rows'],ensure_ascii=False,separators=(',',':'))
+        if digest(text)!=payload['sha256']:raise ValueError('Chunk cache hash mismatch')
+        return payload['rows']
+    rows=[chunk for doc in docs for chunk in chunk_document(doc,tokenizer)]
+    text=json.dumps(rows,ensure_ascii=False,separators=(',',':'))
+    pending=path.with_suffix('.pending')
+    pending.write_bytes(json.dumps({'rows':rows,'sha256':digest(text)},ensure_ascii=False,separators=(',',':')).encode('utf8'))
+    pending.replace(path)
+    return rows
 
 
 def chunk_document(doc, tokenizer, max_tokens=384, overlap=48):

@@ -1,0 +1,2065 @@
+{
+  "notice": "Mention-based coverage is not clinical completeness. Drug references are not product-specific approved labels.",
+  "original_documents": 3298,
+  "unique_urls": 3298,
+  "generation": "b3b280351e902b2d",
+  "diseases": {
+    "高血压": {
+      "title_matches": 10,
+      "document_ids": [
+        "bp_home",
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019",
+        "dayi_disease_1150927",
+        "cma_45484",
+        "cma_45504",
+        "cma_47463"
+      ],
+      "status": "covered_by_title"
+    },
+    "糖尿病": {
+      "title_matches": 20,
+      "document_ids": [
+        "diabetes",
+        "diabetes_myths",
+        "cma_45184",
+        "dayi_disease_1145179",
+        "cma_45502",
+        "cma_46638",
+        "cma_46917",
+        "dayi_disease_1014906"
+      ],
+      "status": "covered_by_title"
+    },
+    "冠心病": {
+      "title_matches": 4,
+      "document_ids": [
+        "cma_45447",
+        "dayi_disease_1161723",
+        "cma_50044",
+        "cma_58919"
+      ],
+      "status": "covered_by_title"
+    },
+    "心绞痛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1141523"
+      ],
+      "status": "covered_by_title"
+    },
+    "心肌梗死": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151668"
+      ],
+      "status": "covered_by_title"
+    },
+    "心力衰竭": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1029238",
+        "dayi_disease_1157225"
+      ],
+      "status": "covered_by_title"
+    },
+    "心律失常": {
+      "title_matches": 3,
+      "document_ids": [
+        "cma_47756",
+        "dayi_disease_1113286",
+        "dayi_disease_1151142"
+      ],
+      "status": "covered_by_title"
+    },
+    "高脂血症": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1145177",
+        "cma_51824"
+      ],
+      "status": "covered_by_title"
+    },
+    "脑卒中": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1140848",
+        "cma_45484",
+        "cma_48588",
+        "cma_55275"
+      ],
+      "status": "covered_by_title"
+    },
+    "脑梗死": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151723"
+      ],
+      "status": "covered_by_title"
+    },
+    "脑出血": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1122779"
+      ],
+      "status": "covered_by_title"
+    },
+    "感冒": {
+      "title_matches": 31,
+      "document_ids": [
+        "dayi_disease_1010951",
+        "dayi_disease_1161551",
+        "cma_46636",
+        "dayi_disease_1010794",
+        "dayi_drug_1015620",
+        "dayi_disease_1019973",
+        "cma_48543",
+        "dayi_drug_1015756"
+      ],
+      "status": "covered_by_title"
+    },
+    "流感": {
+      "title_matches": 4,
+      "document_ids": [
+        "flu",
+        "dayi_disease_1019959",
+        "cma_56877",
+        "dayi_disease_1157722"
+      ],
+      "status": "covered_by_title"
+    },
+    "咳嗽": {
+      "title_matches": 13,
+      "document_ids": [
+        "cold",
+        "dayi_disease_1010952",
+        "cma_46055",
+        "cma_47761",
+        "cma_48536",
+        "dayi_disease_1026886",
+        "cma_48756",
+        "dayi_disease_1027832"
+      ],
+      "status": "covered_by_title"
+    },
+    "肺炎": {
+      "title_matches": 9,
+      "document_ids": [
+        "dayi_disease_1157418",
+        "dayi_disease_1019891",
+        "dayi_disease_1019946",
+        "dayi_disease_1024617",
+        "dayi_disease_1026986",
+        "cma_55455",
+        "cma_56755",
+        "cma_57221"
+      ],
+      "status": "covered_by_title"
+    },
+    "支气管炎": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1156609"
+      ],
+      "status": "covered_by_title"
+    },
+    "哮喘": {
+      "title_matches": 11,
+      "document_ids": [
+        "medication",
+        "dayi_disease_1157213",
+        "cma_46635",
+        "cma_48540",
+        "dayi_disease_1026974",
+        "cma_55521",
+        "cma_55562",
+        "cma_56017"
+      ],
+      "status": "covered_by_title"
+    },
+    "慢性阻塞性肺疾病": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1125470"
+      ],
+      "status": "covered_by_title"
+    },
+    "肺结核": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1146313",
+        "dayi_disease_1020049",
+        "cma_60263"
+      ],
+      "status": "covered_by_title"
+    },
+    "鼻炎": {
+      "title_matches": 14,
+      "document_ids": [
+        "rhinitis",
+        "rhinitis_general",
+        "dayi_disease_1151552",
+        "cma_48543",
+        "cma_48545",
+        "dayi_drug_1015857",
+        "dayi_disease_1118612",
+        "dayi_disease_1118617"
+      ],
+      "status": "covered_by_title"
+    },
+    "鼻窦炎": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1151538",
+        "cma_48546"
+      ],
+      "status": "covered_by_title"
+    },
+    "咽炎": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151579"
+      ],
+      "status": "covered_by_title"
+    },
+    "扁桃体炎": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151546"
+      ],
+      "status": "covered_by_title"
+    },
+    "中耳炎": {
+      "title_matches": 6,
+      "document_ids": [
+        "dayi_disease_1151577",
+        "cma_50127",
+        "cma_50128",
+        "dayi_disease_1113362",
+        "dayi_disease_1113369",
+        "dayi_disease_1113378"
+      ],
+      "status": "covered_by_title"
+    },
+    "结膜炎": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1145175",
+        "dayi_disease_1031197",
+        "dayi_disease_1031361"
+      ],
+      "status": "covered_by_title"
+    },
+    "干眼症": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1145166"
+      ],
+      "status": "covered_by_title"
+    },
+    "白内障": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1145168"
+      ],
+      "status": "covered_by_title"
+    },
+    "青光眼": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1145170",
+        "dayi_disease_1028275",
+        "dayi_disease_1028281",
+        "dayi_disease_1028349"
+      ],
+      "status": "covered_by_title"
+    },
+    "近视": {
+      "title_matches": 10,
+      "document_ids": [
+        "dayi_disease_700158",
+        "cma_50040",
+        "cma_50042",
+        "cma_50043",
+        "cma_51986",
+        "cma_55652",
+        "cma_56057",
+        "cma_56878"
+      ],
+      "status": "covered_by_title"
+    },
+    "胃炎": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151850"
+      ],
+      "status": "covered_by_title"
+    },
+    "胃溃疡": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1151793"
+      ],
+      "status": "covered_by_title"
+    },
+    "胃食管反流": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_45379",
+        "dayi_disease_1161076"
+      ],
+      "status": "covered_by_title"
+    },
+    "肠炎": {
+      "title_matches": 7,
+      "document_ids": [
+        "diarrhea",
+        "dayi_drug_1013174",
+        "dayi_disease_1156448",
+        "dayi_disease_1026831",
+        "cma_60238",
+        "cma_60254",
+        "dayi_disease_1156497"
+      ],
+      "status": "covered_by_title"
+    },
+    "腹泻": {
+      "title_matches": 8,
+      "document_ids": [
+        "ors",
+        "dayi_disease_1019881",
+        "dayi_disease_1024606",
+        "cma_50436",
+        "dayi_drug_1016065",
+        "cma_60237",
+        "cma_60238",
+        "dayi_disease_1142068"
+      ],
+      "status": "covered_by_title"
+    },
+    "便秘": {
+      "title_matches": 10,
+      "document_ids": [
+        "dayi_disease_1027022",
+        "cma_45380",
+        "dayi_disease_1150957",
+        "cma_45455",
+        "cma_48742",
+        "cma_48755",
+        "cma_49740",
+        "dayi_disease_1113249"
+      ],
+      "status": "covered_by_title"
+    },
+    "痔疮": {
+      "title_matches": 7,
+      "document_ids": [
+        "dayi_disease_1160411",
+        "dayi_drug_1015545",
+        "cma_46935",
+        "dayi_drug_1015608",
+        "dayi_drug_1015674",
+        "cma_50325",
+        "dayi_drug_1016262"
+      ],
+      "status": "covered_by_title"
+    },
+    "脂肪肝": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1156504",
+        "cma_49598"
+      ],
+      "status": "covered_by_title"
+    },
+    "乙肝": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1160536",
+        "cma_50355",
+        "cma_58143",
+        "cma_60350"
+      ],
+      "status": "covered_by_title"
+    },
+    "丙肝": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1160546"
+      ],
+      "status": "covered_by_title"
+    },
+    "胆囊炎": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1148588",
+        "dayi_disease_1020040",
+        "dayi_disease_1027029",
+        "dayi_disease_1118838",
+        "dayi_disease_1118845"
+      ],
+      "status": "covered_by_title"
+    },
+    "胆结石": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1151521",
+        "cma_50065",
+        "cma_50068"
+      ],
+      "status": "covered_by_title"
+    },
+    "胰腺炎": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1151790",
+        "dayi_disease_1119907"
+      ],
+      "status": "covered_by_title"
+    },
+    "阑尾炎": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1155761",
+        "cma_60334",
+        "cma_60335"
+      ],
+      "status": "covered_by_title"
+    },
+    "肾结石": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1141633",
+        "cma_47727",
+        "cma_48505",
+        "cma_48506"
+      ],
+      "status": "covered_by_title"
+    },
+    "尿路感染": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1142180"
+      ],
+      "status": "covered_by_title"
+    },
+    "肾炎": {
+      "title_matches": 7,
+      "document_ids": [
+        "dayi_disease_1155777",
+        "dayi_disease_1013921",
+        "dayi_disease_1019880",
+        "dayi_drug_1015685",
+        "dayi_drug_1015686",
+        "dayi_disease_1020025",
+        "dayi_disease_1020027"
+      ],
+      "status": "covered_by_title"
+    },
+    "肾病综合征": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1156755"
+      ],
+      "status": "covered_by_title"
+    },
+    "慢性肾脏病": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_59808",
+        "dayi_disease_1161193"
+      ],
+      "status": "covered_by_title"
+    },
+    "前列腺增生": {
+      "title_matches": 6,
+      "document_ids": [
+        "dayi_disease_1151570",
+        "cma_47925",
+        "cma_48240",
+        "cma_49638",
+        "cma_55219",
+        "cma_59921"
+      ],
+      "status": "covered_by_title"
+    },
+    "前列腺炎": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1119969",
+        "cma_48504",
+        "cma_51422",
+        "cma_58144",
+        "cma_59940"
+      ],
+      "status": "covered_by_title"
+    },
+    "痛风": {
+      "title_matches": 7,
+      "document_ids": [
+        "dayi_disease_1010161",
+        "dayi_disease_1142155",
+        "cma_45506",
+        "cma_47883",
+        "cma_50275",
+        "cma_50277",
+        "cma_55537"
+      ],
+      "status": "covered_by_title"
+    },
+    "骨关节炎": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1012666"
+      ],
+      "status": "covered_by_title"
+    },
+    "类风湿关节炎": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_48638",
+        "dayi_disease_1155833"
+      ],
+      "status": "covered_by_title"
+    },
+    "骨质疏松": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1125962",
+        "cma_45477",
+        "cma_46980",
+        "cma_49580",
+        "cma_49581"
+      ],
+      "status": "covered_by_title"
+    },
+    "腰椎间盘突出": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_45442",
+        "dayi_disease_1160518"
+      ],
+      "status": "covered_by_title"
+    },
+    "颈椎病": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1124480",
+        "cma_45443",
+        "cma_48576"
+      ],
+      "status": "covered_by_title"
+    },
+    "肩周炎": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1132449",
+        "cma_49775"
+      ],
+      "status": "covered_by_title"
+    },
+    "扭伤": {
+      "title_matches": 4,
+      "document_ids": [
+        "cma_45467",
+        "cma_46798",
+        "cma_56669",
+        "dayi_disease_1157254"
+      ],
+      "status": "covered_by_title"
+    },
+    "湿疹": {
+      "title_matches": 6,
+      "document_ids": [
+        "dayi_disease_1150933",
+        "dayi_disease_1027556",
+        "cma_50199",
+        "cma_50203",
+        "cma_55981",
+        "cma_58476"
+      ],
+      "status": "covered_by_title"
+    },
+    "荨麻疹": {
+      "title_matches": 3,
+      "document_ids": [
+        "loratadine",
+        "dayi_disease_1125078",
+        "dayi_drug_1016109"
+      ],
+      "status": "covered_by_title"
+    },
+    "痤疮": {
+      "title_matches": 6,
+      "document_ids": [
+        "dayi_disease_1125499",
+        "cma_48722",
+        "dayi_drug_1015890",
+        "dayi_drug_1015980",
+        "cma_57578",
+        "dayi_disease_1123541"
+      ],
+      "status": "covered_by_title"
+    },
+    "足癣": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1149958"
+      ],
+      "status": "covered_by_title"
+    },
+    "带状疱疹": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1019895",
+        "cma_57201",
+        "cma_57260"
+      ],
+      "status": "covered_by_title"
+    },
+    "银屑病": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_56665",
+        "dayi_disease_1144507"
+      ],
+      "status": "covered_by_title"
+    },
+    "过敏": {
+      "title_matches": 18,
+      "document_ids": [
+        "rhinitis",
+        "rhinitis_general",
+        "cma_45357",
+        "cma_45470",
+        "dayi_disease_1158510",
+        "cma_46635",
+        "dayi_disease_1013913",
+        "dayi_disease_1013917"
+      ],
+      "status": "covered_by_title"
+    },
+    "贫血": {
+      "title_matches": 14,
+      "document_ids": [
+        "dayi_disease_1027012",
+        "cma_45375",
+        "dayi_disease_1142213",
+        "dayi_disease_1012394",
+        "dayi_disease_1013920",
+        "dayi_disease_1019870",
+        "dayi_disease_1019917",
+        "dayi_disease_1019930"
+      ],
+      "status": "covered_by_title"
+    },
+    "缺铁性贫血": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1142213",
+        "dayi_disease_1019917",
+        "dayi_disease_1027049"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲状腺功能亢进": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1159158"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲状腺功能减退": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1155775"
+      ],
+      "status": "covered_by_title"
+    },
+    "肥胖": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1029278",
+        "cma_45858",
+        "cma_47751"
+      ],
+      "status": "covered_by_title"
+    },
+    "失眠": {
+      "title_matches": 7,
+      "document_ids": [
+        "cma_45487",
+        "cma_45495",
+        "cma_47297",
+        "cma_50336",
+        "cma_50337",
+        "cma_57457",
+        "dayi_disease_1158884"
+      ],
+      "status": "covered_by_title"
+    },
+    "抑郁症": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1151738",
+        "cma_45500",
+        "dayi_disease_1028821",
+        "cma_56724",
+        "cma_59520"
+      ],
+      "status": "covered_by_title"
+    },
+    "焦虑症": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1156484"
+      ],
+      "status": "covered_by_title"
+    },
+    "偏头痛": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1122913",
+        "dayi_disease_1019916"
+      ],
+      "status": "covered_by_title"
+    },
+    "癫痫": {
+      "title_matches": 9,
+      "document_ids": [
+        "dayi_disease_1010129",
+        "dayi_disease_1031258",
+        "dayi_disease_1031262",
+        "cma_55458",
+        "cma_55459",
+        "cma_55657",
+        "cma_57658",
+        "dayi_disease_1119880"
+      ],
+      "status": "covered_by_title"
+    },
+    "帕金森病": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1029220",
+        "cma_49617",
+        "cma_51308",
+        "cma_51428",
+        "cma_59978"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿尔茨海默病": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_48580",
+        "cma_48581"
+      ],
+      "status": "covered_by_title"
+    },
+    "月经不调": {
+      "title_matches": 2,
+      "document_ids": [
+        "cma_46858",
+        "cma_60370"
+      ],
+      "status": "covered_by_title"
+    },
+    "痛经": {
+      "title_matches": 8,
+      "document_ids": [
+        "dayi_disease_1027802",
+        "dayi_disease_1151665",
+        "cma_46701",
+        "dayi_disease_1020011",
+        "cma_48656",
+        "dayi_drug_1016207",
+        "dayi_drug_1016418",
+        "cma_60369"
+      ],
+      "status": "covered_by_title"
+    },
+    "子宫肌瘤": {
+      "title_matches": 14,
+      "document_ids": [
+        "dayi_disease_1156517",
+        "cma_46855",
+        "cma_47276",
+        "cma_47277",
+        "cma_47376",
+        "cma_47377",
+        "cma_47388",
+        "cma_47435"
+      ],
+      "status": "covered_by_title"
+    },
+    "阴道炎": {
+      "title_matches": 6,
+      "document_ids": [
+        "dayi_disease_1151658",
+        "dayi_disease_1020010",
+        "cma_50439",
+        "dayi_disease_1119337",
+        "dayi_disease_1119474",
+        "dayi_disease_1119482"
+      ],
+      "status": "covered_by_title"
+    },
+    "乳腺增生": {
+      "title_matches": 3,
+      "document_ids": [
+        "cma_50139",
+        "dayi_disease_1113372",
+        "dayi_disease_1160532"
+      ],
+      "status": "covered_by_title"
+    },
+    "多囊卵巢综合征": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_disease_1020013"
+      ],
+      "status": "covered_by_title"
+    },
+    "手足口病": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1010871",
+        "dayi_disease_1019963"
+      ],
+      "status": "covered_by_title"
+    },
+    "水痘": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1019967",
+        "dayi_disease_1027484",
+        "cma_57201"
+      ],
+      "status": "covered_by_title"
+    },
+    "麻疹": {
+      "title_matches": 6,
+      "document_ids": [
+        "loratadine",
+        "dayi_disease_1019990",
+        "dayi_disease_1027466",
+        "dayi_disease_1125078",
+        "cma_48237",
+        "dayi_drug_1016109"
+      ],
+      "status": "covered_by_title"
+    },
+    "百日咳": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_disease_1019876",
+        "dayi_disease_1024644"
+      ],
+      "status": "covered_by_title"
+    },
+    "肺癌": {
+      "title_matches": 5,
+      "document_ids": [
+        "dayi_disease_1031561",
+        "dayi_disease_1124509",
+        "cma_46975",
+        "cma_48541",
+        "cma_59481"
+      ],
+      "status": "covered_by_title"
+    },
+    "胃癌": {
+      "title_matches": 8,
+      "document_ids": [
+        "dayi_disease_1113344",
+        "dayi_disease_1155658",
+        "cma_47462",
+        "cma_48501",
+        "cma_57418",
+        "cma_58216",
+        "cma_58958",
+        "cma_59847"
+      ],
+      "status": "covered_by_title"
+    },
+    "结直肠癌": {
+      "title_matches": 1,
+      "document_ids": [
+        "cma_45875"
+      ],
+      "status": "covered_by_title"
+    },
+    "乳腺癌": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1118407",
+        "cma_46856",
+        "cma_50137",
+        "cma_50138"
+      ],
+      "status": "covered_by_title"
+    },
+    "宫颈癌": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_disease_1020042",
+        "cma_60371",
+        "dayi_disease_1131269"
+      ],
+      "status": "covered_by_title"
+    },
+    "肝癌": {
+      "title_matches": 4,
+      "document_ids": [
+        "dayi_disease_1113476",
+        "dayi_disease_1156417",
+        "cma_48502",
+        "dayi_disease_1118890"
+      ],
+      "status": "covered_by_title"
+    },
+    "胃肠炎": {
+      "title_matches": 2,
+      "document_ids": [
+        "diarrhea",
+        "dayi_disease_1156497"
+      ],
+      "status": "covered_by_title"
+    }
+  },
+  "drugs": {
+    "对乙酰氨基酚": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152033"
+      ],
+      "status": "covered_by_title"
+    },
+    "布洛芬": {
+      "title_matches": 2,
+      "document_ids": [
+        "ibuprofen",
+        "dayi_drug_1151907"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿司匹林": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151076",
+        "cma_45460"
+      ],
+      "status": "covered_by_title"
+    },
+    "氯雷他定": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151949"
+      ],
+      "status": "covered_by_title"
+    },
+    "西替利嗪": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151985",
+        "dayi_drug_1152389"
+      ],
+      "status": "covered_by_title"
+    },
+    "左西替利嗪": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152389"
+      ],
+      "status": "covered_by_title"
+    },
+    "非索非那定": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152386"
+      ],
+      "status": "covered_by_title"
+    },
+    "氯苯那敏": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152332"
+      ],
+      "status": "covered_by_title"
+    },
+    "孟鲁司特": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152236"
+      ],
+      "status": "covered_by_title"
+    },
+    "布地奈德": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151959"
+      ],
+      "status": "covered_by_title"
+    },
+    "氟替卡松": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153689"
+      ],
+      "status": "covered_by_title"
+    },
+    "沙丁胺醇": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152057"
+      ],
+      "status": "covered_by_title"
+    },
+    "特布他林": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154716"
+      ],
+      "status": "covered_by_title"
+    },
+    "异丙托溴铵": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152144"
+      ],
+      "status": "covered_by_title"
+    },
+    "氨溴索": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151964"
+      ],
+      "status": "covered_by_title"
+    },
+    "乙酰半胱氨酸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152150"
+      ],
+      "status": "covered_by_title"
+    },
+    "右美沙芬": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152171"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿莫西林": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151078",
+        "dayi_drug_1157858"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿莫西林克拉维酸钾": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157858"
+      ],
+      "status": "covered_by_title"
+    },
+    "头孢氨苄": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152108"
+      ],
+      "status": "covered_by_title"
+    },
+    "头孢克洛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155069"
+      ],
+      "status": "covered_by_title"
+    },
+    "头孢呋辛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152083"
+      ],
+      "status": "covered_by_title"
+    },
+    "头孢克肟": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151919"
+      ],
+      "status": "covered_by_title"
+    },
+    "头孢地尼": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153757"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿奇霉素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151900"
+      ],
+      "status": "covered_by_title"
+    },
+    "克拉霉素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151943"
+      ],
+      "status": "covered_by_title"
+    },
+    "多西环素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152017"
+      ],
+      "status": "covered_by_title"
+    },
+    "左氧氟沙星": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151912",
+        "dayi_drug_1024975"
+      ],
+      "status": "covered_by_title"
+    },
+    "莫西沙星": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152010"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲硝唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151926"
+      ],
+      "status": "covered_by_title"
+    },
+    "奥硝唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153085"
+      ],
+      "status": "covered_by_title"
+    },
+    "奥司他韦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151908"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿昔洛韦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1025062"
+      ],
+      "status": "covered_by_title"
+    },
+    "伐昔洛韦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153676"
+      ],
+      "status": "covered_by_title"
+    },
+    "奥美拉唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151923"
+      ],
+      "status": "covered_by_title"
+    },
+    "埃索美拉唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152281"
+      ],
+      "status": "covered_by_title"
+    },
+    "泮托拉唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152030"
+      ],
+      "status": "covered_by_title"
+    },
+    "雷贝拉唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152403"
+      ],
+      "status": "covered_by_title"
+    },
+    "法莫替丁": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152098"
+      ],
+      "status": "covered_by_title"
+    },
+    "铝碳酸镁": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152287"
+      ],
+      "status": "covered_by_title"
+    },
+    "硫糖铝": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152388"
+      ],
+      "status": "covered_by_title"
+    },
+    "多潘立酮": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152385"
+      ],
+      "status": "covered_by_title"
+    },
+    "莫沙必利": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151989"
+      ],
+      "status": "covered_by_title"
+    },
+    "蒙脱石散": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1025700"
+      ],
+      "status": "covered_by_title"
+    },
+    "口服补液盐": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155528"
+      ],
+      "status": "covered_by_title"
+    },
+    "洛哌丁胺": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152186"
+      ],
+      "status": "covered_by_title"
+    },
+    "乳果糖": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152006"
+      ],
+      "status": "covered_by_title"
+    },
+    "聚乙二醇": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152024"
+      ],
+      "status": "covered_by_title"
+    },
+    "开塞露": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151924"
+      ],
+      "status": "covered_by_title"
+    },
+    "二甲双胍": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151920",
+        "dayi_drug_1157916"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿卡波糖": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154726"
+      ],
+      "status": "covered_by_title"
+    },
+    "格列美脲": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157587"
+      ],
+      "status": "covered_by_title"
+    },
+    "格列齐特": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155473"
+      ],
+      "status": "covered_by_title"
+    },
+    "瑞格列奈": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154313"
+      ],
+      "status": "covered_by_title"
+    },
+    "西格列汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153865"
+      ],
+      "status": "covered_by_title"
+    },
+    "达格列净": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154501"
+      ],
+      "status": "covered_by_title"
+    },
+    "恩格列净": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1157870",
+        "dayi_drug_1157916"
+      ],
+      "status": "covered_by_title"
+    },
+    "利拉鲁肽": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153376"
+      ],
+      "status": "covered_by_title"
+    },
+    "司美格鲁肽": {
+      "title_matches": 1,
+      "document_ids": [
+        "psm_semaglutide"
+      ],
+      "status": "covered_by_title"
+    },
+    "胰岛素": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1151952",
+        "cma_46638"
+      ],
+      "status": "covered_by_title"
+    },
+    "氨氯地平": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1152051",
+        "dayi_drug_1157866"
+      ],
+      "status": "covered_by_title"
+    },
+    "硝苯地平": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151977"
+      ],
+      "status": "covered_by_title"
+    },
+    "非洛地平": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154753"
+      ],
+      "status": "covered_by_title"
+    },
+    "缬沙坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151975"
+      ],
+      "status": "covered_by_title"
+    },
+    "氯沙坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152225"
+      ],
+      "status": "covered_by_title"
+    },
+    "厄贝沙坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154125"
+      ],
+      "status": "covered_by_title"
+    },
+    "替米沙坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154070"
+      ],
+      "status": "covered_by_title"
+    },
+    "奥美沙坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154504"
+      ],
+      "status": "covered_by_title"
+    },
+    "贝那普利": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1158020"
+      ],
+      "status": "covered_by_title"
+    },
+    "依那普利": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152100"
+      ],
+      "status": "covered_by_title"
+    },
+    "培哚普利": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155190"
+      ],
+      "status": "covered_by_title"
+    },
+    "美托洛尔": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152032"
+      ],
+      "status": "covered_by_title"
+    },
+    "比索洛尔": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152122"
+      ],
+      "status": "covered_by_title"
+    },
+    "氢氯噻嗪": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152055"
+      ],
+      "status": "covered_by_title"
+    },
+    "吲达帕胺": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157010"
+      ],
+      "status": "covered_by_title"
+    },
+    "呋塞米": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152019"
+      ],
+      "status": "covered_by_title"
+    },
+    "螺内酯": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152035"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿托伐他汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152372"
+      ],
+      "status": "covered_by_title"
+    },
+    "瑞舒伐他汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152374"
+      ],
+      "status": "covered_by_title"
+    },
+    "辛伐他汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152119"
+      ],
+      "status": "covered_by_title"
+    },
+    "非诺贝特": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152537"
+      ],
+      "status": "covered_by_title"
+    },
+    "依折麦布": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152306"
+      ],
+      "status": "covered_by_title"
+    },
+    "氯吡格雷": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151945"
+      ],
+      "status": "covered_by_title"
+    },
+    "替格瑞洛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152621"
+      ],
+      "status": "covered_by_title"
+    },
+    "华法林": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152353"
+      ],
+      "status": "covered_by_title"
+    },
+    "利伐沙班": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1156479"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿哌沙班": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153481"
+      ],
+      "status": "covered_by_title"
+    },
+    "硝酸甘油": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151958"
+      ],
+      "status": "covered_by_title"
+    },
+    "硝酸异山梨酯": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1147317"
+      ],
+      "status": "covered_by_title"
+    },
+    "曲美他嗪": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152097"
+      ],
+      "status": "covered_by_title"
+    },
+    "地高辛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153546"
+      ],
+      "status": "covered_by_title"
+    },
+    "别嘌醇": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152259"
+      ],
+      "status": "covered_by_title"
+    },
+    "非布司他": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152262"
+      ],
+      "status": "covered_by_title"
+    },
+    "秋水仙碱": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151911"
+      ],
+      "status": "covered_by_title"
+    },
+    "塞来昔布": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152414"
+      ],
+      "status": "covered_by_title"
+    },
+    "双氯芬酸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154794"
+      ],
+      "status": "covered_by_title"
+    },
+    "依托考昔": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152271"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿仑膦酸钠": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154771"
+      ],
+      "status": "covered_by_title"
+    },
+    "碳酸钙": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151953"
+      ],
+      "status": "covered_by_title"
+    },
+    "维生素D": {
+      "title_matches": 2,
+      "document_ids": [
+        "dayi_drug_1156385",
+        "dayi_disease_1010803"
+      ],
+      "status": "covered_by_title"
+    },
+    "骨化三醇": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153399"
+      ],
+      "status": "covered_by_title"
+    },
+    "硫酸亚铁": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152031"
+      ],
+      "status": "covered_by_title"
+    },
+    "叶酸": {
+      "title_matches": 3,
+      "document_ids": [
+        "dayi_drug_1151904",
+        "cma_57696",
+        "cma_60367"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲钴胺": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151914"
+      ],
+      "status": "covered_by_title"
+    },
+    "维生素B12": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151903"
+      ],
+      "status": "covered_by_title"
+    },
+    "左甲状腺素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157124"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲巯咪唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154806"
+      ],
+      "status": "covered_by_title"
+    },
+    "丙硫氧嘧啶": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157067"
+      ],
+      "status": "covered_by_title"
+    },
+    "泼尼松": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152087"
+      ],
+      "status": "covered_by_title"
+    },
+    "地塞米松": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152133"
+      ],
+      "status": "covered_by_title"
+    },
+    "氢化可的松": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152056"
+      ],
+      "status": "covered_by_title"
+    },
+    "他克莫司": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155210"
+      ],
+      "status": "covered_by_title"
+    },
+    "甲氨蝶呤": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153137"
+      ],
+      "status": "covered_by_title"
+    },
+    "羟氯喹": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154763"
+      ],
+      "status": "covered_by_title"
+    },
+    "氟康唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151987"
+      ],
+      "status": "covered_by_title"
+    },
+    "伊曲康唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152071"
+      ],
+      "status": "covered_by_title"
+    },
+    "特比萘芬": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152986"
+      ],
+      "status": "covered_by_title"
+    },
+    "克霉唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152038"
+      ],
+      "status": "covered_by_title"
+    },
+    "酮康唑": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152911"
+      ],
+      "status": "covered_by_title"
+    },
+    "莫匹罗星": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154901"
+      ],
+      "status": "covered_by_title"
+    },
+    "夫西地酸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153855"
+      ],
+      "status": "covered_by_title"
+    },
+    "阿达帕林": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155604"
+      ],
+      "status": "covered_by_title"
+    },
+    "维A酸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152248"
+      ],
+      "status": "covered_by_title"
+    },
+    "过氧苯甲酰": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1158440"
+      ],
+      "status": "covered_by_title"
+    },
+    "氧化锌": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1153066"
+      ],
+      "status": "covered_by_title"
+    },
+    "炉甘石": {
+      "title_matches": 1,
+      "document_ids": [
+        "psm_calamine"
+      ],
+      "status": "covered_by_title"
+    },
+    "氯霉素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155446"
+      ],
+      "status": "covered_by_title"
+    },
+    "左氧氟沙星滴眼液": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1024975"
+      ],
+      "status": "covered_by_title"
+    },
+    "人工泪液": {
+      "title_matches": 1,
+      "document_ids": [
+        "psm_tears"
+      ],
+      "status": "covered_by_title"
+    },
+    "拉坦前列素": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1154951"
+      ],
+      "status": "covered_by_title"
+    },
+    "坦索罗辛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157869"
+      ],
+      "status": "covered_by_title"
+    },
+    "非那雄胺": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151990"
+      ],
+      "status": "covered_by_title"
+    },
+    "舍曲林": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151954"
+      ],
+      "status": "covered_by_title"
+    },
+    "艾司西酞普兰": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155703"
+      ],
+      "status": "covered_by_title"
+    },
+    "氟西汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151917"
+      ],
+      "status": "covered_by_title"
+    },
+    "文拉法辛": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1155722"
+      ],
+      "status": "covered_by_title"
+    },
+    "度洛西汀": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152207"
+      ],
+      "status": "covered_by_title"
+    },
+    "劳拉西泮": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1159164"
+      ],
+      "status": "covered_by_title"
+    },
+    "艾司唑仑": {
+      "title_matches": 1,
+      "document_ids": [
+        "hnpa_estazolam"
+      ],
+      "status": "covered_by_title"
+    },
+    "唑吡坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157949"
+      ],
+      "status": "covered_by_title"
+    },
+    "丙戊酸钠": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152053"
+      ],
+      "status": "covered_by_title"
+    },
+    "左乙拉西坦": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152329"
+      ],
+      "status": "covered_by_title"
+    },
+    "卡马西平": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1151961"
+      ],
+      "status": "covered_by_title"
+    },
+    "加巴喷丁": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152224"
+      ],
+      "status": "covered_by_title"
+    },
+    "普瑞巴林": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152331"
+      ],
+      "status": "covered_by_title"
+    },
+    "左旋多巴": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1156198"
+      ],
+      "status": "covered_by_title"
+    },
+    "多奈哌齐": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152336"
+      ],
+      "status": "covered_by_title"
+    },
+    "美金刚": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152339"
+      ],
+      "status": "covered_by_title"
+    },
+    "复方氨酚烷胺": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157895"
+      ],
+      "status": "covered_by_title"
+    },
+    "氨咖黄敏": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1158347"
+      ],
+      "status": "covered_by_title"
+    },
+    "复方甘草": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152588"
+      ],
+      "status": "covered_by_title"
+    },
+    "复方鲜竹沥": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152521"
+      ],
+      "status": "covered_by_title"
+    },
+    "连花清瘟": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157983"
+      ],
+      "status": "covered_by_title"
+    },
+    "藿香正气": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1157969"
+      ],
+      "status": "covered_by_title"
+    },
+    "六味地黄丸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1022241"
+      ],
+      "status": "covered_by_title"
+    },
+    "逍遥丸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1146403"
+      ],
+      "status": "covered_by_title"
+    },
+    "归脾丸": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1146805"
+      ],
+      "status": "covered_by_title"
+    },
+    "板蓝根": {
+      "title_matches": 7,
+      "document_ids": [
+        "dayi_drug_1015551",
+        "dayi_drug_1015614",
+        "dayi_drug_1015637",
+        "dayi_drug_1015639",
+        "dayi_drug_1015679",
+        "dayi_drug_1015930",
+        "dayi_drug_1015939"
+      ],
+      "status": "covered_by_title"
+    },
+    "蒲地蓝": {
+      "title_matches": 1,
+      "document_ids": [
+        "dayi_drug_1152252"
+      ],
+      "status": "covered_by_title"
+    }
+  }
+}

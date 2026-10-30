@@ -32,7 +32,7 @@
  {"id":"p01","kind":"in_domain","query":"高血压患者水果能不能吃","expected_docs":["hypertension","hypertension_intro","hypertension_standard2019"],"evidence_terms":["水果","饮食"]},
  {"id":"p02","kind":"in_domain","query":"血压高平时怎样管理","expected_docs":["hypertension","hypertension_intro","hypertension_standard2019"],"evidence_terms":["膳食","运动"]},
  {"id":"p03","kind":"in_domain","query":"儿童过敏性鼻炎有哪些症状","expected_docs":["rhinitis"],"evidence_terms":["鼻塞","喷嚏"]},
- {"id":"p04","kind":"audience_mismatch","query":"成人鼻炎如何护理"},
+ {"id":"p04","kind":"audience_mismatch","query":"成人口服补液盐的配制误区"},
  {"id":"p05","kind":"knowledge_gap","query":"氯雷他定有哪些禁忌","expected_gap":"missing_product_label"},
  {"id":"p06","kind":"needs_information","query":"虚构：我吃了一片布洛芬，现在该怎么办"},
  {"id":"p07","kind":"in_domain","query":"糖尿病患者水果能不能吃","expected_docs":["diabetes_myths","diabetes_diet"],"evidence_terms":["水果"]},
@@ -41,5 +41,8 @@
  {"id":"n01","kind":"in_domain","query":"糖尿病低GI饮食如何选择主食","expected_docs":["diabetes_diet"],"evidence_terms":["主食","全麦"]},
  {"id":"n02","kind":"in_domain","query":"高血压每天食盐摄入应该注意什么","expected_docs":["hypertension","hypertension_intro","hypertension_standard2019"],"evidence_terms":["5克","5 g","食盐"]},
  {"id":"n03","kind":"in_domain","query":"糖尿病患者能否完全不吃甜食和水果","expected_docs":["diabetes_myths","diabetes_diet"],"evidence_terms":["水果"]},
- {"id":"n04","kind":"in_domain","query":"高血压运动前的医学检查有什么要求","expected_docs":["hypertension_standard2019"],"evidence_terms":["运动","检查"]}
+ {"id":"n04","kind":"in_domain","query":"高血压运动前的医学检查有什么要求","expected_docs":["hypertension_standard2019"],"evidence_terms":["运动","检查"]},
+ {"id":"n05","kind":"in_domain","query":"家庭监测高血压应该选择什么血压计","expected_docs":["bp_home"],"evidence_terms":["上臂式"]},
+ {"id":"n06","kind":"in_domain","query":"鼻炎患者有哪些鼻腔冲洗的方法","expected_docs":["nasal_rinse"],"evidence_terms":["冲洗"]},
+ {"id":"n07","kind":"in_domain","query":"成人过敏性鼻炎有哪些治疗方法","expected_docs":["rhinitis_general"],"evidence_terms":["鼻炎"]}
 ]

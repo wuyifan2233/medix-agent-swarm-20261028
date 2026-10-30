@@ -385,7 +385,7 @@ $('questionChips').onclick = event => {
 };
 
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
-const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）'};
+const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）',medical_encyclopedia:'专业平台疾病资料，非政府发布',drug_reference:'专业平台药物资料，非具体制剂核准说明书'};
 function showEvidence(source, quote = '') {
   if (!source) return;
   $('dialogTitle').textContent = source.title;
@@ -427,8 +427,16 @@ async function openKnowledge() {
   try {
     const response = await fetch('/api/knowledge/catalog'); const data = await response.json(); if (!response.ok) throw new Error(data.detail);
     catalogNode.replaceChildren();
-    const count = document.createElement('p'); count.textContent = `${data.documents.length} 份来源 · ${data.chunks} 个独立片段 · 版本 ${data.version}`; catalogNode.append(count);
+    const count = document.createElement('p'); count.textContent = `${data.document_total || data.documents.length} 份来源 · ${data.chunks} 个独立片段 · 版本 ${data.version}`; catalogNode.append(count);
     data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}｜${(doc.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}｜${evidenceKindLabels[doc.evidence_kind] || '类型未注明'}`; catalogNode.append(p); });
+    if (data.next_offset !== null && data.next_offset !== undefined) {
+      const more = document.createElement('button'); more.type = 'button'; more.textContent = '再查看50份来源'; let offset = data.next_offset; catalogNode.append(more);
+      more.onclick = async () => { more.disabled = true; try {
+        const response = await fetch(`/api/knowledge/catalog?offset=${offset}&limit=50`); if (!response.ok) throw new Error('加载失败'); const page = await response.json();
+        page.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}｜${evidenceKindLabels[doc.evidence_kind] || '类型未注明'}`; catalogNode.insertBefore(p, more); });
+        offset = page.next_offset; if (offset === null) more.remove();
+      } catch { more.textContent = '加载失败，点击重试'; } finally { more.disabled = false; } };
+    }
   } catch (error) { catalogNode.textContent = error.message; }
   try {
     const response = await fetch('/api/knowledge/explore'); if (!response.ok) return; const data = await response.json();

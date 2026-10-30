@@ -1,6 +1,8 @@
 # 本地医学证据库交付与合入说明
 
-> 当前完整设计与最新操作步骤见 [knowledge/DESIGN.md](../knowledge/DESIGN.md)。2026-10-30扩展交付：16份中文原文、186块，两个中文开源数据集辅助接入；本机显式选择硅基流动Embedding，纯文字证据问答默认单次生成。最新验证见 `docs/live-demo-validation.json`；下文12份来源等数字是此前交付记录。
+> 最新克隆启动：安装requirements.kb.txt后直接运行run_kb_demo.py；首次需联网自动获取中文原文和BGE模型，在项目内建库。无需.env.local即可本地检索。新全文与证据数据库不公开分发。验证范围见docs/clone-bootstrap-validation.json。
+
+> 当前完整设计与操作步骤见 [knowledge/DESIGN.md](../knowledge/DESIGN.md)。最新交付为3,298篇独立中文原文，本地BGE（512维）建库。以下12份/19份、Qwen默认等为历史交付记录，不代表当前配置。
 
 ## 范围与当前数据
 
@@ -12,7 +14,7 @@
 
 ## 安装、构建与运行
 
-### Gitee Qwen3-Embedding-8B（证据版默认后端）
+### Gitee Qwen3-Embedding-8B（可选远程后端，历史记录）
 
 嵌入接口为 `POST https://ai.gitee.com/v1/embeddings`，使用独立的 `GITEE_AI_API_KEY`，不要复用或覆盖聊天模型的 `OPENAI_API_KEY`。请求使用 `model=Qwen3-Embedding-8B`、`encoding_format=float`、显式 `dimensions=4096`，并严格校验响应。2026-10-29 实测省略 dimensions 时 Gitee 返回 1024 维，因此不能依赖原生模型维度推断服务端默认值。配置模板见根目录 `.env.example`；可复制成被 Git 忽略的 `.env.local` 保存本机默认凭据。嵌入及重排配置支持从 `.env.local` 读取，进程环境变量优先；模型缓存等其余运行配置继续使用环境变量。
 
@@ -48,7 +50,7 @@ python knowledge/scripts/evaluate_evidence.py
 python run_kb_demo.py --port 8766
 ```
 
-打开 http://127.0.0.1:8766/，点击“医学知识库”，输入问题检索原文。无需聊天模型 Key 即可检索和查看证据，但默认 Gitee 后端需要嵌入 Key；聊天会明确返回“本地原文检索结果，未调用模型生成回答”。图像理解、Agent 综合回答仍需聊天模型 API 配置。
+打开 http://127.0.0.1:8766/，点击“医学知识库”，输入问题检索原文。无需聊天模型 Key 即可检索和查看证据，本地BGE后端无需嵌入Key，选择Gitee时需要嵌入Key；聊天会明确返回“本地原文检索结果，未调用模型生成回答”。图像理解、Agent 综合回答仍需聊天模型 API 配置。
 
 模型由 `HF_HOME` 决定缓存位置，首次下载后可设置 `HF_HUB_OFFLINE=1`；不要在模型未缓存时开启离线模式。若复用旧工作区缓存，先将 `HF_HOME` 指向该目录。
 

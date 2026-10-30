@@ -5,11 +5,11 @@
 # MediX 项目协作指南
 
 ## 本分支的证据库交付
-- 最新完整设计与演示步骤先读 `knowledge/DESIGN.md`。当前16份中文原文、Qwen版186块；`import_open_datasets.py`导入独立问法/评测素材，不把CMB答案或社区回答混入主证据。纯文字默认`MEDIX_EVIDENCE_GENERATOR=direct`单次生成，quote仅证明原文存在。新测试`knowledge.test_answering`。本机Gitee免费调用受限后，已显式选择siliconflow并实测独立索引，代码默认仍gitee。
-- 证据版默认嵌入后端为 Gitee `Qwen3-Embedding-8B`，通过 `GITEE_AI_API_KEY` 配置；`MEDIX_EMBEDDING_PROVIDER=local` 可显式使用 BGE。`MEDIX_EMBEDDING_PROVIDER=siliconflow` 支持硅基流动 `Qwen/Qwen3-Embedding-8B`，使用 `SILICONFLOW_API_KEY`；所有后端必须使用独立版本索引，不允许自动回退或迁入旧向量。真实 Gitee 验证需有 Key；`knowledge.test_embeddings` 使用模拟 HTTP。
+- 最新完整设计与演示步骤先读 `knowledge/DESIGN.md`。当前3,298篇独立中文原文，默认本地BGE（512维），旧Qwen索引保留；`import_open_datasets.py`导入独立问法/评测素材，不把CMB答案或社区回答混入主证据。纯文字默认`MEDIX_EVIDENCE_GENERATOR=direct`单次生成，quote仅证明原文存在。新测试`knowledge.test_answering`。本机现已显式选择local；Gitee与硅基流动作为可选远程后端保留。
+- 证据版默认嵌入后端为本地 `BAAI/bge-small-zh-v1.5`；可选 Gitee `Qwen3-Embedding-8B`，通过 `GITEE_AI_API_KEY` 配置；`MEDIX_EMBEDDING_PROVIDER=local` 可显式使用 BGE。`MEDIX_EMBEDDING_PROVIDER=siliconflow` 支持硅基流动 `Qwen/Qwen3-Embedding-8B`，使用 `SILICONFLOW_API_KEY`；所有后端必须使用独立版本索引，不允许自动回退或迁入旧向量。真实 Gitee 验证需有 Key；`knowledge.test_embeddings` 使用模拟 HTTP。
 - `.env.local` 保存本机默认 `GITEE_AI_API_KEY` 和 `SILICONFLOW_API_KEY`，环境变量优先；该文件不得提交或展示。`MEDIX_RERANK_PROVIDER=none` 默认关闭可选硅基流动 Qwen 重排；填 Key 后显式设为 `siliconflow`，此开关不选择 embedding 后端；嵌入与重排开关均支持 `.env.local`。
 - 先读 `docs/KNOWLEDGE_DELIVERY.md`。本分支基于同事 `feature/rag`，保留默认集合的空库自动初始化。
-- 新证据演示使用 `requirements.kb.txt`，依次执行 `knowledge/scripts/fetch_sources.py`、`build_evidence.py`，通过 `run_kb_demo.py` 启动，默认 8766；普通 `run_web.py` 保持旧库兼容。
+- 新克隆安装 `requirements.kb.txt` 后可直接用 `run_kb_demo.py` 启动（8766），缺失语料自动逐篇缓存获取，至少3000篇才发布；首次仍需联网获取正文和固定BGE模型。`--prepare-only`可提前构建。默认数据库在项目内`knowledge/data/evidence/`，普通 `run_web.py` 保持旧库兼容。
 - `MEDIX_KB_MODE=evidence` 为显式开关；`MEDIX_EVIDENCE_ROOT` 与原 `MEDIX_DB_PATH` 分离。不要对证据库运行旧版迁移或样例导入。
 - 来源全文、快照和构建状态位于忽略提交的 `knowledge/.local/`。未知再分发许可的正文不能加入交付包或 Git。
 - 新验证：`python -m unittest knowledge.test_embeddings knowledge.test_reranking knowledge.test_bootstrap knowledge.test_evidence knowledge.test_query_policy web.test_web -v`；关闭占用同一证据版本的服务后运行 `python knowledge/scripts/evaluate_evidence.py`。真实生成未配置 Key 时不得宣称验证通过。
@@ -55,3 +55,5 @@
 - `verify_runtime.py kb` 需要独占数据库及嵌入模型；停止网页后运行。
 - `api`、`skills`、`research` 模式和 `verify_mem0.py` 会调用外部服务。报告中区分离线测试、知识库就绪和实际 API 验证；健康接口的 `model_configured` 不代表鉴权成功。
 - 不提交日志、模型缓存、环境目录、会话摘要或 verification 产物。文档修改无需添加机械式测试。
+
+- 扩库验收以独立原文计数，不以chunk凑数。来源分层和94病种/159药物名称覆盖清单见knowledge/DESIGN.md与coverage_inventory.json。不得把专业平台条目称为政府数据库或具体制剂核准说明书。新回归包含knowledge.test_bulk。

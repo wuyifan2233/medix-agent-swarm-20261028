@@ -12,8 +12,8 @@ from pymilvus import MilvusClient
 from knowledge.embeddings import create_embedder, normalize_vectors
 from knowledge.reranking import create_reranker, rerank_candidates
 from knowledge.bootstrap import validate_target
-from knowledge.corpus import LOCAL, CHUNK_VERSION, chunk_document, digest, load_corpus
-from knowledge.query_policy import normalize_query, insufficient_medication, requested_audience, applicability, knowledge_gap
+from knowledge.corpus import LOCAL, CHUNK_VERSION, chunk_document, cached_chunks, digest, load_corpus
+from knowledge.query_policy import normalize_query, insufficient_medication, requested_audience, applicability, knowledge_gap, TOPICS
 
 def tokens(text):
     return [x.lower() for x in jieba.cut_for_search(text) if re.search(r'[\w\u4e00-\u9fff]', x)]
@@ -44,14 +44,13 @@ class EvidenceKnowledgeBase:
             self.reranker = create_reranker()
             self.embedding_model = create_embedder()
             self.embedding_dim = self.embedding_model.dimension
-            self.rows = [chunk for doc in docs for chunk in chunk_document(doc, self.embedding_model.tokenizer)]
+            self.rows = cached_chunks(docs,self.embedding_model.tokenizer,self.embedding_model.identity)
             if not self.rows or len({r['id'] for r in self.rows}) != len(self.rows):
                 raise ValueError('Empty corpus or duplicate chunk IDs')
             self.version = digest(json.dumps({'chunks':[(r['id'],r['metadata']['content_sha256'],r['metadata']['url']) for r in self.rows],'metadata':[d['metadata'] | {'retrieved_at':''} for d in docs],'embedding':self.embedding_model.identity,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))[:16]
             # MEDIX_DB_PATH remains the legacy database setting. Evidence uses its own
             # versioned root so migration cannot accidentally insert bundled samples.
-            import tempfile
-            default = Path(tempfile.gettempdir())/'medix-evidence'
+            default = Path(__file__).resolve().parent/'data'/'evidence'
             from runtime_settings import load_setting
             self.db_path = validate_target(Path(load_setting('MEDIX_EVIDENCE_ROOT', str(default)))/self.version/'milvus.db')
             self.collection_name = 'medical_evidence'
@@ -64,15 +63,27 @@ class EvidenceKnowledgeBase:
                 if count not in (0,len(self.rows)):
                     raise ValueError('Incomplete evidence index; choose a fresh MEDIX_EVIDENCE_ROOT')
                 if count == 0:
-                    vectors = self.embedding_model.encode_documents([r['content'] for r in self.rows])
-                    self.milvus_client.insert(self.collection_name,[{'id':r['id'],'vector':v.tolist(),'content':r['content'],'metadata':json.dumps(r['metadata'],ensure_ascii=False),'doc_type':r['metadata']['type']} for r,v in zip(self.rows,vectors)])
+                    vector_folder=LOCAL/'vectors';vector_folder.mkdir(parents=True,exist_ok=True)
+                    vector_path=vector_folder/(self.version+'.npy')
+                    if vector_path.exists():
+                        vectors=normalize_vectors(np.load(vector_path,allow_pickle=False),self.embedding_dim,len(self.rows))
+                    else:
+                        vectors = self.embedding_model.encode_documents([r['content'] for r in self.rows])
+                        with open(vector_path.with_suffix('.pending'),'wb') as handle:np.save(handle,vectors,allow_pickle=False)
+                        vector_path.with_suffix('.pending').replace(vector_path)
+                    for start in range(0,len(self.rows),256):
+                        self.milvus_client.insert(self.collection_name,[{'id':r['id'],'vector':v.tolist(),'content':r['content'],'metadata':json.dumps(r['metadata'],ensure_ascii=False),'doc_type':r['metadata']['type']} for r,v in zip(self.rows[start:start+256],vectors[start:start+256])])
                     self.milvus_client.flush(self.collection_name)
                 self.milvus_client.load_collection(self.collection_name)
                 description=self.milvus_client.describe_collection(self.collection_name)
                 field=next(f for f in description['fields'] if f['name']=='vector')
                 if int(field['params']['dim'])!=self.embedding_dim:
                     raise ValueError('Evidence index dimension does not match embedding backend')
-                actual = self.milvus_client.query(self.collection_name,filter='',output_fields=['id','vector'],limit=len(self.rows)+1)
+                actual=[]
+                # ID batches avoid the server's query-window limit on large corpora.
+                ids=[r['id'] for r in self.rows]
+                for start in range(0,len(ids),512):
+                    actual.extend(self.milvus_client.query(self.collection_name,filter='id in '+json.dumps(ids[start:start+512]),output_fields=['id','vector'],limit=512))
                 if {r['id'] for r in actual} != {r['id'] for r in self.rows}:
                     raise ValueError('Evidence index identity mismatch')
                 stored=normalize_vectors([r['vector'] for r in actual],self.embedding_dim,len(actual))
@@ -99,19 +110,20 @@ class EvidenceKnowledgeBase:
         gap=knowledge_gap(query,self.documents)
         trace = {'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version,'audience':audience,'knowledge_gap':gap,'rerank':{'status':'skipped' if self.reranker else 'disabled'}}
         if insufficient_medication(query):
-            return {'status':'needs_information','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库提供基础科普，不能据此确定个人用药、剂量或联合用药。请提供具体制剂、规格、年龄、相关病史及当前用药，并咨询医生或药师。'}
-        # This is a deliberately small demo corpus: do not claim general medicine
-        # coverage merely because an unrelated query has a high dense similarity.
+            return {'status':'needs_information','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库提供健康及药物参考资料，不能据此确定个人用药、剂量或联合用药。请提供具体制剂、规格、年龄、相关病史及当前用药，并咨询医生或药师。'}
+        # Explicit topic coverage still bounds retrieval after corpus expansion.
+        # Dense similarity alone does not establish medical relevance.
         if not any(term in query for term in self.scope_terms):
             return {'status':'no_results','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库资料不足，该问题不在本批资料明确覆盖的主题内。'}
         try:
             with self._lock:
                 vector = self.embedding_model.encode_query(query)
                 filt = 'doc_type == '+json.dumps(filter_type) if filter_type else ''
-                found = self.milvus_client.search(collection_name=self.collection_name,data=[vector.tolist()],limit=10,filter=filt,output_fields=['content','metadata'])
+                candidate_limit=40 if any(term in query for term in ('主食','记录')) else 10
+                found = self.milvus_client.search(collection_name=self.collection_name,data=[vector.tolist()],limit=candidate_limit,filter=filt,output_fields=['content','metadata'])
                 dense = found[0]
                 scores = self.lexical.get_scores(tokens(query))
-                sparse = [self.rows[i]['id'] for i in np.argsort(-scores) if scores[i]>0 and (not filter_type or self.rows[i]['metadata']['type']==filter_type)][:10]
+                sparse = [self.rows[i]['id'] for i in np.argsort(-scores) if scores[i]>0 and (not filter_type or self.rows[i]['metadata']['type']==filter_type)][:candidate_limit]
                 similarities = {h['id']:float(h['distance']) for h in dense}
                 extra = [self.by_id[cid] for cid in sparse if cid not in similarities]
                 if extra:
@@ -120,15 +132,19 @@ class EvidenceKnowledgeBase:
                 for ids in ([h['id'] for h in dense],sparse):
                     for rank,cid in enumerate(ids,1):ranks[cid]=ranks.get(cid,0)+1/(60+rank)
                 ranked = sorted(ranks,key=lambda cid:(-ranks[cid],cid))
-                subjects={term for term in ('对乙酰氨基酚','布洛芬','氯雷他定','口服补液盐','高血压','糖尿病','流感','鼻炎','哮喘','胃肠炎','腹泻') if term in query}
+                subjects={term for term in TOPICS if len(term)>=2 and term not in ('血压','血糖','饮食','运动','水果','健康科普','测量','主食','食盐','用药','症状','治疗') and term in query}
                 hits=[];seen=set();audience_excluded=0;per_document={}
                 for cid in ranked:
                     row=self.by_id[cid]
                     if similarities.get(cid,-1)<.4 or row['content'] in seen:continue
                     if subjects and not subjects.intersection(row['metadata']['topics']):continue
+                    # Bulk society tags inferred from body mentions are too broad.
+                    if subjects and row['metadata']['doc_id'].startswith('cma_') and not any(t in row['metadata']['title'] for t in subjects):continue
                     subtopics=[word for word in ('水果','血压计','食盐') if word in query]
                     if subtopics and not all(word in row['content'] for word in subtopics):continue
-                    if '饮食' in query and not any(word in row['content'] for word in ('饮食','膳食','食物')):continue
+                    if '饮食' in query and not any(word in row['content'] for word in ('饮食','膳食','食物','主食','全谷物','低GI')):continue
+                    if '主食' in query and not any(word in row['content'] for word in ('主食','全谷物','粗粮')):continue
+                    if '记录' in query and '血压' in query and not any(word in row['content'] for word in ('记录','读数','数值')):continue
                     suitability=applicability(row['metadata'],audience)
                     if suitability=='mismatch':
                         audience_excluded+=1
