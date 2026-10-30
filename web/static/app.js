@@ -20,6 +20,7 @@ const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&am
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); clearTimeout(state.toast); state.toast = setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function scrollDown() { $('conversation').scrollTop = $('conversation').scrollHeight; }
 function updateComposer() {
+  window.MedixProfile?.setBusy(state.busy);
   $('sendButton').disabled = state.busy || (!$('message').value.trim() && !state.images.length);
   $('attachButton').disabled = state.busy;
   $('message').disabled = state.busy;
@@ -108,8 +109,14 @@ function pendingMessage() {
   row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真听你说</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
   $('messages').append(row); scrollDown(); return row;
 }
-function resultMessage(row, result) {
+function resultMessage(row, result, userText, jobId) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
+  const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
+  profileNote.textContent = result.profile_used
+    ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状",followups:"建议与待核实事项"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
+    : '本轮未使用健康档案。';
+  if(result.reply_preferences_used){const detail={brief:'简短重点',standard:'适中解释',detailed:'详细说明'}[result.reply_preferences_detail] || '';profileNote.textContent+=result.reply_preferences_status==='applied'?` 已应用回答偏好 v${result.reply_preferences_revision} · ${detail}；本轮暂停云端记忆。`:' 回答偏好整理未完成，已保留原始完整回答；可重新发送。本轮暂停云端记忆。';}
+
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
   const meta = document.createElement('div'); meta.className = 'message-meta';
@@ -136,11 +143,26 @@ function resultMessage(row, result) {
     const chips = document.createElement('div'); chips.className = 'pending-steps';
     [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
   }
+  const actions=document.createElement('section');actions.className='answer-profile-actions';actions.setAttribute('aria-label','本轮回答后续操作');
+  const actionRow=document.createElement('div');actionRow.className='answer-profile-action-row';
+  const copy=document.createElement('div'),title=document.createElement('strong'),hint=document.createElement('p');
+  title.textContent='把有用的信息留在健康档案';hint.textContent='整理本轮内容，逐项选择；保存前由你确认。';copy.append(title,hint);
+  const pickerSlot=document.createElement('div');pickerSlot.className='answer-profile-picker-slot';
+  const update=document.createElement('button');update.type='button';update.className='answer-profile-save';update.textContent='选择加入健康档案';
+  update.onclick=()=>{let picker=pickerSlot.querySelector('.conversation-profile-picker');if(!picker)picker=window.MedixInlineProfilePicker?.(pickerSlot,userText,jobId);picker?.scrollIntoView({behavior:'smooth',block:'nearest'});};
+  actionRow.append(copy,update);actions.append(actionRow,pickerSlot);
+  const reference=document.createElement('details');reference.className='answer-profile-reference';
+  const referenceTitle=document.createElement('summary');referenceTitle.textContent=[result.profile_used?'本轮已参考健康档案':'本轮未使用健康档案',result.reply_preferences_used?(result.reply_preferences_status==='applied'?'回答偏好已应用':'回答偏好整理未完成'):''].filter(Boolean).join(' · ')+' · 查看说明';
+  reference.open=Boolean(result.reply_preferences_used && result.reply_preferences_status!=='applied');
+  reference.append(referenceTitle,profileNote);actions.append(reference);main.append(actions);
   scrollDown();
 }
 async function submit(message, images, retryRow) {
   if (!await MedixAuth.requireLogin()) return;
   if (state.busy) return;
+  let profileChoice;
+  try { profileChoice = window.MedixProfile?.choice() || {use_profile:false}; }
+  catch (error) { toast(error.message); return; }
   const epoch = authEpoch;
   state.busy = true; updateComposer();
   closeSidebar();
@@ -149,7 +171,7 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
+    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked, ...profileChoice})});
     const data = await response.json();
     if (epoch !== authEpoch) return;
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
@@ -169,7 +191,7 @@ async function submit(message, images, retryRow) {
       row.querySelector('.phase-label').textContent = status.label;
       const chips = row.querySelector('.pending-steps'); chips.replaceChildren();
       status.steps.forEach((step, i) => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = `${i < status.steps.length - 1 ? '✓ ' : ''}${step.label.replace('正在', '')}`; chips.append(chip); });
-      if (status.status === 'completed') { resultMessage(row, status.result); break; }
+      if (status.status === 'completed') { resultMessage(row, status.result, message, data.job_id); break; }
       if (status.status === 'failed') throw new Error(status.error || '分析未能完成，请稍后重试。');
     }
   } catch (error) {

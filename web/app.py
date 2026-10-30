@@ -1,5 +1,6 @@
 """Local chat UI backed by the project's real vision, RAG and agent pipeline."""
 import asyncio
+import mimetypes
 import base64
 import binascii
 import io
@@ -29,6 +30,21 @@ from auth.settings import AuthSettings
 from auth.middleware import AuthBodyLimit
 from storage.database import make_database
 from storage.migrate import upgrade_database
+from personalization.router import router as profile_router
+from personalization.store import ProfileStore
+from personalization.middleware import ProfileBodyLimit
+from personalization.memory_tools import memory_tool_result
+from personalization.report_imports import router as report_import_router
+from personalization.conversation_updates import router as conversation_profile_router
+from personalization.context import profile_context, retrieval_query, scope as profile_scope
+from personalization.context import select_fields, PROFILE_FIELDS
+from personalization.preferences import router as preferences_router, load_preferences, preference_context
+from personalization.reply_render import render_reply
+
+# Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
+mimetypes.init()
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).parent / "static"
@@ -94,11 +110,16 @@ auth_settings = AuthSettings.from_env()
 auth_engine, auth_sessions = make_database(auth_settings.database_url)
 app.state.auth_service = AuthService(auth_sessions, auth_settings)
 app.add_middleware(AuthBodyLimit)
+app.add_middleware(ProfileBodyLimit)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
     {urlsplit(origin).hostname for origin in auth_settings.origins}
     | ({"testserver"} if not auth_settings.production else set())))
 app.include_router(auth_router)
 app.include_router(sms_router)
+app.include_router(profile_router)
+app.include_router(report_import_router)
+app.include_router(conversation_profile_router)
+app.include_router(preferences_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -180,7 +201,22 @@ async def analyze(job, payload, session_id, memory_user_id):
     from swarm import SwarmCoordinator
 
     question = payload["message"] or "请解读图片中的可见信息，并说明不确定之处。"
+    snapshot = payload.get("profile_snapshot")
+    if snapshot:
+        # Re-check after queueing: edits/clearing/reconfirmation invalidate old work.
+        current = ProfileStore(app.state.auth_service.sessions).snapshot(job["owner_user_id"], snapshot["revision"])
+        current = select_fields(current, snapshot.get('selected_fields',PROFILE_FIELDS))
+        if profile_scope(current) != profile_scope(snapshot):
+            raise ValueError("档案确认状态已变化，请重新提交问题。")
+        snapshot = current
+    preferences = load_preferences(app.state.auth_service.sessions,job["owner_user_id"])
+    preferences_used = preferences["data"]["enabled"]
+    preference_scope = preferences["revision"] if preferences_used else None
     previous = contexts.get(session_id, {})
+    if previous.get("preference_scope") != preference_scope:
+        previous = {}
+    if previous.get("profile_scope") != profile_scope(snapshot):
+        previous = {}  # Opt-out/change must not reuse profile-derived answers or report facts.
     observed = previous.get("image_observations", "")
     if payload["images"]:
         stage(job, "vision", "正在读取图片中的文字与可见信息")
@@ -196,7 +232,11 @@ async def analyze(job, payload, session_id, memory_user_id):
 
     stage(job, "knowledge", "正在检索本地医学资料")
     kb = MedicalKnowledgeBase()
-    candidates = kb.search((question + "\n" + observed)[:4000], top_k=10)
+    direct = kb.search(retrieval_query(question, observed, None), top_k=10) if snapshot else []
+    candidates = kb.search(retrieval_query(question, observed, snapshot), top_k=10)
+    if snapshot:
+        # Keep evidence about the actual question even if profile terms dominate embeddings.
+        candidates = [hit for pair in zip(candidates, direct) for hit in pair] + candidates[len(direct):] + direct[len(candidates):]
     hits, seen = [], set()
     for hit in candidates:
         fingerprint = hit["content"].strip()
@@ -209,23 +249,37 @@ async def analyze(job, payload, session_id, memory_user_id):
                 "file": hit["metadata"].get("filename", "本地医学知识库"),
                 "excerpt": hit["content"][:220]} for hit in hits]
     enriched = question
+    enriched += profile_context(snapshot)
+    if not snapshot:
+        enriched += ("\n\n【本轮未授权健康档案】不得读取或声称已读取保存的健康档案。"
+                     "仅能根据本轮及允许的用户历史消息、附件中明确提供的事实总结个人情况。"
+                     "公共医学资料、相似案例和助手先前的猜测都不是这个用户的病史。"
+                     "没有足够的个人资料时，明确说明无法总结，并请用户提供症状或勾选页面的档案开关后重新发送。"
+                     "聊天里口头说同意不等于开启档案开关，不得承诺凭口头授权读取档案；不得编造年龄、性别、疾病、过敏或用药。")
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
     if hits:
         enriched += "\n\n【本地检索参考；不相关的信息请忽略，不得将其当成用户病史】\n"
         enriched += "\n\n".join(hit["content"][:750] for hit in hits)
-    enriched += "\n\n请优先直接回答用户问题，总长尽量不超过600字。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
+    enriched += "\n\n请优先直接回答用户问题。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
+    enriched += preference_context(preferences) if preferences_used else "\n回答总长尽量不超过600字。"
 
     stage(job, "agents", "正在由专业助手分析与整合")
-    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"], memory_user_id=memory_user_id,
+    # The coordinator saves its input in Mem0. Do not duplicate profile data there.
+    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot and not preferences_used, memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
+    # AgentLoop has a separate process-wide singleton containing enriched prompts.
+    # Only the sanitized web contexts above may cross request boundaries.
+    coordinator.short_term_memory.clear_session(session_id)
     trace = []
     for worker in coordinator.worker_pool:
         original = worker.skill_registry.execute
         async def tracked(name, _original=original, **arguments):
             entry = {"name": name, "label": LABELS.get(name, name), "status": "running"}
             trace.append(entry)
-            response = await _original(name, **arguments)
+            response = memory_tool_result(name, arguments, previous, coordinator)
+            if response is None:
+                response = await _original(name, **arguments)
             entry["status"] = "failed" if response.get("success") is False or response.get("status") == "error" else "completed"
             return response
         worker.skill_registry.execute = tracked
@@ -234,17 +288,33 @@ async def analyze(job, payload, session_id, memory_user_id):
         answer = result.get("answer")
         if not answer or result.get("error"):
             raise RuntimeError("Agent did not return a complete answer")
+        presentation_status='off'
+        if preferences_used:
+            stage(job, "presentation", "正在按称呼、详略和呈现偏好整理回答")
+            answer,presentation_status=await render_reply(answer,question,preferences)
         agents = result.get("agents_involved") or [result.get("agent_id", "consultation_agent")]
         job["result"] = {"answer": answer, "sources": sources, "tools": trace,
                          "swarm_enabled": bool(result.get("swarm_enabled")), "agents": agents,
                          "image_count": len(payload["images"]), "image_observations": observed if payload["images"] else "",
                          "image_context_used": bool(observed) and not payload["images"],
                          "memory_enabled": bool(coordinator.long_term_memory.enabled),
+                         "profile_used": bool(snapshot),
+                         "reply_preferences_used": preferences_used,
+                         "reply_preferences_revision": preference_scope,
+                         "reply_preferences_status": presentation_status,
+                         "reply_preferences_detail": preferences["data"]["detail"] if preferences_used else None,
+                         "profile_revision": snapshot["revision"] if snapshot else None,
+                         "profile_fields": list(snapshot.get('selected_fields',PROFILE_FIELDS)) if snapshot else [],
+                         "profile_confirmed_at": snapshot["confirmed_at"] if snapshot else None,
+                         "memory_suppressed_for_profile": bool(snapshot and payload["remember"]),
+                         "memory_suppressed_for_preferences": bool(preferences_used and payload["remember"]),
                          "elapsed": round(time.monotonic() - job["started"], 1),
                          "partial": bool(result.get("timeout_occurred"))}
         history = previous.get("history", []) + [{"role":"user", "content":question[:1200]}, {"role":"assistant", "content":answer[:1800]}]
-        contexts[session_id] = {"image_observations": observed, "history": history[-6:], "updated":time.time()}
+        contexts[session_id] = {"image_observations": observed, "history": history[-6:],
+                                "profile_scope": profile_scope(snapshot), "preference_scope":preference_scope, "updated":time.time()}
     finally:
+        coordinator.short_term_memory.clear_session(session_id)
         clients = {id(obj.llm_client): obj.llm_client for obj in [coordinator, *coordinator.worker_pool]}
         for client in clients.values():
             await client.client.close()
@@ -297,9 +367,22 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
         remember = payload.get("remember", False)
         if not isinstance(remember, bool):
             raise ValueError("记忆选项格式不正确。")
+        use_profile = payload.get("use_profile", False)
+        if not isinstance(use_profile, bool):
+            raise ValueError("档案选项格式不正确。")
+        if any(key in payload for key in ("profile", "profile_data", "profile_snapshot", "user_id")):
+            raise ValueError("用户身份与档案必须由服务端读取。")
+        revision = payload.get("profile_revision")
+        if use_profile and (type(revision) is not int or revision < 1):
+            raise ValueError("请先确认档案并提交对应版本。")
+        fields=payload.get('profile_fields',list(PROFILE_FIELDS))
+        if use_profile and (not isinstance(fields,list) or not fields or any(type(field) is not str or field not in PROFILE_FIELDS for field in fields) or len(fields)!=len(set(fields))):
+            raise ValueError('请选择有效且不重复的档案字段。')
     except (ValueError, TypeError, KeyError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
     owner = user.id
+    snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
+    if snapshot: snapshot=select_fields(snapshot,fields)
     for key, old in list(contexts.items()):
         if time.time() - old["updated"] > 3600:
             contexts.pop(key, None)
@@ -309,10 +392,11 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     if sum(job["status"] in {"running", "queued"} for job in jobs.values()) >= 6:
         raise HTTPException(429, "正在处理的请求较多，请稍后重试。")
     job_id = uuid.uuid4().hex
-    job = {"id": job_id, "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
+    job = {"id": job_id, "request_text": message.strip(), "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
     jobs[job_id] = job
-    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember},
+    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember,
+                                  "profile_snapshot": snapshot},
                     f"web-{owner}-{chat_id}", f"medix:{app.state.auth_service.settings.namespace}:user:{owner}")
     return {"job_id": job_id}
 
@@ -322,7 +406,7 @@ def job_status(job_id: str, user: CurrentUser = Depends(require_user)):
     job = jobs.get(job_id)
     if not job or job["owner_user_id"] != user.id:
         raise HTTPException(404, "未找到这次分析，请重新提问。")
-    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started"}}
+    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started", "request_text"}}
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")
