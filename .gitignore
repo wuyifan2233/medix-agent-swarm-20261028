@@ -72,3 +72,8 @@ knowledge/.local/
 knowledge/data/evidence/
 
 .venv-integration/
+# Private case archives and runtime indexes
+/data/
+*.sqlite3
+*.sqlite3-*
+*.db/

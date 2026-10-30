@@ -82,6 +82,7 @@ class LLMClient:
             模型返回的文本
         """
         try:
+            return_metadata = kwargs.pop("_return_metadata", False)
             temperature = temperature or self.temperature
             max_tokens = max_tokens or self.max_tokens
 
@@ -96,6 +97,8 @@ class LLMClient:
             )
 
             content = response.choices[0].message.content or ''
+            if return_metadata:
+                return {"content":content, "finish_reason":response.choices[0].finish_reason}
             logger.debug(f"LLM response length: {len(content)} chars")
             return content
 
@@ -104,9 +107,12 @@ class LLMClient:
             raise
 
     def _request_options(self, overrides):
-        options = {**self.request_defaults, **overrides}
-        if 'extra_body' in self.request_defaults or 'extra_body' in overrides:
-            options['extra_body'] = {**self.request_defaults.get('extra_body', {}),
+        defaults = getattr(self, "request_defaults", {})
+        if not defaults and getattr(self, "config", {}).get("extra_body"):
+            defaults = {"extra_body":self.config["extra_body"]}
+        options = {**defaults, **overrides}
+        if 'extra_body' in defaults or 'extra_body' in overrides:
+            options['extra_body'] = {**defaults.get('extra_body', {}),
                                      **(overrides.get('extra_body') or {})}
         return options
 

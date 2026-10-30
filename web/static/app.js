@@ -14,6 +14,15 @@ function renderAccount(user) {
 window.addEventListener('medix-auth-change', event => renderAccount(event.detail));
 window.addEventListener('medix-auth-error', event => toast(event.detail));
 MedixAuth.ready.then(renderAccount).catch(() => {});
+state.caseId = '';
+async function refreshCases(selected = state.caseId) {
+  const response = await MedixAuth.fetch('/api/cases');
+  if (!response.ok) return;
+  const data = await response.json();
+  $('caseContext').replaceChildren(new Option('新对话，不关联历史',''));
+  data.cases.forEach(item => $('caseContext').add(new Option(`${item.name} · ${item.records} 条记录`,item.id)));
+  $('caseContext').value=selected;
+}
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -128,6 +137,18 @@ function citationPreview(trigger, source, quote = '') {
   card.style.top = `${Math.max(12, Math.min(rect.bottom + 8, innerHeight - height - 12))}px`;
 }
 function resultMessage(row, result, userText, jobId) {
+  if (result.case_id) {state.caseId=result.case_id; refreshCases().catch(()=>{});}
+  if (result.case_changes?.length) {
+    document.querySelectorAll('.message.assistant').forEach(previous => {
+      if (previous === row || !previous.caseRefs || previous.dataset.caseStale) return;
+      if (result.case_changes.some(change => previous.caseRefs.some(ref=>ref.id===change.id && ref.revision<change.revision))) {
+        const note=document.createElement('p');note.className='case-update-note';note.textContent='这条回答引用的病例信息已更新，请以最新回复为准。';
+        previous.querySelector('.message-main').prepend(note);previous.dataset.caseStale='true';
+      }
+    });
+  }
+  row.caseRefs=result.case_sources || [];
+
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
   profileNote.textContent = result.profile_used
@@ -136,6 +157,24 @@ function resultMessage(row, result, userText, jobId) {
   if(result.reply_preferences_used){const detail={brief:'简短重点',standard:'适中解释',detailed:'详细说明'}[result.reply_preferences_detail] || '';profileNote.textContent+=result.reply_preferences_status==='applied'?` 已应用回答偏好 v${result.reply_preferences_revision} · ${detail}；本轮暂停云端记忆。`:' 回答偏好整理未完成，已保留原始完整回答；可重新发送。本轮暂停云端记忆。';}
 
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.generation === 'not_called' ? '本地证据检索 · 未调用模型' : result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
+  if (result.case_changes?.length) {
+    const notice=document.createElement('p'); notice.className='case-update-note';
+    const revised=result.case_changes.filter(item=>item.action!=='add');
+    notice.textContent=revised.length ? `已按本轮说明更新 ${revised.map(item=>item.name).join('、')}，后续使用最新记录。` : `已在本机记录 ${result.case_changes.length} 条本次病例信息。`;
+    main.append(notice);
+  }
+  if (result.case_switched) {const notice=document.createElement('p');notice.className='case-update-note';notice.textContent='已按你的说明开始新的病例，本次不引用上一位的记录。';main.append(notice);}
+  (result.data_warnings || []).forEach(message => {
+    const notice=document.createElement('p'); notice.className='case-update-note';
+    notice.setAttribute('role', 'status'); notice.textContent=message; main.append(notice);
+  });
+  if (result.case_sources?.length) {
+    const block=document.createElement('details');block.className='observations case-evidence';
+    const summary=document.createElement('summary');summary.textContent=`本次结合的病例资料 · ${result.case_sources.length} 条`;
+    block.append(summary);
+    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}，v${source.revision}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
+    main.append(block);
+  }
   const answer = document.createElement('div'); answer.className = 'answer'; main.append(answer);
   const inline = result.generation === 'model' && result.evidence_links?.length;
   if (inline) {
@@ -196,7 +235,7 @@ function resultMessage(row, result, userText, jobId) {
   reference.append(referenceTitle,profileNote);actions.append(reference);main.append(actions);
   scrollDown();
 }
-async function submit(message, images, retryRow) {
+async function submit(message, images, retryRow, requestId = crypto.randomUUID()) {
   if (!await MedixAuth.requireLogin()) return;
   if (state.busy) return;
   let profileChoice;
@@ -210,7 +249,7 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked, ...profileChoice})});
+    const response = await MedixAuth.fetch('/api/chat', {method:'POST', body:JSON.stringify({chat_id:state.chatId, case_id:state.caseId, request_id:requestId, message, images, remember:$('remember').checked, ...profileChoice})});
     const data = await response.json();
     if (epoch !== authEpoch) return;
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
@@ -237,12 +276,16 @@ async function submit(message, images, retryRow) {
     if (epoch !== authEpoch) return;
     const main = row.querySelector('.message-main'); main.replaceChildren();
     const text = document.createElement('div'); text.className = 'error-text'; text.textContent = error.message;
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage()); };
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage(), requestId); };
     main.append(text, button); scrollDown();
   } finally { if (epoch === authEpoch) { state.busy = false; updateComposer(); $('message').focus(); } }
 }
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
 $('newChat').onclick = () => { if (state.busy) return; state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
+const resetChat = $('newChat').onclick;
+$('newChat').onclick = () => {if(state.busy)return; resetChat();state.caseId='';$('caseContext').value='';};
+$('caseContext').onchange = () => {const selected=$('caseContext').value;resetChat();state.caseId=selected;$('caseContext').value=selected;};
+refreshCases().catch(()=>{});
 document.querySelectorAll('[data-example]').forEach(button => button.onclick = async () => {
   if (state.busy) return;
   const example = button.dataset.example;
@@ -403,3 +446,6 @@ $('refreshPrompts').onclick = () => {
     $('questionChips').append(button);
   });
 };
+
+window.addEventListener("medix-auth-change",()=>refreshCases().catch(()=>{}));
+window.addEventListener("medix-signout",()=>{state.caseId="";$("caseContext").replaceChildren(new Option("新对话，不关联历史",""));});
