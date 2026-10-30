@@ -116,7 +116,7 @@ function resultMessage(row, result, userText) {
     ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
     : '本轮未使用健康档案。';
   main.append(profileNote);
-  const update=document.createElement('button'); update.type='button'; update.className='retry-button'; update.textContent='从本次描述更新健康档案'; update.onclick=()=>window.MedixConversationUpdate?.(userText); main.append(update);
+  const update=document.createElement('button'); update.type='button'; update.className='retry-button'; update.textContent='筛选本轮内容，选择加入健康档案'; update.onclick=()=>{ if(main.querySelector('.conversation-profile-picker'))return; window.MedixInlineProfilePicker?.(main,userText); }; main.append(update);
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
   const meta = document.createElement('div'); meta.className = 'message-meta';
