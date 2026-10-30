@@ -14,6 +14,7 @@ from loguru import logger
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import LLM_CONFIG
+from core.chat_runtime import completion
 
 
 @dataclass
@@ -83,18 +84,21 @@ class LLMClient:
         """
         try:
             return_metadata = kwargs.pop("_return_metadata", False)
+            visible = kwargs.pop("_stream_visible", False)
+            agent = kwargs.pop("_agent", "system")
+            transform = kwargs.pop("_stream_transform", None)
             temperature = temperature or self.temperature
             max_tokens = max_tokens or self.max_tokens
 
             logger.debug(f"Calling LLM ({self.model_type}) with {len(messages)} messages")
 
-            response = await self.client.chat.completions.create(
+            response = await completion(self.client, dict(
                 model=self.model_name,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 **self._request_options(kwargs)
-            )
+            ), visible=visible, agent=agent, transform=transform)
 
             content = response.choices[0].message.content or ''
             if return_metadata:
@@ -182,6 +186,9 @@ class LLMClient:
 
             logger.debug(f"Calling LLM with {len(tools) if tools else 0} tools")
 
+            visible = kwargs.pop("_stream_visible", False)
+            agent = kwargs.pop("_agent", "system")
+
             # 准备请求参数
             request_params = {
                 "model": self.model_name,
@@ -197,7 +204,7 @@ class LLMClient:
                 if tool_choice != "auto":
                     request_params["tool_choice"] = tool_choice
 
-            response = await self.client.chat.completions.create(**request_params)
+            response = await completion(self.client, request_params, visible=visible, agent=agent)
 
             # 解析响应
             message = response.choices[0].message

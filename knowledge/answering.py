@@ -39,6 +39,22 @@ def parse_answer(raw, sources):
     return '\n\n'.join(lines), links
 
 
+def partial_answer(raw, sources):
+    # Only publish complete sentence objects after the same citation validation.
+    start=raw.find('[')
+    if start < 0: return ''
+    decoder=json.JSONDecoder(); position=start+1; sentences=[]
+    while position < len(raw):
+        while position < len(raw) and raw[position] in ' \n\r\t,': position+=1
+        try: item,end=decoder.raw_decode(raw,position)
+        except ValueError: break
+        if not isinstance(item,dict): break
+        sentences.append(item); position=end
+    if not sentences: return ''
+    try: return parse_answer(json.dumps({'sentences':sentences}),sources)[0]
+    except (ValueError,TypeError,KeyError): return ''
+
+
 async def generate_answer(query, sources, gap=''):
     client = LLMClient()
     # No automatic generation retries or tool/agent rounds for this path.
@@ -52,7 +68,8 @@ async def generate_answer(query, sources, gap=''):
              '"citations":[1],"quotes":[{"citation":1,"quote":"对应证据中连续、逐字一致的原文"}]}]}。'
              '每条事实应有引用和直接相关原文；说明资料不足可无引用。不要改写quote，不要在text中写引用编号。'},
             {'role': 'user', 'content': json.dumps({'question': query, 'gap': gap, 'sources': sources}, ensure_ascii=False)}
-        ])
+        ], _stream_visible=True, _agent="evidence_reader",
+           _stream_transform=lambda raw: partial_answer(raw,sources))
         answer, links = parse_answer(raw, sources)
         return {'answer': answer, 'evidence_links': links, 'llm_requests': 1}
     finally:

@@ -7,7 +7,7 @@ class AuthBodyLimit:
         self.app, self.maximum = app, maximum
 
     async def __call__(self, scope, receive, send):
-        protected = scope.get("path", "").startswith(("/api/auth/", "/api/admin/"))
+        protected = scope.get("path", "").startswith(("/api/auth/", "/api/admin/", "/api/wallet/"))
         if scope["type"] != "http" or not protected or scope.get("method") not in {"POST", "PUT", "PATCH", "DELETE"}:
             return await self.app(scope, receive, send)
         body = bytearray()

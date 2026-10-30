@@ -426,7 +426,7 @@ class LeadAgent:
         try:
             response = await self.llm_client.chat([
                 {"role": "user", "content": synthesis_prompt}
-            ])
+            ], _stream_visible=True, _agent="lead_synthesis")
 
             return response
 

@@ -110,6 +110,7 @@ class AgentLoop:
                         messages=messages,
                         tools=tools_openai_format,
                         tool_choice="auto",
+                        _stream_visible=True, _agent=agent.agent_id,
                         temperature=agent.config.get('temperature', 0.7)
                     )
 
@@ -276,7 +277,7 @@ class AgentLoop:
                     # 调用 LLM（禁用 function calling）
                     final_response = await agent.llm_client.chat_with_tools(
                         messages=messages,
-                        tools=None,
+                        tools=None, _stream_visible=True, _agent=agent.agent_id,
                         temperature=0.7
                     )
 
