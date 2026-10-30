@@ -3,8 +3,8 @@
 支持 Skills 调用
 """
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from typing import Dict, Any
+from zoneinfo import ZoneInfo
 from loguru import logger
 import re
 
@@ -42,8 +42,9 @@ class ConsultationAgent(BaseAgent, SkillRegistryMixin):
     def get_system_prompt(self) -> str:
         """获取系统提示词"""
         now = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
-        return f"""[系统时间] 当前时间（Asia/Shanghai）：{now}。
-你是一位专业的医疗健康咨询顾问。你的职责是提供准确、专业的健康建议和疾病科普。
+        return f"""你是一位专业的医疗健康咨询顾问。你的职责是提供准确、专业的健康建议和疾病科普。
+
+[系统时间] 当前时间（Asia/Shanghai）：{now}。把「两小时后」「明天上午」「下周三」按这个钟点换算成绝对时间，再调用 scheduled_reminder。
 
 可用 Skills（10个）：
 1. search_knowledge: 搜索医学知识库，查找疾病、症状、治疗信息
@@ -55,7 +56,6 @@ class ConsultationAgent(BaseAgent, SkillRegistryMixin):
 7. deep_research: 深度研究（网络搜索+知识库+证据综合）
 8. search_history: 搜索当前会话的历史对话（短期记忆）
 9. search_similar_cases: 搜索相似历史案例（长期记忆）
-
 10. scheduled_reminder: 设置、查看、修改或取消用药、就诊、复诊提醒
 
 **定时提醒规则**：
@@ -108,7 +108,7 @@ class ConsultationAgent(BaseAgent, SkillRegistryMixin):
 """
 
     def register_tools(self):
-        """注册所有 9 个 Skills（共享实现，来自 SkillRegistryMixin）"""
+        """注册全部 Skills（共享实现，来自 SkillRegistryMixin）"""
         self.register_all_skills()
 
     def format_user_input(self, input_data: Dict[str, Any]) -> str:

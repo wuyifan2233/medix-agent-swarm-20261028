@@ -281,3 +281,7 @@ coverage_inventory.json包含94项常见病和159项常见药工程清单。所�
 本轮克隆路径实测见docs/clone-bootstrap-validation.json：从Git暂存树导出无.env.local、无正文及证据索引的副本，以3个真实中文来源验证首次自动获取、BGE构建（16块）、项目内独立持久化、网页重载同版本与无API检索。复用了现有BGE模型缓存，未重复验证全量3298篇的新机下载构建；不能把该小样本说成全量跨机通过。67项离线测试通过，包含中断续传、最低篇数、缺源指纹、模型identity与Windows目录重命名失败回退。目录发布遇到Windows锁定时，复制到版本目录并逐文件核验，全部通过才替换manifest；失败不报告就绪。
 
 main_copy 后续补合：完整接入 feature/knowledge_db 的 1f8c777，包括扩库登记、断点准备、分块/向量缓存、目录分页和新来源分类。上文3,298篇为该模块原作者的验收记录；本集成工作区尚未下载该批正文，不能将旧库180条就绪冒称新证据库已建成。
+
+提醒分支完整补合：恢复 MiniKnowledgeBase 文本后备检索、统一 search_knowledge 入口和可见 backend 标识。MEDIX_KB_BACKEND 可选 auto/milvus/mini；证据模式始终禁止自动退回 mini。默认 auto 的文本后备不能冒称向量检索或3298篇证据库就绪。
+
+证据专用入口现在委托统一 run_web.main，包含 .env.local/.env.sms 加载、端口来源与业务库选择；保留 --prepare-only，防止知识库专用端口丢失已有账号/短信配置。新增目录分页接口与统一启动契约回归。

@@ -51,6 +51,9 @@ htmlcov/
 session_summaries/*.md
 agent_identities/*.md
 
+# 提醒数据库
+data/
+
 # Local verification artifacts and runtime state
 verification_*.json
 memory/swarm/session_summaries/

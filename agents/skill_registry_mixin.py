@@ -81,6 +81,7 @@ class SkillRegistryMixin:
         explicit = parameters_from_frontmatter(skill_info.get("metadata") or {})
         if explicit:
             return explicit
+
         func = skill_info["function"]
 
         # 获取函数签名

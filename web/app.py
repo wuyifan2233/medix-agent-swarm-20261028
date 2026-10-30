@@ -104,12 +104,18 @@ def warmup():
             from knowledge.initialize import ensure_sources
             ensure_sources()
             health.update(knowledge_stage='loading_index')
-        if os.environ.get('MEDIX_KB_MODE') != 'evidence':
-            from knowledge.scripts.migrate_legacy_db import migrate
-            migrate()
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        kb = MedicalKnowledgeBase()
-        health.update(knowledge="ready", knowledge_stage="ready", documents=kb.count_documents())
+        backend=os.environ.get('MEDIX_KB_BACKEND','auto')
+        if os.environ.get('MEDIX_KB_MODE') != 'evidence' and backend != 'mini':
+            try:
+                from knowledge.scripts.migrate_legacy_db import migrate
+                migrate()
+            except Exception as exc:
+                if backend == 'milvus': raise
+                logger.warning('Legacy knowledge migration unavailable ({})',type(exc).__name__)
+        from knowledge import get_knowledge_base
+        kb=get_knowledge_base()
+        health.update(knowledge="ready", knowledge_stage="ready", documents=kb.count_documents(),
+                      knowledge_backend=getattr(kb,'backend','milvus'))
         if os.environ.get('MEDIX_KB_MODE') == 'evidence':
             health.update(mode='evidence', source_documents=len(kb.documents), version=kb.version,
                           embedding=kb.embedding_model.identity,
@@ -306,7 +312,7 @@ async def analyze(job, payload, session_id, memory_user_id):
     if not configured and (not evidence_mode or payload['images']):
         raise ValueError("服务端尚未配置模型 API Key，请通过启动脚本配置。")
     from core import LLMClient
-    from knowledge.milvus_kb import MedicalKnowledgeBase
+    from knowledge import get_knowledge_base
     from swarm import SwarmCoordinator
 
     question = payload["message"] or "请解读图片中的可见信息，并说明不确定之处。"
@@ -355,7 +361,7 @@ async def analyze(job, payload, session_id, memory_user_id):
     if snapshot and patient != 'self':
         raise ValueError('本轮询问对象不是本人，请关闭本人档案授权后重新提交。')
     stage(job, "knowledge", "正在检索本地医学资料")
-    kb = MedicalKnowledgeBase()
+    kb = get_knowledge_base()
     stage(job, "case", "正在结合本次信息与相关病例记录")
     case = {"case_id":"", "facts":[], "context":"", "sources":[], "index_ready":True,
             "outcome":{"changes":[], "questions":[], "switched":False}, "warnings":[]}

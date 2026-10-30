@@ -1,3 +1,7 @@
+## main_copy 完整分支补合（2026-10-30）
+
+知识库 1f8c777 和提醒/机器人 2a3b6c8 完整纳入后，`python scripts/verify_integration.py`：327项通过（123.701秒）。新增覆盖扩库准备、缓存恢复、目录分页、文本后备标识、提醒工具选择限制、证据入口账号/短信配置一致性；全部前端脚本及变更Python语法检查通过。原有真实外部服务验证边界不变，见 INTEGRATION.md 和 BRANCH-INTEGRATION-AUDIT.md。
+
 ## main_copy 2026-10-30 集成验收
 
 `python scripts/verify_integration.py`：311 项通过，使用合成账号与模拟外部服务。本地 BGE/Milvus 实际初始化 180 条并检索返回3条。浏览器检查1366×768、390×844，登录与设置弹窗正常，控制台无错误。统一安装清单通过 pip 全新环境 dry-run 解析；未在全新电脑安装。实际短信、LLM/VLM、证据嵌入、Mem0、微信/QQ外部通信待独立配置联调。详细边界见 INTEGRATION.md。

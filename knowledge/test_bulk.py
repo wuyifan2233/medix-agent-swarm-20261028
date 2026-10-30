@@ -10,6 +10,27 @@ from knowledge.test_evidence import CharacterTokenizer
 
 
 class BulkTests(unittest.TestCase):
+    def test_public_catalog_paginates_without_losing_source_metadata(self):
+        from fastapi.testclient import TestClient
+        from types import SimpleNamespace
+        from web.app import app, health
+        docs=[{'metadata':{'id':str(i),'title':'synthetic '+str(i),'evidence_kind':'drug_reference'}} for i in range(121)]
+        kb=SimpleNamespace(documents=docs,rows=[{}]*400,version='synthetic')
+        with patch.dict(health,knowledge='ready',mode='evidence'),patch('knowledge.evidence.EvidenceKnowledgeBase',return_value=kb):
+            client=TestClient(app)
+            try:
+                page=client.get('/api/knowledge/catalog?offset=50&limit=50').json()
+                self.assertEqual(page['document_total'],121)
+                self.assertEqual(len(page['documents']),50)
+                self.assertEqual(page['documents'][0]['id'],'50')
+                self.assertEqual(page['documents'][-1]['evidence_kind'],'drug_reference')
+                self.assertEqual(page['next_offset'],100)
+                last=client.get('/api/knowledge/catalog?offset=100&limit=50').json()
+                self.assertEqual(len(last['documents']),21)
+                self.assertIsNone(last['next_offset'])
+                self.assertEqual(client.get('/api/knowledge/catalog?offset=-1').status_code,400)
+            finally:client.close()
+
     def test_highlighted_names_keep_characters_and_exclude_qa(self):
         html='<a href="/drug/123.html"><em>华</em><em>法</em>林</a><a href="/qa/4.html">华法林</a><a href="https://evil.test/drug/123.html">华法林</a>'
         self.assertEqual(matching_links(html,'drug','华法林'),[('华法林','/drug/123.html','123')])
