@@ -6,7 +6,7 @@ import unittest
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -176,7 +176,7 @@ class ProfileTests(unittest.TestCase):
         job={'owner_user_id':user_id,'started':time.monotonic(),'steps':[]}
         payload={'message':'请分析本次病历，日期尚未确认','images':images or [],'remember':remember,'profile_snapshot':snapshot}
         from config import LLM_CONFIG
-        with patch.dict(LLM_CONFIG, {'api_key':'test-only-placeholder'}), patch('core.LLMClient', VisionClient), patch.dict('sys.modules',{'knowledge.milvus_kb':SimpleNamespace(MedicalKnowledgeBase=KB),'swarm':SimpleNamespace(SwarmCoordinator=Coordinator)}):
+        with patch('web.app.render_reply',AsyncMock(side_effect=lambda answer,*args:(answer,'applied'))), patch.dict(LLM_CONFIG, {'api_key':'test-only-placeholder'}), patch('core.LLMClient', VisionClient), patch.dict('sys.modules',{'knowledge.milvus_kb':SimpleNamespace(MedicalKnowledgeBase=KB),'swarm':SimpleNamespace(SwarmCoordinator=Coordinator)}):
             asyncio.run(analyze(job,payload,session,f'medix:test:user:{user_id}'))
         captured['result']=job['result']; return captured
 

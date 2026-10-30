@@ -115,7 +115,7 @@ function resultMessage(row, result, userText, jobId) {
   profileNote.textContent = result.profile_used
     ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状",followups:"建议与待核实事项"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
     : '本轮未使用健康档案。';
-  if(result.reply_preferences_used)profileNote.textContent+=' 已使用回答偏好（称呼、语气与呈现方式）；本轮暂停云端记忆。';
+  if(result.reply_preferences_used){const detail={brief:'简短重点',standard:'适中解释',detailed:'详细说明'}[result.reply_preferences_detail] || '';profileNote.textContent+=result.reply_preferences_status==='applied'?` 已应用回答偏好 v${result.reply_preferences_revision} · ${detail}；本轮暂停云端记忆。`:' 回答偏好整理未完成，已保留原始完整回答；可重新发送。本轮暂停云端记忆。';}
   main.append(profileNote);
   const update=document.createElement('button'); update.type='button'; update.className='retry-button'; update.textContent='筛选本轮内容，选择加入健康档案'; update.onclick=()=>{ if(main.querySelector('.conversation-profile-picker'))return; window.MedixInlineProfilePicker?.(main,userText,jobId); }; main.append(update);
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);

@@ -38,6 +38,7 @@ from personalization.conversation_updates import router as conversation_profile_
 from personalization.context import profile_context, retrieval_query, scope as profile_scope
 from personalization.context import select_fields, PROFILE_FIELDS
 from personalization.preferences import router as preferences_router, load_preferences, preference_context
+from personalization.reply_render import render_reply
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -280,6 +281,10 @@ async def analyze(job, payload, session_id, memory_user_id):
         answer = result.get("answer")
         if not answer or result.get("error"):
             raise RuntimeError("Agent did not return a complete answer")
+        presentation_status='off'
+        if preferences_used:
+            stage(job, "presentation", "正在按称呼、详略和呈现偏好整理回答")
+            answer,presentation_status=await render_reply(answer,question,preferences)
         agents = result.get("agents_involved") or [result.get("agent_id", "consultation_agent")]
         job["result"] = {"answer": answer, "sources": sources, "tools": trace,
                          "swarm_enabled": bool(result.get("swarm_enabled")), "agents": agents,
@@ -289,6 +294,8 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "profile_used": bool(snapshot),
                          "reply_preferences_used": preferences_used,
                          "reply_preferences_revision": preference_scope,
+                         "reply_preferences_status": presentation_status,
+                         "reply_preferences_detail": preferences["data"]["detail"] if preferences_used else None,
                          "profile_revision": snapshot["revision"] if snapshot else None,
                          "profile_fields": list(snapshot.get('selected_fields',PROFILE_FIELDS)) if snapshot else [],
                          "profile_confirmed_at": snapshot["confirmed_at"] if snapshot else None,

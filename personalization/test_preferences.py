@@ -59,3 +59,39 @@ class ReplyPreferencesTests(unittest.TestCase):
 
     def test_disabled_preferences_produce_no_context(self):
         self.assertEqual(preference_context({'data':Preferences(nickname='不应发送').model_dump()}),'')
+
+
+class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
+    async def run_render(self,content,finish='stop',**changes):
+        import json
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock,patch
+        from personalization.reply_render import render_reply
+        from config import LLM_CONFIG
+        create=AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason=finish,message=SimpleNamespace(content=content))]))
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)),close=AsyncMock())
+        prefs={'data':Preferences(enabled=True,nickname='新昵称',**changes).model_dump(),'revision':2}
+        with patch.dict(LLM_CONFIG,{'api_key':'test-only-placeholder'}),patch('openai.AsyncOpenAI',return_value=client):
+            result=await render_reply('原回答：若胸痛持续，请立即就医。','本次问题',prefs)
+        client.close.assert_awaited_once()
+        return result,create.call_args.kwargs
+
+    async def test_final_stage_has_high_priority_style_and_explicit_address(self):
+        result,request=await self.run_render('{"answer":"请先记录情况；若胸痛持续，请立即就医。"}',detail='brief')
+        self.assertEqual(result[1],'applied');self.assertTrue(result[0].startswith('新昵称，'))
+        self.assertIn('300字',request['messages'][0]['content'])
+        self.assertIn('关键风险',request['messages'][0]['content'])
+        self.assertIn('原回答',request['messages'][1]['content'])
+        _,long_request=await self.run_render('{"answer":"完整解释。"}',detail='detailed')
+        self.assertIn('700—1000字',long_request['messages'][0]['content'])
+
+    async def test_incomplete_or_invalid_rewrite_keeps_full_original_with_failure_status(self):
+        for content,reason in [('{"answer":"被截断的内容"}','length'),('bad-json','stop'),('{"answer":""}','stop')]:
+            result,_=await self.run_render(content,reason)
+            self.assertEqual(result[1],'fallback')
+            self.assertIn('若胸痛持续，请立即就医',result[0])
+
+    async def test_explicit_no_nickname_and_no_duplicate_address(self):
+        from personalization.reply_render import address
+        self.assertEqual(address('原回答','小林','本轮不要称呼我'),'原回答')
+        self.assertEqual(address('小林，原回答','小林','测试'),'小林，原回答')

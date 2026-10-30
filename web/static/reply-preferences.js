@@ -14,7 +14,7 @@
   <label>术语程度<select name="terminology"><option value="plain">通俗易懂</option><option value="professional">可使用专业术语</option></select></label></div></section>
   <section><h3>再了解一点你的偏好</h3><label>希望怎样和你沟通 <span>选填 · 最多200字</span><textarea name="communication_note" maxlength="200" rows="3" placeholder="例如：先告诉我最重要的一件事，再解释原因；避免过多寒暄。"></textarea></label>
   <label>日常安排与执行偏好 <span>选填 · 最多200字</span><textarea name="daily_context" maxlength="200" rows="3" placeholder="例如：工作日时间紧，希望建议拆成每次5分钟可完成的步骤。疾病、过敏和用药请填入健康档案。"></textarea></label></section>
-  <p class="rp-hint">保存后从下一次提问生效。温和表达不会省略必要的风险提示，偏好也不代表疾病诊断。启用时，本轮暂停云端记忆。</p>
+  <p class="rp-hint">需要勾选上方开关并保存，才会从下一次提问生效；已有回答不会自动改写。温和表达不会省略必要的风险提示，偏好也不代表疾病诊断。启用时，本轮暂停云端记忆。</p>
   <footer><button type="submit" id="rpSave">保存回答偏好</button><button type="button" id="rpReset">恢复默认并关闭偏好</button></footer></form><p id="rpStatus" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
   const form=dialog.querySelector('form'),status=dialog.querySelector('#rpStatus');
@@ -39,7 +39,7 @@
   open.onclick=async()=>{
     if(!await MedixAuth.requireLogin())return;
     actor=MedixAuth.user.id;loaded=false;const mine=epoch;dialog.showModal();lock(true);status.textContent='正在读取当前账号的偏好…';
-    try{const result=await request();revision=result.revision;loaded=true;render(result.data);status.textContent='保存后生效；本次提问中的明确要求优先。';}
+    try{const result=await request();revision=result.revision;loaded=true;render(result.data);status.textContent=result.data.enabled?'已启用 v'+result.revision+'；修改后请保存，再重新发送问题。':'当前未启用。请勾选上方开关并保存，设置才会用于下一次回答。';}
     catch(error){if(mine===epoch)status.textContent=error.message;return;}
     finally{if(mine===epoch)lock(!loaded);}
   };
