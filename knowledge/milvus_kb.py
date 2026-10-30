@@ -78,7 +78,7 @@ class MedicalKnowledgeBase:
 
         # 初始化 Milvus Lite
         logger.info(f"Connecting to Milvus Lite: {db_path}")
-        self.milvus_client = MilvusClient(db_path)
+        self.milvus_client = MilvusClient(db_path, grpc_options={"grpc.keepalive_time_ms": 120000, "grpc.keepalive_permit_without_calls": False})
 
         # 创建 collection（如果不存在）
         if not self.milvus_client.has_collection(collection_name):

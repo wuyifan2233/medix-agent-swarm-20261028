@@ -1,4 +1,2 @@
--r requirements.verified.txt
-fastapi==0.162.0
-uvicorn==0.54.0
-pillow==13.0.0
+# 兼容原安装入口；统一使用当前运行环境的依赖清单。
+-r requirements.txt

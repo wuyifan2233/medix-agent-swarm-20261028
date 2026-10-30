@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=2"><script src="/assets/app.js?v=2" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=12"><script src="/assets/source-highlights.js?v=2" defer></script><script src="/assets/family-summary.js?v=1" defer></script><script src="/assets/app.js?v=15" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -34,6 +34,9 @@
 <button class="nav-item" data-action="upload"><svg><use href="#i-image"/></svg><span>报告解读</span><span class="nav-tag">图文</span></button>
 <button class="nav-item" data-action="knowledge"><svg><use href="#i-book"/></svg><span>医学知识库</span><svg class="nav-chevron"><use href="#i-chevron"/></svg></button>
 </nav>
+<button class="nav-item" id="familyMemory"><svg><use href="#i-team"/></svg><span>亲友健康记忆</span></button>
+<button class="nav-item" id="memoryLibrary"><svg><use href="#i-spark"/></svg><span>我的健康记忆</span></button>
+<button class="nav-item" id="memoryDemo"><svg><use href="#i-chat"/></svg><span>体验记忆新功能</span><span class="nav-tag">虚构演示</span></button>
 <div class="conversation-heading">本次对话<span>仅本次保留</span></div>
 <div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
@@ -41,7 +44,7 @@
 <div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>
 <div class="service-line"><span class="status-dot" id="modelDot"></span><span>图文理解</span><small id="modelState">检测中</small></div>
 <div class="service-line"><span class="status-dot" id="kbDot"></span><span>医学资料</span><small id="kbState">准备中</small></div>
-<div class="memory-option"><label for="remember"><span><svg><use href="#i-spark"/></svg>记住我们的对话</span><input type="checkbox" id="remember" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p id="memoryHelp">开启后，对话和图片解读摘要将发送至 Mem0，用于后续会话检索。</p></div>
+<div class="memory-option"><strong>智能长期记忆</strong><p id="memoryHelp">模型自动判断值得保留的健康信息，保存至 Mem0 并用于后续咨询；按本人、父亲、母亲分开记录。你可以查看、编辑、停用或删除记忆。本机旧记录不会自动上传。</p></div>
 <div class="profile"><span class="profile-icon">你</span><div>我的本地空间<small>从关心自己开始</small></div><button class="icon-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg></button></div>
 </div>
 </aside>
@@ -65,11 +68,13 @@
 </div>
 <div class="composer-region"><div class="drop-hint" id="dropHint"><svg><use href="#i-image"/></svg>松开即可添加图片</div>
 <form class="composer" id="chatForm"><div class="attachments" id="attachments"></div><label class="sr-only" for="message">输入健康问题</label><textarea id="message" placeholder="有健康问题，尽管问我…" rows="2" maxlength="8000"></textarea>
-<div class="composer-bottom"><div class="compose-left"><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">报告、药盒、健康记录</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+<div class="composer-memory"><span class="automatic-memory-label">智能长期记忆 · 自动判断</span><span id="composerMemoryHint">正在检查记忆服务…</span></div><div class="composer-bottom"><div class="compose-left"><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">报告、药盒、健康记录</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
 <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></form>
 <p class="disclaimer"><svg><use href="#i-shield"/></svg>AI 回答仅供参考，不能替代医生诊断。紧急不适请及时就医。</p>
 </div>
 </main></div>
 <dialog id="infoDialog" class="info-dialog" aria-labelledby="dialogTitle"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-book"/></svg></span><button id="closeDialog" class="icon-button" aria-label="关闭说明"><svg><use href="#i-close"/></svg></button></div><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div><button id="dialogDone" class="dialog-done">知道了</button></dialog>
+<dialog id="sourceDialog" class="info-dialog source-dialog" aria-labelledby="sourceTitle"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-book"/></svg></span><button id="closeSource" class="icon-button" aria-label="关闭原始资料"><svg><use href="#i-close"/></svg></button></div><h2 id="sourceTitle"></h2><div id="sourceContent" class="dialog-content"></div><button id="sourceDone" class="dialog-done">返回</button></dialog>
+<dialog id="memoryEditDialog" class="info-dialog memory-edit-dialog" aria-labelledby="memoryEditTitle"><form id="memoryEditForm"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-spark"/></svg></span><button type="button" id="closeMemoryEdit" class="icon-button" aria-label="关闭记忆编辑"><svg><use href="#i-close"/></svg></button></div><h2 id="memoryEditTitle">编辑健康记忆</h2><p id="memoryEditHelp"></p><label class="memory-edit-label" for="memoryEditContent">记忆内容</label><textarea id="memoryEditContent" required maxlength="8000" rows="6"></textarea><label class="memory-edit-label" for="memoryEditObservations">图片读取文字（如有）</label><textarea id="memoryEditObservations" maxlength="16000" rows="3"></textarea><p id="memoryEditError" role="alert"></p><div class="memory-edit-actions"><button type="button" id="cancelMemoryEdit">取消</button><button type="submit" id="saveMemoryEdit">保存并覆盖原记忆</button></div></form></dialog>
 <div id="toast" role="alert" class="toast"></div>
 </body></html>

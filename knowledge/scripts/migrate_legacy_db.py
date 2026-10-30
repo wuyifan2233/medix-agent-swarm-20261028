@@ -31,7 +31,7 @@ def migrate():
                      "content": row["content"], "metadata": json.dumps(metadata, ensure_ascii=False),
                      "doc_type": metadata.get("type", "general")})
     assert rows and all(len(row["vector"]) == 512 for row in rows)
-    client = MilvusClient(str(target))
+    client = MilvusClient(str(target), grpc_options={"grpc.keepalive_time_ms": 120000, "grpc.keepalive_permit_without_calls": False})
     try:
         name = "medical_knowledge"
         if not client.has_collection(name):
