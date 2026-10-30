@@ -135,7 +135,6 @@ function resultMessage(row, result) {
       answer.innerHTML = answer.innerHTML.replace(/\[(\d+)\]/g, (match, n) => result.sources.some(s => s.citation === Number(n)) ? `<button type="button" class="citation" data-citation="${n}" aria-label="查看证据 ${n}">[${n}]</button>` : match);
       answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => citationPreview(button, result.sources.find(s => s.citation === Number(button.dataset.citation))));
     }
-    main.append(retrievalDetails(result.retrieval));
   }
   const meta = document.createElement('div'); meta.className = 'message-meta';
   const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求 · 原文定位' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
@@ -294,17 +293,6 @@ $('questionChips').onclick = event => {
   if (button) fillQuestion(button.dataset.question);
 };
 
-function retrievalDetails(trace) {
-  const details = document.createElement('details'); details.className = 'observations';
-  const summary = document.createElement('summary'); summary.textContent = '查看本次检索过程';
-  const text = document.createElement('p'); text.textContent = `语义召回 ${trace.vector_candidates} 段 · 关键词召回 ${trace.keyword_candidates} 段 → 合并 ${trace.merged_candidates} 段 → 相关性过滤后提供 ${trace.selected} 段证据。检索耗时 ${trace.elapsed_ms} 毫秒。分数用于排序，不代表医学可信度。`;
-  if (trace.rerank?.status === 'ok') text.textContent += ` 已对 ${trace.rerank.candidates} 段候选完成相关性重排。`;
-  if (trace.rerank?.status === 'degraded') text.textContent += ` ${trace.rerank.message}`;
-  if (trace.context_rewritten) text.textContent += ` 已结合本轮主题检索：${trace.query}`;
-  if (trace.audience_excluded) text.textContent += ` 已排除 ${trace.audience_excluded} 段人群不匹配资料。`;
-  if (trace.knowledge_gap) text.textContent += ` ${trace.knowledge_gap.message}`;
-  details.append(summary, text); return details;
-}
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
 const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）'};
 function showEvidence(source, quote = '') {
@@ -343,7 +331,6 @@ async function openKnowledge() {
         const title = document.createElement('strong'); title.textContent = `[${source.citation}] ${source.title}`;
         const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt;
         card.append(title, excerpt); card.onclick = () => showEvidence(source); results.append(card); });
-      results.append(retrievalDetails(data.trace));
     } catch (error) { results.textContent = error.message; } finally { button.disabled = false; }
   };
   try {
