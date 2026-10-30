@@ -11,7 +11,7 @@
   <details class="hp-privacy"><summary>了解档案的使用方式与隐私说明</summary>  <p>仅记录本人信息。保存后请逐项核对并主动确认。病历图片、模型推断不会自动写入；未知不等于没有疾病、过敏或用药。年龄为来源记录时的年龄，请核对病历日期，不自动推算。</p>
   <p>档案保存在本机账号数据库。仅在勾选“本次为本人咨询”时，随问题发给配置的模型服务，并暂停本轮云端记忆。请勿用于他人的报告；历史记录不代表当前诊断或正在用药。</p>
 </details>
-  <form id="hpForm"><div class="hp-basics"><label>记录年龄<input id="hpAge" type="number" min="0" max="130" step="1" placeholder="未知可留空"></label><label>性别<select id="hpSex"><option value="unknown">未知</option><option value="female">女</option><option value="male">男</option><option value="other">其他</option><option value="undisclosed">不愿透露</option></select></label></div><div id="hpGroups"></div><p id="hpMeta"></p><div class="hp-actions"><button type="submit" id="hpSave">保存为待确认草稿</button><button type="button" id="hpReload">重新加载</button></div></form>
+  <p id="hpMeta"></p><form id="hpForm"><div class="hp-basics"><label>记录年龄<input id="hpAge" type="number" min="0" max="130" step="1" placeholder="未知可留空"></label><label>性别<select id="hpSex"><option value="unknown">未知</option><option value="female">女</option><option value="male">男</option><option value="other">其他</option><option value="undisclosed">不愿透露</option></select></label></div><div id="hpGroups"></div><div class="hp-actions"><button type="submit" id="hpSave">保存为待确认草稿</button><button type="button" id="hpReload">重新加载</button></div></form>
   <div class="hp-confirm"><label><input type="checkbox" id="hpAck">我已核对已保存的各项内容，理解它们是自述历史记录，不能代表当前情况。</label><button type="button" id="hpConfirm" disabled>确认已保存的档案</button></div>
   <details><summary>清空档案</summary><p>清空本账号的结构化档案并作废确认。不会删除其他模块的聊天或云端记忆。</p><button type="button" id="hpDelete">清空我的档案</button></details><p id="hpFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);

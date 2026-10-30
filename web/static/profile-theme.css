@@ -74,3 +74,34 @@
 .conversation-profile-picker [data-role=save]{background:var(--hp-primary);border-color:var(--hp-primary);color:white}
 @media(max-width:760px){.health-profile-dialog{max-width:calc(100vw - 24px);padding:22px;max-height:92dvh;border-radius:18px}.health-profile-dialog .hp-heading{top:-22px;margin:-22px -22px 16px;padding:18px 22px}.health-profile-dialog .hp-heading h2{font-size:21px}#hpGroups,#peCandidates{grid-template-columns:1fr}.health-profile-dialog #peOpen::after{display:block;float:none;margin-top:5px}.hp-steps{gap:6px}.hp-steps span{font-size:10px;padding:7px 10px}.health-profile-dialog .hp-basics{padding:17px;gap:14px}#profileEvolutionDialog #peForm{padding:17px;grid-template-columns:1fr}#peForm>label{grid-column:1/-1}.health-profile-tools{gap:6px;padding:10px}#hpFieldChoices{margin-left:0}.conversation-profile-picker{padding:16px}}
 @media(prefers-reduced-motion:reduce){.health-profile-dialog button{transition:none}}
+
+/* Read in a stable top-to-bottom order; one full-width section per health category. */
+#healthProfileDialog{width:960px}
+#healthProfileDialog #hpGroups{grid-template-columns:1fr;gap:22px}
+#healthProfileDialog #hpGroups>fieldset{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 24px;padding:18px 24px 22px}
+#healthProfileDialog #hpGroups>fieldset>legend{font-size:15px;padding:0 9px}
+#healthProfileDialog #hpGroups>fieldset>label{grid-column:1;grid-row:1;max-width:310px;display:grid;grid-template-columns:68px minmax(0,1fr);align-items:center;gap:12px}
+#healthProfileDialog #hpGroups>fieldset>button{grid-column:2;grid-row:1;width:auto;align-self:center;min-width:130px;border-style:solid;background:#f2f8f5}
+#healthProfileDialog #hpGroups>fieldset>div{grid-column:1/-1;min-width:0}
+#healthProfileDialog #hpGroups>fieldset>div:empty{display:none}
+#healthProfileDialog .hp-item{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px 18px;border:0;border-top:1px solid #e3ebed;border-radius:0;background:transparent;margin:4px 0 0;padding:20px 0 4px}
+#healthProfileDialog .hp-item>label:has([data-field=name]){grid-column:1/6;grid-row:1}
+#healthProfileDialog .hp-item>label:has([data-field=status]){grid-column:6/11;grid-row:1}
+#healthProfileDialog .hp-item>button{grid-column:11/13;grid-row:1;align-self:end;justify-self:end;margin-bottom:3px;white-space:nowrap}
+#healthProfileDialog .hp-item>label:has([data-field=dose]){grid-column:1/7}
+#healthProfileDialog .hp-item>label:has([data-field=frequency]){grid-column:7/13}
+#healthProfileDialog .hp-item>label:has([data-field=note]),#healthProfileDialog .hp-item>.hp-source{grid-column:1/-1}
+#healthProfileDialog .hp-item>.hp-source{border-top:0;padding-top:0;margin-top:-4px}
+#healthProfileDialog .hp-basics{margin-bottom:26px}
+#healthProfileDialog .hp-steps{margin:15px 0}
+#healthProfileDialog .hp-steps span{background:transparent;border:0;padding:3px 10px 3px 0}
+#healthProfileDialog #hpMeta{margin:0 0 12px;padding:0 3px;font-size:11px}
+@media(max-width:600px){
+  #healthProfileDialog #hpGroups>fieldset{grid-template-columns:minmax(0,1fr);padding:16px;gap:12px}
+  #healthProfileDialog #hpGroups>fieldset>label{grid-column:1;grid-row:auto;max-width:none}
+  #healthProfileDialog #hpGroups>fieldset>button{grid-column:1;grid-row:auto;width:100%}
+  #healthProfileDialog #hpGroups>fieldset>div{grid-row:2}
+  #healthProfileDialog .hp-item{grid-template-columns:1fr;gap:13px;padding-top:16px}
+  #healthProfileDialog .hp-item>label:has([data-field]),#healthProfileDialog .hp-item>.hp-source{grid-column:1;grid-row:auto}
+  #healthProfileDialog .hp-item>button{grid-column:1;grid-row:auto;justify-self:end}
+}
