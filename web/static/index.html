@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><script src="/assets/app.js?v=4" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=6"><script src="/assets/app.js?v=9" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -39,6 +39,29 @@
 <div class="conversation-heading">定时提醒<span id="reminderCount"></span></div>
 <div id="reminderList" class="reminder-list" aria-live="polite"></div>
 <p id="reminderEmpty" class="reminder-empty">还没有即将到来的提醒</p>
+<div class="wechat-card" id="wechatCard">
+<div class="channel-switch" role="tablist" aria-label="选择微信或 QQ">
+<button type="button" id="pickWechat" aria-pressed="true">微信</button>
+<button type="button" id="pickQq" aria-pressed="false">QQ</button>
+</div>
+<div class="wechat-heading"><span id="channelTitle">微信 MediX</span><small id="wechatState">未连接</small></div>
+<p id="wechatHint">用微信扫码，把 MediX 加到聊天列表。手机上的对话会同步到这里，提醒也会发到微信。</p>
+<img id="wechatQr" alt="用微信扫描，添加 MediX" hidden>
+<form id="qqFriendForm" class="wechat-code" hidden>
+<label class="sr-only" for="qqFriendId">好友 QQ 号</label>
+<input id="qqFriendId" inputmode="numeric" maxlength="11" placeholder="好友 QQ 号" autocomplete="off">
+<button type="submit">添加好友</button>
+</form>
+<form id="wechatCodeForm" class="wechat-code" hidden>
+<label class="sr-only" for="wechatCode">配对码</label>
+<input id="wechatCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="输入配对码">
+<button type="submit">确认</button>
+</form>
+<div class="wechat-actions">
+<button type="button" id="wechatLogin">扫码添加</button>
+<button type="button" id="wechatLogout" hidden>断开</button>
+</div>
+</div>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
 <div class="sidebar-bottom">
 <div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>

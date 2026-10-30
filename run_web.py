@@ -12,7 +12,7 @@ os.chdir(ROOT)
 
 if __name__ == "__main__":
     logger.remove()
-    logger.add(sys.stderr, level="WARNING", filter=lambda record: record["name"].startswith("web."),
+    logger.add(sys.stderr, level="WARNING", filter=lambda record: record["name"].startswith(("web.", "wechat.", "qq.")),
                format="{time:HH:mm:ss} | {level} | {message}")
     print("MediX 网页聊天：http://127.0.0.1:8765", flush=True)
     uvicorn.run("web.app:app", host="127.0.0.1", port=8765, log_level="warning")

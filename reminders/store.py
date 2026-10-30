@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
     delivered_at TEXT NOT NULL,
     read INTEGER NOT NULL DEFAULT 0,
     canonical_text TEXT NOT NULL,
+    wechat_sent INTEGER NOT NULL DEFAULT 0,
     UNIQUE (reminder_id, scheduled_fire_at)
 );
 CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(user_id, status);
@@ -50,6 +51,9 @@ class ReminderStore:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.executescript(SCHEMA)
+        columns = {row[1] for row in self.conn.execute("PRAGMA table_info(deliveries)")}
+        if "wechat_sent" not in columns:
+            self.conn.execute("ALTER TABLE deliveries ADD COLUMN wechat_sent INTEGER NOT NULL DEFAULT 0")
         self.conn.commit()
 
     def close(self):
@@ -130,6 +134,22 @@ class ReminderStore:
                    ORDER BY d.id""",
                 (user_id,)).fetchall()
         return [dict(row) for row in rows]
+
+    def pending_wechat(self, user_id, limit=3):
+        with self.lock:
+            rows = self.conn.execute(
+                """SELECT id, canonical_text FROM deliveries
+                   WHERE user_id = ? AND wechat_sent = 0
+                   ORDER BY id LIMIT ?""",
+                (user_id, int(limit))).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_wechat_sent(self, user_id, delivery_id):
+        with self.lock:
+            self.conn.execute(
+                "UPDATE deliveries SET wechat_sent = 1 WHERE user_id = ? AND id = ?",
+                (user_id, delivery_id))
+            self.conn.commit()
 
     def mark_read(self, user_id, delivery_ids):
         if not delivery_ids:

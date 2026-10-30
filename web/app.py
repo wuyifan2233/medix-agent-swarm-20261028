@@ -81,10 +81,20 @@ async def lifespan(app):
     from reminders.service import get_service
     reminders = get_service()
     reminders.start()
+    from wechat.bridge import get_bridge as wechat_bridge
+    from qq.bridge import get_bridge as qq_bridge
+    wechat = wechat_bridge()
+    qq = qq_bridge()
+    wechat.set_reply(answer_from_channel("wechat"))
+    qq.set_reply(answer_from_channel("qq"))
+    wechat.start()
+    qq.start()
     asyncio.get_running_loop().run_in_executor(executor, warmup)
     try:
         yield
     finally:
+        qq.stop()
+        wechat.stop()
         reminders.stop()
 
 
@@ -171,6 +181,9 @@ async def analyze(job, payload, session_id, memory_user_id):
         enriched += "\n\n【本地检索参考；不相关的信息请忽略，不得将其当成用户病史】\n"
         enriched += "\n\n".join(hit["content"][:750] for hit in hits)
     enriched += "\n\n请优先直接回答用户问题，总长尽量不超过600字。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
+    if payload.get("channel") in {"wechat", "qq"}:
+        where = "微信" if payload.get("channel") == "wechat" else "QQ"
+        enriched += f"\n\n你正在通过{where}和用户对话，你的名字是 MediX。请用纯文本，不要使用表格或 Markdown。"
 
     stage(job, "agents", "正在由专业助手分析与整合")
     coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"], memory_user_id=memory_user_id,
@@ -218,6 +231,17 @@ def run_job(job, payload, session_id, memory_user_id):
                 await asyncio.wait_for(analyze(job, payload, session_id, memory_user_id), timeout=180)
             asyncio.run(bounded())
             job.update(status="completed", stage="completed", label="分析完成")
+            answer = (job.get("result") or {}).get("answer")
+            if answer and payload.get("channel") not in {"wechat", "qq"}:
+                try:
+                    from messenger import current_channel
+                    if current_channel() == "qq":
+                        from qq.bridge import get_bridge
+                    else:
+                        from wechat.bridge import get_bridge
+                    get_bridge().forward_local(memory_user_id, payload["message"] or "（图片）", answer)
+                except Exception:
+                    logger.warning("Phone forward skipped")
         except Exception as exc:
             logger.error("Web chat job failed ({})", type(exc).__name__)
             message = str(exc) if isinstance(exc, ValueError) else "分析暂时未能完成，请重试；若持续失败，请检查服务端接口配置和网络。"
@@ -277,6 +301,42 @@ def job_status(job_id: str, request: Request):
     return {key: value for key, value in job.items() if key not in {"owner", "created", "started"}}
 
 
+def answer_from_channel(channel):
+    """Answer one phone message on the same worker as the web chat."""
+
+    def reply(user_id, session_id, message):
+        box = {}
+
+        def work():
+            _answer_phone(box, channel, user_id, session_id, message)
+
+        executor.submit(work).result(timeout=200)
+        if "error" in box:
+            raise box["error"]
+        return box["answer"]
+
+    return reply
+
+
+def _answer_phone(box, channel, user_id, session_id, message):
+    job = {"steps": [], "started": time.monotonic()}
+    payload = {"message": message, "images": [], "remember": False, "channel": channel}
+    try:
+        if health["knowledge"] != "ready":
+            raise ValueError("知识库尚未就绪，请稍后再试。")
+        from reminders.context import bind_identity
+        with bind_identity(user_id, session_id):
+            async def bounded():
+                await asyncio.wait_for(analyze(job, payload, session_id, user_id), timeout=180)
+            asyncio.run(bounded())
+        answer = (job.get("result") or {}).get("answer")
+        if not answer:
+            raise RuntimeError("empty answer")
+        box["answer"] = answer
+    except Exception as exc:
+        box["error"] = exc
+
+
 def browser_user(request):
     return "web-" + request.state.browser_id
 
@@ -299,6 +359,95 @@ async def read_reminders(request: Request):
         raise HTTPException(400, "已读列表格式不正确。")
     get_service().mark_read(browser_user(request), ids)
     return {"ok": True}
+
+
+@app.get("/api/channel")
+def channel_state():
+    from messenger import current_channel
+    return {"channel": current_channel()}
+
+
+@app.post("/api/channel")
+async def channel_choose(request: Request):
+    from messenger import set_channel
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "请选择微信或 QQ。") from exc
+    name = payload.get("channel") if isinstance(payload, dict) else ""
+    try:
+        chosen = set_channel(name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"channel": chosen}
+
+
+@app.get("/api/qq")
+def qq_state(request: Request, after: int = 0):
+    from qq.bridge import get_bridge
+    if after < 0:
+        after = 0
+    return get_bridge().view(request.state.browser_id, after)
+
+
+@app.post("/api/qq/friend")
+async def qq_friend(request: Request):
+    from qq.bridge import get_bridge
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "请输入好友 QQ 号。") from exc
+    user_id = payload.get("user_id") if isinstance(payload, dict) else ""
+    try:
+        return get_bridge().add_friend(request.state.browser_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/qq/login")
+def qq_login(request: Request):
+    from qq.bridge import get_bridge
+    return get_bridge().begin_login(request.state.browser_id)
+
+
+@app.post("/api/qq/logout")
+def qq_logout(request: Request):
+    from qq.bridge import get_bridge
+    return get_bridge().logout(request.state.browser_id)
+
+
+@app.get("/api/wechat")
+def wechat_state(request: Request, after: int = 0):
+    from wechat.bridge import get_bridge
+    if after < 0:
+        after = 0
+    return get_bridge().view(request.state.browser_id, after)
+
+
+@app.post("/api/wechat/login")
+def wechat_login(request: Request):
+    from wechat.bridge import get_bridge
+    return get_bridge().begin_login(request.state.browser_id)
+
+
+@app.post("/api/wechat/code")
+async def wechat_code(request: Request):
+    from wechat.bridge import get_bridge
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "配对码是 4 到 8 位数字。") from exc
+    code = payload.get("code") if isinstance(payload, dict) else ""
+    try:
+        return get_bridge().submit_code(request.state.browser_id, code)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/wechat/logout")
+def wechat_logout(request: Request):
+    from wechat.bridge import get_bridge
+    return get_bridge().logout(request.state.browser_id)
 
 
 @app.post("/api/reminders/{reminder_id}/cancel")

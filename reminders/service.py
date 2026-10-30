@@ -38,6 +38,8 @@ class ReminderService:
     def start(self, sync_seconds=30):
         if self.scheduler is not None:
             return
+        if self.store.conn is None:
+            self.store = ReminderStore(self.db_path)
         from apscheduler.schedulers.background import BackgroundScheduler
 
         scheduler = BackgroundScheduler(

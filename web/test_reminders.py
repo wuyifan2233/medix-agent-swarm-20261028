@@ -1,5 +1,7 @@
-import asyncio
 import os
+os.environ.setdefault("MEDIX_WECHAT_DISABLE", "1")
+os.environ.setdefault("MEDIX_QQ_DISABLE", "1")
+import asyncio
 import shutil
 import tempfile
 import unittest
