@@ -49,6 +49,17 @@ class EvolutionTests(unittest.TestCase):
         self.assertEqual(result['data']['conditions']['items'][1]['source']['report_date'],'2020-01-01')
         self.assertEqual(self.apply(batch,[{'candidate_id':b['id'],'action':'append'}]).status_code,409)
 
+    def test_unrelated_record_cannot_be_replaced_but_can_be_appended(self):
+        self.saved(name='头痛')
+        candidate=self.candidate(name='感冒');batch=self.batch([candidate])
+        rejected=self.apply(batch,[{'candidate_id':candidate['id'],'action':'replace','target_index':0}])
+        self.assertEqual(rejected.status_code,422,rejected.text)
+        self.assertEqual(self.client.get('/api/profile').json()['data']['conditions']['items'][0]['name'],'头痛')
+        self.assertFalse(self.client.get('/api/profile/imports/'+batch['id']).json()['consumed'])
+        saved=self.apply(batch,[{'candidate_id':candidate['id'],'action':'append'}])
+        self.assertEqual(saved.status_code,200,saved.text)
+        self.assertEqual([item['name'] for item in saved.json()['data']['conditions']['items']],['头痛','感冒'])
+
     def test_uncertain_candidate_requires_separate_acknowledgement(self):
         a=self.candidate(uncertain=True);batch=self.batch([a])
         self.assertEqual(self.apply(batch,[{'candidate_id':a['id'],'action':'append'}]).status_code,422)

@@ -1,5 +1,6 @@
 /* Report import, evidence review and profile history. Never stores health records in browser storage. */
 (() => {
+  const sameRecord=(a,b)=>a.normalize('NFKC').replace(/\s/g,'').toLowerCase()===b.normalize('NFKC').replace(/\s/g,'').toLowerCase();
   const base=document.getElementById('healthProfileDialog');
   const open=document.createElement('button'); open.type='button';open.id='peOpen';open.textContent='从病历提取 / 历史版本 / 导出';
   base.querySelector('.hp-heading').after(open);
@@ -12,7 +13,7 @@
   <label class="pe-check"><input type="checkbox" id="peSelf" required>我确认描述属于本人实际经历，不是假设或他人情况；病历日期已核对</label>
   <label class="pe-check"><input type="checkbox" id="peConsent" required>我同意将上述文字与图片发送给配置的模型服务进行提取</label>
   <button type="submit">提取候选信息</button></form>
-  <section id="peReview" hidden><h3>逐项对比并采纳</h3><p>年龄为病历日期时的年龄。旧用药默认历史记录，不能推定仍在使用。替换会覆盖所选旧值；未选内容保持原样。</p><div id="peCandidates"></div><button type="button" id="peApply">将选中项保存为待确认草稿</button><button type="button" id="peDiscard">丢弃候选</button></section>
+  <section id="peReview" hidden><h3>逐项对比并采纳</h3><p>年龄为病历日期时的年龄。旧用药默认历史记录，不能推定仍在使用。仅同名记录可更新；不同内容请追加，未选内容保持原样。</p><div id="peCandidates"></div><button type="button" id="peApply">将选中项保存为待确认草稿</button><button type="button" id="peDiscard">丢弃候选</button></section>
   <hr><h3>档案维护</h3><button type="button" id="peHistory">加载最近50个版本</button><button type="button" id="peExport">导出当前档案 JSON</button><div id="peVersions"></div><p id="peFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
   const el=id=>document.getElementById(id), labels={age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'};
@@ -50,7 +51,7 @@
       const select=document.createElement('select');select.dataset.role='action';select.setAttribute('aria-label','采纳方式');
       const add=(value,text)=>{const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);};
       if(['age','sex'].includes(candidate.field))add('replace','明确替换基础字段');
-      else {add('append',candidate.existing?.status==='none_reported'?'追加（将自述无记录改为有记录）':'追加并保留旧条目');(candidate.existing?.items||[]).forEach((item,index)=>add('replace:'+index,`替换旧条目 ${index+1}：${item.name}`));}
+      else {add('append',candidate.existing?.status==='none_reported'?'追加（将自述无记录改为有记录）':'追加并保留旧条目');(candidate.existing?.items||[]).forEach((item,index)=>{if(sameRecord(item.name,candidate.value.name))add('replace:'+index,`更新同名记录：${item.name}`);});}
       card.append(select);
       if(candidate.uncertain){const label=document.createElement('label');label.className='pe-check';const ack=document.createElement('input');ack.type='checkbox';ack.dataset.role='uncertainty';label.append(ack,document.createTextNode('我已核对这条不确定内容；它仍作为待核对记录保存'));card.append(label);}
       el('peCandidates').append(card);

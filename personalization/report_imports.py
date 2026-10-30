@@ -1,6 +1,7 @@
 """Extract evidence-backed report candidates, then apply explicit user selections atomically."""
 import asyncio
 import json
+import unicodedata
 import time
 import uuid
 from datetime import date
@@ -176,6 +177,10 @@ def discard(import_id:str,request:Request,user:CurrentUser=Depends(require_user)
         db.delete(row);db.commit()
 
 
+def record_key(name):
+    return ''.join(unicodedata.normalize('NFKC',name).split()).lower()
+
+
 @router.post('/{import_id}/apply')
 def apply(import_id:str,command:ApplyImport,request:Request,user:CurrentUser=Depends(require_user)):
     profiles=ProfileStore(request.app.state.auth_service.sessions)
@@ -197,11 +202,12 @@ def apply(import_id:str,command:ApplyImport,request:Request,user:CurrentUser=Dep
             else:
                 group=data[field];value={**item['value'],'source':item['source']}
                 if selection.action=='append':
-                    if selection.target_index is not None or any(old['name']==value['name'] for old in group['items']): raise HTTPException(422,'已有同名记录，请明确选择替换的旧条目。')
+                    if selection.target_index is not None or any(record_key(old['name'])==record_key(value['name']) for old in group['items']): raise HTTPException(422,'已有同名记录，请明确选择替换的旧条目。')
                     group['items'].append(value)
                 else:
                     index=selection.target_index;target=(field,index)
                     if index is None or index>=original_sizes[field] or target in targets: raise HTTPException(422,'请指定未被重复替换的旧条目。')
+                    if record_key(group['items'][index]['name'])!=record_key(value['name']): raise HTTPException(422,'只能更新同名记录；不同症状或疾病请追加，不能覆盖无关条目。')
                     targets.add(target);group['items'][index]=value
                 group['status']='reported'
         try: validated=ProfileData.model_validate(data)

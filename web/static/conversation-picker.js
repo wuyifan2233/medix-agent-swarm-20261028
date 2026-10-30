@@ -1,6 +1,7 @@
 /* Inline, opt-in selection of facts from the user's message; never auto-saves. */
 (() => {
   const labels={age:'年龄',sex:'性别',conditions:'本人自述诊断',allergies:'过敏',medications:'用药',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'};
+  const sameRecord=(a,b)=>a.normalize('NFKC').replace(/\s/g,'').toLowerCase()===b.normalize('NFKC').replace(/\s/g,'').toLowerCase();
   const sex={female:'女',male:'男',unknown:'未知',other:'其他',undisclosed:'不愿透露'};
   function showValue(value){
     if(value===null || value===undefined)return '未知';
@@ -43,7 +44,7 @@
           const mode=document.createElement('select');mode.dataset.role='mode';
           const option=(value,label)=>{const node=document.createElement('option');node.value=value;node.textContent=label;mode.append(node);};
           if(['age','sex'].includes(candidate.field))option('replace','明确替换此字段');
-          else{option('append','追加并保留现有条目');(candidate.existing?.items || []).forEach((item,index)=>option('replace:'+index,'替换：'+item.name));}
+          else{option('append','追加并保留现有条目');(candidate.existing?.items || []).forEach((item,index)=>{if(sameRecord(item.name,candidate.value.name))option('replace:'+index,'更新同名记录：'+item.name);});}
           modeLabel.append(mode);card.append(legend,choice,evidence,previous,modeLabel);
           if(candidate.uncertain){const warning=document.createElement('label'),ack=document.createElement('input');ack.type='checkbox';ack.dataset.role='uncertain';warning.append(ack,document.createTextNode('我已核对；助手建议仅作待核实事项保存，不代表诊断、已执行或正在用药'));card.append(warning);}
           el('items').append(card);
