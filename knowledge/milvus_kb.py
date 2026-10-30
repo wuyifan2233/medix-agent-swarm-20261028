@@ -17,6 +17,7 @@ from loguru import logger
 from pymilvus import MilvusClient
 from sentence_transformers import SentenceTransformer
 from runtime_paths import DB_PATH
+from knowledge.bootstrap import DEFAULT_COLLECTION, DEFAULT_EMBEDDING, ensure_knowledge_collection, validate_target
 
 
 class MedicalKnowledgeBase:
@@ -34,7 +35,8 @@ class MedicalKnowledgeBase:
         self,
         db_path: Optional[str] = None,
         collection_name: str = "medical_knowledge",
-        embedding_model: str = "BAAI/bge-small-zh-v1.5"
+        embedding_model: str = "BAAI/bge-small-zh-v1.5",
+        bootstrap: bool = True
     ):
         """
         初始化医学知识库
@@ -43,12 +45,13 @@ class MedicalKnowledgeBase:
             db_path: Milvus Lite 数据库文件路径
             collection_name: Collection 名称
             embedding_model: Embedding 模型名称或本地路径
+            bootstrap: 默认医学集合为空时自动导入随仓库提供的资料；自建空库可设 False
         """
         # 防止重复初始化
         if hasattr(self, '_initialized'):
             return
 
-        db_path = db_path or DB_PATH
+        db_path = validate_target(db_path or DB_PATH)
         self.db_path = db_path
         self.collection_name = collection_name
 
@@ -59,7 +62,7 @@ class MedicalKnowledgeBase:
         # 优先检查本地缓存路径
         local_model_path = Path.home() / ".cache" / "huggingface" / "hub" / "models--BAAI--bge-small-zh-v1.5" / "snapshots"
 
-        if local_model_path.exists():
+        if embedding_model == DEFAULT_EMBEDDING and local_model_path.exists():
             # 找到最新的 snapshot
             snapshots = sorted(local_model_path.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
             if snapshots:
@@ -80,19 +83,14 @@ class MedicalKnowledgeBase:
         logger.info(f"Connecting to Milvus Lite: {db_path}")
         self.milvus_client = MilvusClient(db_path)
 
-        # 创建 collection（如果不存在）
-        if not self.milvus_client.has_collection(collection_name):
-            logger.info(f"Creating collection: {collection_name}")
-            self.milvus_client.create_collection(
-                collection_name=collection_name,
-                dimension=self.embedding_dim,
-                metric_type="COSINE",  # 余弦相似度
-                auto_id=True  # 自动生成整数ID
-            )
-        else:
-            logger.info(f"Collection already exists: {collection_name}")
-
-        self.milvus_client.load_collection(collection_name)
+        try:
+            result = ensure_knowledge_collection(
+                self.milvus_client, collection_name, self.embedding_dim,
+                bootstrap=bootstrap and collection_name == DEFAULT_COLLECTION and embedding_model == DEFAULT_EMBEDDING)
+            logger.info("Knowledge collection ready: {} rows ({})", result["rows"], result["status"])
+        except Exception:
+            self.milvus_client.close()
+            raise
         self._initialized = True
 
     def _chunk_text(self, text: str, chunk_size: int = 1024, overlap: int = 100) -> List[str]:

@@ -130,7 +130,9 @@ $env:MEDIX_CONFIG_PATH = 'D:\my-config\config.py'
 - 当前向量库：由 [`runtime_paths.py`](runtime_paths.py) 决定，默认是系统临时目录下的 `medix-<项目路径哈希>/milvus_v3.db` **目录**。
 - 当前迁移后的索引包含 180 条记录；原数据含重复片段，不能理解为 180 份独立医学文献。
 
-启动时执行 [`migrate_legacy_db.py`](knowledge/scripts/migrate_legacy_db.py)，从旧库只读复制已有向量到新版目录；不会训练模型，也不会覆盖原始库。如果目标数量不符合迁移预期，脚本会报错而不是强行覆盖。
+默认医学知识库现在会在初始化时自动准备数据，网页、命令行、Skill 和检索测试均通过同一个初始化逻辑：V3 集合不存在或为空时，从旧库只读导入已有180条向量；已有非空集合直接使用，不重复导入，也不覆盖新增文档。无需先手动执行迁移，不涉及训练。旧的 [`migrate_legacy_db.py`](knowledge/scripts/migrate_legacy_db.py) 仍可单独运行，输出实际路径、记录数和本次导入数量，重复执行不会重复插入。
+
+`milvus_lite.db` 是旧版源文件，内部为二进制序列化数据，不是空文件；`milvus_v3.db` 是当前运行时生成的目录。不要把 `MEDIX_DB_PATH` 指向源文件，否则会给出明确错误。默认自动导入仅用于原配 BGE 模型和 `medical_knowledge` 集合；自定义模型／集合不复用原模型的向量，需要自行导入，自建空库也可设置 `bootstrap=False`。
 
 默认临时目录是为了规避 Windows 中文路径下的索引保存兼容问题。可通过 `MEDIX_DB_PATH` 指定其他**仅含 ASCII 字符**的持久路径；修改后重启服务。示例：
 
@@ -138,6 +140,8 @@ $env:MEDIX_CONFIG_PATH = 'D:\my-config\config.py'
 $env:MEDIX_DB_PATH = 'D:\medix-data\milvus_v3.db'
 .\start_web.ps1
 ```
+
+`MEDIX_DB_PATH` 是可选项，正常使用无需设置。它只对设置它的终端及子进程生效；若手动迁移和启动使用不同路径，会操作两个不同的库。默认路径随项目绝对路径改变而改变，移动项目后会在新位置自动恢复附带知识资料，但不会搬运自行新增的文档。不要同时运行多个访问同一目录的实例。
 
 这些资料是项目自带内容，**尚未核实其权威性、时效性与完整性**。展示检索来源不等于验证医学结论。不要为了解决启动问题反复运行原始导入脚本，以免重复导入；当前启动流程使用迁移脚本。
 

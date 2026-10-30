@@ -130,7 +130,8 @@ def main():
     logger.info(f"   - 其他: {len(general_docs)}")
 
     # 创建知识库实例
-    kb = MedicalKnowledgeBase()
+    # This command imports TXT documents explicitly; do not seed them first.
+    kb = MedicalKnowledgeBase(bootstrap=False)
 
     # 导入数据
     logger.info("\n💾 导入到 Milvus...")
