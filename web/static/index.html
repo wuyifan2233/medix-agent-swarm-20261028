@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=2"><script src="/assets/app.js?v=2" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=4"><script src="/assets/app.js?v=4" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -34,6 +34,7 @@
 <button class="nav-item" data-action="upload"><svg><use href="#i-image"/></svg><span>报告解读</span><span class="nav-tag">图文</span></button>
 <button class="nav-item" data-action="knowledge"><svg><use href="#i-book"/></svg><span>医学知识库</span><svg class="nav-chevron"><use href="#i-chevron"/></svg></button>
 </nav>
+<label class="case-context-label" for="caseContext">接着哪个病例聊？</label><select id="caseContext" class="case-context-select" aria-label="继续已有病例"><option value="">新对话，不关联历史</option></select><p class="case-context-note">病例信息在后台整理并保存到本机。原图和完整聊天不保存；重要信息不清楚时会追问。</p>
 <div class="conversation-heading">本次对话<span>仅本次保留</span></div>
 <div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>

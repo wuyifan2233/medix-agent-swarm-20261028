@@ -1,5 +1,14 @@
 const $ = (id) => document.getElementById(id);
 const state = {chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0};
+state.caseId = '';
+async function refreshCases(selected = state.caseId) {
+  const response = await fetch('/api/cases');
+  if (!response.ok) return;
+  const data = await response.json();
+  $('caseContext').replaceChildren(new Option('新对话，不关联历史',''));
+  data.cases.forEach(item => $('caseContext').add(new Option(`${item.name} · ${item.records} 条记录`,item.id)));
+  $('caseContext').value=selected;
+}
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,8 +19,10 @@ function updateComposer() {
   $('attachButton').disabled = state.busy;
   $('message').disabled = state.busy;
   $('newChat').disabled = state.busy;
+  $('caseContext').disabled = state.busy;
   document.querySelectorAll('[data-action="upload"], [data-prompt], [data-example], #refreshPrompts').forEach(button => { button.disabled = state.busy; });
-  $('remember').disabled = state.busy || !state.health?.memory_configured;
+  $('remember').disabled = state.busy || !state.health?.memory_configured || Boolean(state.caseId);
+  $('memoryHelp').textContent = state.caseId ? '本轮使用本机病例档案，Mem0 摘要不参与病例分析。' : !state.health?.memory_configured ? 'Mem0 未配置；病例信息仍可保存到本机。' : '普通咨询可开启 Mem0 摘要；病例分析使用独立本机档案。';
   $('message').style.height = 'auto';
   $('message').style.height = Math.min($('message').scrollHeight, 155) + 'px';
 }
@@ -95,11 +106,40 @@ function pendingMessage() {
   $('messages').append(row); scrollDown(); return row;
 }
 function resultMessage(row, result) {
+  if (result.case_id) {state.caseId=result.case_id; refreshCases().catch(()=>{});}
+  if (result.case_changes?.length) {
+    document.querySelectorAll('.message.assistant').forEach(previous => {
+      if (previous === row || !previous.caseRefs || previous.dataset.caseStale) return;
+      if (result.case_changes.some(change => previous.caseRefs.some(ref=>ref.id===change.id && ref.revision<change.revision))) {
+        const note=document.createElement('p');note.className='case-update-note';note.textContent='这条回答引用的病例信息已更新，请以最新回复为准。';
+        previous.querySelector('.message-main').prepend(note);previous.dataset.caseStale='true';
+      }
+    });
+  }
+  row.caseRefs=result.case_sources || [];
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
+  if (result.case_changes?.length) {
+    const notice=document.createElement('p'); notice.className='case-update-note';
+    const revised=result.case_changes.filter(item=>item.action!=='add');
+    notice.textContent=revised.length ? `已按本轮说明更新 ${revised.map(item=>item.name).join('、')}，后续使用最新记录。` : `已在本机记录 ${result.case_changes.length} 条本次病例信息。`;
+    main.append(notice);
+  }
+  if (result.case_switched) {const notice=document.createElement('p');notice.className='case-update-note';notice.textContent='已按你的说明开始新的病例，本次不引用上一位的记录。';main.append(notice);}
+  (result.data_warnings || []).forEach(message => {
+    const notice=document.createElement('p'); notice.className='case-update-note';
+    notice.setAttribute('role', 'status'); notice.textContent=message; main.append(notice);
+  });
+  if (result.case_sources?.length) {
+    const block=document.createElement('details');block.className='observations case-evidence';
+    const summary=document.createElement('summary');summary.textContent=`本次结合的病例资料 · ${result.case_sources.length} 条`;
+    block.append(summary);
+    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}，v${source.revision}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
+    main.append(block);
+  }
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
   const meta = document.createElement('div'); meta.className = 'message-meta';
-  const tags = [result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  const tags = [result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.case_sources?.length ? ['结合病例资料'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
   const elapsed = document.createElement('span'); elapsed.textContent = `${result.elapsed} 秒`; meta.append(elapsed); main.append(meta);
   if (result.image_observations) {
@@ -124,7 +164,7 @@ function resultMessage(row, result) {
   }
   scrollDown();
 }
-async function submit(message, images, retryRow) {
+async function submit(message, images, retryRow, requestId = crypto.randomUUID()) {
   if (state.busy) return;
   state.busy = true; updateComposer();
   closeSidebar();
@@ -133,7 +173,7 @@ async function submit(message, images, retryRow) {
   if (!retryRow) { userMessage(message, images); if (!state.count++) $('chatTitle').textContent = (message || '图片解读').slice(0, 18); }
   const row = retryRow || pendingMessage();
   try {
-    const response = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked})});
+    const response = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({chat_id:state.chatId, message, images, remember:$('remember').checked,case_id:state.caseId,request_id:requestId})});
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
     $('message').value = ''; state.images = []; renderAttachments();
@@ -156,12 +196,16 @@ async function submit(message, images, retryRow) {
   } catch (error) {
     const main = row.querySelector('.message-main'); main.replaceChildren();
     const text = document.createElement('div'); text.className = 'error-text'; text.textContent = error.message;
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage()); };
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage(), requestId); };
     main.append(text, button); scrollDown();
   } finally { state.busy = false; updateComposer(); $('message').focus(); }
 }
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
 $('newChat').onclick = () => { if (state.busy) return; state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
+const resetChat = $('newChat').onclick;
+$('newChat').onclick = () => {if(state.busy)return; resetChat();state.caseId='';$('caseContext').value='';};
+$('caseContext').onchange = () => {const selected=$('caseContext').value;resetChat();state.caseId=selected;$('caseContext').value=selected;};
+refreshCases().catch(()=>{});
 document.querySelectorAll('[data-example]').forEach(button => button.onclick = async () => {
   if (state.busy) return;
   const example = button.dataset.example;
@@ -232,7 +276,7 @@ document.querySelectorAll('[data-action]').forEach(button => button.onclick = ()
     $('dialogContent').innerHTML = `<p>提问时，MediX 会检索项目自带的本地医学知识库，帮助你理解相关信息。</p><div class="dialog-stat"><b>${count}</b> 个已加载资料片段</div><p><strong>涵盖方向</strong><br>常见健康问题、生活方式、疾病编码与临床指南类资料。</p><p><strong>怎样查看来源？</strong><br>回答下方的「本地检索参考」会展示实际检索到的文件名及原文片段。</p><p>本地内容尚未完成权威性与时效性审核，请结合医生意见核实。</p>`;
   } else {
     $('dialogTitle').textContent = '把健康问题，说给我听';
-    $('dialogContent').innerHTML = '<p><strong>01 · 描述你的问题</strong><br>可以说说具体症状、持续时间和已经了解的情况。不确定怎么描述，也可以直接问。</p><p><strong>02 · 图片也能一起问</strong><br>上传清晰的报告、药盒或记录；支持粘贴和拖入图片。最多 3 张，每张不超过 8 MB，支持 JPG、PNG、WebP。</p><p><strong>03 · 接着聊，不必重复</strong><br>可根据本轮图片继续追问。开启新对话会重置本轮上下文；刷新页面不会保留聊天记录。</p><p>默认关闭长期记忆。开启后，对话和图片解读摘要会发送至 Mem0，供后续会话检索。</p>';
+    $('dialogContent').innerHTML = '<p><strong>01 · 直接说问题，图片也能一起问</strong><br>上传清晰的报告、药盒或记录，最多3张，每张8MB，支持JPG、PNG、WebP。后台整理病例字段，不需要填写表格或逐项确认。</p><p><strong>02 · 随时补充和纠正</strong><br>例如“上次读错了，正确值是6.9”“那次是餐后测的”“今天又测了一次”。系统区分更正、补充和新增；不清楚修改哪条时会追问。</p><p><strong>03 · 继续已有病例</strong><br>侧栏可选择“接着哪个病例聊”。回答中的“本次结合的病例资料”可以展开查看引用。不同患者请开启新对话或明确说明换人。</p><p>病例字段、来源片段、修订版本和分析保存在本机明文SQLite，原图与完整聊天不保存。没有账户或跨设备同步，清除Cookie后无法直接恢复访问。病例分析不使用Mem0摘要；普通文字咨询仍可手动开启Mem0。</p>';
   }
   $('infoDialog').showModal();
 });

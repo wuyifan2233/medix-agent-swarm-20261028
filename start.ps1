@@ -1,11 +1,20 @@
-param([switch]$EnableMem0, [switch]$Web)
+param([switch]$EnableMem0, [switch]$Web,
+      [ValidateSet('DeepSeek', 'Existing')][string]$Provider = 'DeepSeek')
 $ErrorActionPreference = 'Stop'
 $python = Join-Path (Split-Path $PSScriptRoot -Parent) '.medix-venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $python)) { throw 'Missing isolated Python environment.' }
 $previousKey = $env:OPENAI_API_KEY
+$previousDeepSeekKey = $env:DEEPSEEK_API_KEY
 $previousMem0Key = $env:MEM0_API_KEY
 $hasConfigKey = & $python -c "import sys; sys.path.insert(0,sys.argv[1]); from config import LLM_CONFIG; print(LLM_CONFIG.get('api_key') not in ('',None,'not-configured'))" $PSScriptRoot
-if (-not $env:OPENAI_API_KEY -and $hasConfigKey -ne 'True') {
+if ($Provider -eq 'DeepSeek' -and -not $env:DEEPSEEK_API_KEY) {
+    $secret = Read-Host 'DeepSeek API Key (not saved)' -AsSecureString
+    $credential = [System.Net.NetworkCredential]::new('', $secret)
+    $env:DEEPSEEK_API_KEY = $credential.Password
+    $credential = $null
+    $secret = $null
+}
+if ($Provider -eq 'Existing' -and -not $env:DEEPSEEK_API_KEY -and -not $env:OPENAI_API_KEY -and $hasConfigKey -ne 'True') {
     $secret = Read-Host 'OpenAI API Key (not saved)' -AsSecureString
     $credential = [System.Net.NetworkCredential]::new('', $secret)
     $env:OPENAI_API_KEY = $credential.Password
@@ -29,5 +38,6 @@ try {
 } finally {
     Pop-Location
     $env:OPENAI_API_KEY = $previousKey
+    $env:DEEPSEEK_API_KEY = $previousDeepSeekKey
     $env:MEM0_API_KEY = $previousMem0Key
 }

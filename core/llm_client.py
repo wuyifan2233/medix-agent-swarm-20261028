@@ -80,6 +80,7 @@ class LLMClient:
             模型返回的文本
         """
         try:
+            return_metadata = kwargs.pop("_return_metadata", False)
             temperature = temperature or self.temperature
             max_tokens = max_tokens or self.max_tokens
 
@@ -90,10 +91,13 @@ class LLMClient:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                **({"extra_body": self.config["extra_body"]} if self.config.get("extra_body") and "extra_body" not in kwargs else {}),
                 **kwargs
             )
 
             content = response.choices[0].message.content
+            if return_metadata:
+                return {"content": content, "finish_reason": response.choices[0].finish_reason}
             logger.debug(f"LLM response length: {len(content)} chars")
             return content
 
@@ -173,6 +177,7 @@ class LLMClient:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                **({"extra_body": self.config["extra_body"]} if self.config.get("extra_body") else {}),
                 **kwargs
             }
 

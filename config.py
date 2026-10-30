@@ -13,7 +13,14 @@ if source.is_file():
                     settings[target.id] = ast.literal_eval(node.value)
 
 LLM_CONFIG = dict(settings.get("LLM_CONFIG", {}))
-if os.environ.get("OPENAI_API_KEY"):
+if os.environ.get("DEEPSEEK_API_KEY"):
+    LLM_CONFIG.update(api_key=os.environ["DEEPSEEK_API_KEY"],
+                      model_name=os.environ.get("DEEPSEEK_MODEL", "deepseek-flash"),
+                      base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                      # Existing agent history stores tool calls without reasoning_content.
+                      # Disable thinking explicitly so multi-turn tool calls remain valid.
+                      extra_body={"thinking": {"type": "disabled"}})
+elif os.environ.get("OPENAI_API_KEY"):
     LLM_CONFIG.update(api_key=os.environ["OPENAI_API_KEY"],
                       model_name=os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"),
                       base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"))

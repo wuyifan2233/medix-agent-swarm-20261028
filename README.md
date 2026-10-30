@@ -210,3 +210,23 @@ $env:MEDIX_DB_PATH = 'D:\medix-data\milvus_v3.db'
 - 运行时约束及输出修复：[`constraints/`](constraints/)、[`validation/`](validation/)
 
 原项目 README 声明使用 MIT License；本次整理未修改授权声明。
+
+
+## 多模态报告分析分支
+
+`feature/mllm-report-analysis` 基于 `feature/rag`，包含知识库自动初始化及本地病例功能：
+
+- 上传图片与文字 → 逐图转录、结果列校验与必要的分区补读 → 后台分批提取 → SQLite 保存事实与修订历史 → 私有病例向量检索 → Agent 回答。
+- 更正旧值会保留修订记录；新日期检查作为新记录保存。病例名称按已记录的明确诊断或检验主题显示，不根据异常指标自动命名疾病。
+- 历史事实分页读取，按项目、日期和语义相关性选择上下文；索引失败时回退并显示提示。病例与通用医学知识使用独立集合。
+- 完整聊天历史、登录、跨设备同步和加密尚未提供。浏览器 Cookie 仅适合本机演示隔离。原图不保存；问题、图片及相关事实会发送到所配置的模型服务。
+
+配置 `DEEPSEEK_API_KEY` 后支持 DeepSeek；也可使用已有 OpenAI 兼容配置。图像及 JSON 能力须由实际接口提供，不保证所有同名模型均兼容。`MEDIX_CASE_DB_PATH` 指定 SQLite 文件，`MEDIX_DB_PATH` 指定 Milvus V3 目录（建议 ASCII 路径，以 `.db` 结尾；不是旧 SQLite 文件）。同一 Milvus Lite 目录不能同时由两个进程打开。
+
+启动：安装 `requirements.web.txt`，配置模型接口，再运行 `python run_web.py`。现有 Windows 脚本使用项目上一级 `.medix-venv`；手工虚拟环境请直接调用该环境的 Python。页面地址为 `http://127.0.0.1:8765/`。
+
+测试：`python -m unittest web.test_case_pipeline web.test_case_memory web.test_web tests.test_deepseek_config`。
+
+已用 DeepSeek 验证两份报告读取、入库与历史对比。仍存在报告元信息偶发漏提取、性别年龄/医院信息未完整进入分析上下文、回答冗余推测及完整性提示偏保守的问题；不能据此宣称医学诊断可靠。该两轮演示由问诊 Agent 完成，不是多 Agent 协作验证。测试使用的病例图片、输出和数据库不随代码发布。
+
+详细设计及边界见 [病例功能说明](docs/CASE_CHAT.md)。

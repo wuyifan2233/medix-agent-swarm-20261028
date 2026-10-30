@@ -59,3 +59,9 @@ memory/agents/
 .medix-model-cache/
 .env.*
 !.env.example
+
+# Private case archives and runtime indexes
+/data/
+*.sqlite3
+*.sqlite3-*
+*.db/
