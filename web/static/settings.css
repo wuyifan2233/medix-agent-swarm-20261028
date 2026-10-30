@@ -141,3 +141,7 @@ input[aria-invalid="true"]{border-color:#c88992}
 .avatar-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .avatar-picker-footer button{margin:0}
 @media(max-width:380px){.avatar-preset-grid{gap:8px}.avatar-preset{padding:4px}.avatar-picker{padding:20px}}
+
+label[for="settings-oldPassword"]{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.forgot-current-password{border:0;background:transparent;padding:0;color:#8993a7;font:inherit;font-size:11px}
+.forgot-current-password:hover{color:#6375e9}

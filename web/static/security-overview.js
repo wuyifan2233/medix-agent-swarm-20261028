@@ -7,7 +7,7 @@ const entry=section.querySelector('.account-delete-link');
 if(entry){entry.className='security-list-row security-delete-row';entry.innerHTML='<span class="security-row-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></span><span>注销账号</span><span class="security-row-value"></span><span class="security-row-chevron"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>';overview.querySelector('#securityDeleteGroup').append(entry);}
 const back=document.createElement('button');back.type='button';back.className='security-back';back.textContent='‹ 返回账号管理';section.insertBefore(back,overview.nextSibling);
 function home(){section.dataset.view='overview';}
-back.onclick=home;overview.querySelector('#securityPasswordRow').onclick=()=>{section.dataset.view='password';};
+back.onclick=home;overview.querySelector('#securityPasswordRow').onclick=()=>{document.getElementById('settings-oldPassword').value='';section.dataset.view='password';};
 document.getElementById('settingsSecurityTab').addEventListener('click',home);
 document.getElementById('settingsDialog').addEventListener('close',home);
 function render(user){document.getElementById('securityPhoneState').textContent=user?.phone_masked||'未绑定';document.getElementById('securityPasswordState').textContent=user?.has_password===false?'未设置':'已设置';}

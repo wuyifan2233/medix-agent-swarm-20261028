@@ -136,6 +136,7 @@ avatarFile.onchange = () => {
 let pending = false;
 const tabs = [...dialog.querySelectorAll('[data-settings-tab]')];
 function select(id) {
+  byId('oldPassword').value = '';
   tabs.forEach(tab => { const selected = tab.dataset.settingsTab === id; tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1; document.getElementById(tab.dataset.settingsTab).hidden = !selected; });
   byId('feedback').textContent = '';
 }

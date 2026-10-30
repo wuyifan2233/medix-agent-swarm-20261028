@@ -6,7 +6,11 @@ dialog.innerHTML='<div class="phone-dialog-heading"><h2>找回密码</h2><button
 document.body.append(dialog);
 const form=dialog.querySelector('form'), fields=form.querySelectorAll('input'), buttons=form.querySelectorAll('button'), feedback=form.querySelector('[role=status]');
 let challenge='',until=0,sending=false,busy=false,version=0;
-link.onclick=()=>{document.getElementById('authDialog').close();dialog.showModal();};dialog.querySelector('button').onclick=()=>dialog.close();buttons[2].textContent='返回登录';buttons[2].onclick=()=>{dialog.close();if(!MedixAuth.user)MedixAuth.open();};
+let fromSettings=false;
+link.onclick=()=>{fromSettings=false;buttons[2].textContent='返回登录';document.getElementById('authDialog').close();dialog.showModal();};dialog.querySelector('button').onclick=()=>dialog.close();buttons[2].textContent='返回登录';buttons[2].onclick=()=>{dialog.close();if(!MedixAuth.user)MedixAuth.open();};
+const settingsLink=document.createElement('button');settingsLink.type='button';settingsLink.className='forgot-current-password';settingsLink.textContent='忘记当前密码？';
+document.querySelector('label[for="settings-oldPassword"]').append(settingsLink);
+settingsLink.onclick=event=>{event.preventDefault();fromSettings=true;buttons[2].textContent='返回账号安全';dialog.showModal();};
 dialog.addEventListener('close',()=>{version++;challenge='';form.reset();feedback.textContent='';});
 fields[0].oninput=()=>{version++;challenge='';};
 const tick=()=>{const n=Math.max(0,Math.ceil((until-Date.now())/1000));buttons[0].disabled=sending||n>0;buttons[0].textContent=sending?'发送中…':n?`${n} 秒后重发`:'获取验证码';};
@@ -18,7 +22,7 @@ buttons[0].onclick=async()=>{
  catch(e){if(mine===version)feedback.textContent=e.message;}finally{sending=false;tick();}
 };
 form.onsubmit=async e=>{e.preventDefault();if(busy)return;if(!challenge){feedback.textContent='请先获取验证码。';return;}const error=MedixPasswordPolicy.error(fields[2].value);if(error){feedback.textContent=error;return;}if(fields[2].value!==fields[3].value){feedback.textContent='两次密码不一致。';return;}const mine=version;busy=true;buttons[1].disabled=true;
- try{const r=await MedixAuth.raw('/api/auth/password/reset',{method:'POST',body:JSON.stringify({challenge_id:challenge,code:fields[1].value,new_password:fields[2].value})});if(!r.ok)throw new Error(await MedixAuth.detail(r));if(mine===version){challenge='';form.reset();feedback.textContent='密码已重设，请关闭此窗口后重新登录。';}}
+ try{const r=await MedixAuth.raw('/api/auth/password/reset',{method:'POST',body:JSON.stringify({challenge_id:challenge,code:fields[1].value,new_password:fields[2].value})});if(!r.ok)throw new Error(await MedixAuth.detail(r));if(mine===version){challenge='';form.reset();if(fromSettings){MedixAuth.leave(true);document.getElementById('settingsDialog').close();buttons[2].textContent='返回登录';}feedback.textContent='密码已重设，请关闭此窗口后重新登录。';}}
  catch(e){if(mine===version)feedback.textContent=e.message;}finally{busy=false;buttons[1].disabled=false;}
 };
 fields.forEach(input=>{
