@@ -8,12 +8,7 @@ QWEN_MODEL = 'Qwen3-Embedding-8B'
 QUERY_INSTRUCTION = 'Given a medical question, retrieve relevant passages that answer the question'
 
 
-def load_setting(name,default=''):
-    if os.environ.get(name,'').strip():
-        return os.environ[name].strip()
-    from dotenv import dotenv_values
-    path=Path(__file__).resolve().parents[1]/'.env.local'
-    return (dotenv_values(path,encoding='utf-8-sig').get(name) or default).strip()
+from runtime_settings import load_setting
 
 
 def load_api_key(name):

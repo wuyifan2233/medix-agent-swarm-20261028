@@ -34,6 +34,7 @@
 - `HF_HOME` 可指定模型缓存；默认项目上一级 `.medix-model-cache`。首次启动需要下载 `BAAI/bge-small-zh-v1.5` 或存在可读缓存。
 
 ## 配置与数据边界
+- DeepSeek 通过 `.env.local` 的 `MEDIX_LLM_PROVIDER=deepseek`、`DEEPSEEK_API_KEY` 配置，默认 `deepseek-flash`、thinking enabled、reasoning_effort high；占位 `xxx` 不算已配置。同名进程环境变量优先；`auto` 保留旧模型配置优先级。共享读取位于 `runtime_settings.py`。工具调用的 `reasoning_content` 仅在内存中传回 API，不写入会话摘要或显示为回答。离线契约：`python -m unittest core.test_deepseek -v`。
 - 通过进程环境提供 `OPENAI_API_KEY`、可选 `OPENAI_BASE_URL` 和 `OPENAI_MODEL`；也支持 `ARK_API_KEY` 或 `MEDIX_CONFIG_PATH` 指向的外部配置。不要输出、提交或在文档里记录真实密钥。
 - Mem0 默认可选，使用独立 `MEM0_API_KEY`；不要为启动网页额外部署 Redis/Qdrant。
 - 保留 `knowledge/data/documents/` 与旧库 `knowledge/data/milvus_lite.db`。迁移脚本只读旧库，不要反复运行原始导入脚本或删除数据库来解决锁冲突。

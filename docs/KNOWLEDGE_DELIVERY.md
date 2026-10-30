@@ -56,6 +56,27 @@ python run_kb_demo.py --port 8766
 
 ## 2026-10-30 优化交付
 
+### DeepSeek 聊天生成配置
+
+根目录 `.env.local` 可保存本机聊天模型配置，文件已忽略提交。填入 `DEEPSEEK_API_KEY` 后重启服务：
+
+```dotenv
+MEDIX_LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=xxx
+DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_THINKING=enabled
+DEEPSEEK_REASONING_EFFORT=high
+DEEPSEEK_MAX_TOKENS=8192
+```
+
+使用 `https://api.deepseek.com` 的 OpenAI 兼容接口，非流式调用；普通聊天和工具调用都带 `reasoning_effort` 与 `extra_body.thinking`。工具循环在内存中保留并传回 `reasoning_content`，不将其作为回答展示或写入会话摘要。参考 [DeepSeek 思考模式及工具调用要求](https://api-docs.deepseek.com/guides/thinking_mode/)。
+
+进程环境中的同名配置优先于本机文件。`MEDIX_LLM_PROVIDER=deepseek` 显式选择 DeepSeek；`auto` 恢复既有 OpenAI/ARK/外部配置优先的行为，只有无既有 Key 且 DeepSeek Key 有效时才自动选择 DeepSeek。`xxx` 和空值视为未配置，网页继续返回检索原文；健康接口的 configured 只检查配置存在，不验证鉴权。聊天与嵌入/重排的配置独立，Gitee 和硅基流动 Key 不受影响。
+
+新增离线验证：`python -m unittest core.test_deepseek -v`，覆盖本机 Key、环境覆盖、占位值、旧配置优先级和连续工具请求的 HTTP 契约。未填真实 Key，未验证真实 DeepSeek 生成和图像输入能力。
+
+### 检索优化
+
 - `MEDIX_EMBEDDING_PROVIDER=gitee|siliconflow|local` 可在 `.env.local` 中选择。硅基流动使用 `SILICONFLOW_API_KEY`、`https://api.siliconflow.cn/v1/embeddings` 和 `Qwen/Qwen3-Embedding-8B`，显式 4096 维；请求契约已用模拟 HTTP 验证，尚未真实调用。官方文档：[Embedding 接口](https://api-docs.siliconflow.cn/docs/api/embeddings-post)。更换后端必须先停止服务、构建并评测，后端/endpoint/model 都进入版本身份，即使同维度也不能混用向量。`MEDIX_RERANK_PROVIDER` 独立选择是否重排。
 - 食物问题不再仅因“能吃吗”进入用药信息不足分支；增加血压高/血糖高等检索别名。短追问从最近用户消息继承主题，明确的新主题不继承；这是有限规则，不是通用意图模型。
 - `knowledge/applicability.json` 标注当前 12 份资料的人群和科普属性。明确不匹配的人群被过滤，未明确人群的查询会展示需要核对范围；标签不是临床审核。
