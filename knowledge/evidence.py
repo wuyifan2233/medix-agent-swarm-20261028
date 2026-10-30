@@ -52,7 +52,8 @@ class EvidenceKnowledgeBase:
             # versioned root so migration cannot accidentally insert bundled samples.
             import tempfile
             default = Path(tempfile.gettempdir())/'medix-evidence'
-            self.db_path = validate_target(Path(os.environ.get('MEDIX_EVIDENCE_ROOT', str(default)))/self.version/'milvus.db')
+            from runtime_settings import load_setting
+            self.db_path = validate_target(Path(load_setting('MEDIX_EVIDENCE_ROOT', str(default)))/self.version/'milvus.db')
             self.collection_name = 'medical_evidence'
             self._lock = threading.RLock()
             self.milvus_client = MilvusClient(self.db_path)

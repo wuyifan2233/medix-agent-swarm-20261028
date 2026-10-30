@@ -60,3 +60,4 @@ memory/agents/
 .env.*
 !.env.example
 knowledge/.local/
+knowledge/data/evidence/

@@ -132,6 +132,10 @@ Milvus V3本地库默认在系统临时目录 `medix-evidence/<版本>/milvus.db
 
 ## 10. 数据库与持久化细节
 
+本机已将现有证据库迁入 `knowledge/data/evidence/91baa7e1f7938727/milvus.db/`，并在忽略提交的 `.env.local` 设置 `MEDIX_EVIDENCE_ROOT=E:/workspace/medix-agent-swarm-20261028/knowledge/data/evidence`。该配置支持本机文件读取，环境变量优先；其他机器应改成自己的绝对路径。整个evidence目录已忽略Git提交。迁移是停服后完整复制并核对文件哈希，旧临时目录保留。
+
+`knowledge/data/milvus_lite.db` 是旧版SQLite格式的资料迁移源，不是当前8766证据库；`milvus_v3.db/` 是旧库相关V3目录，也不是当前证据版使用的路径。旧版180条BGE样例与当前186块Qwen证据分开管理，不向旧文件写入Qwen向量。
+
 | 内容 | 保存位置 | 重启后的行为 |
 |---|---|---|
 | 正文与HTML | knowledge/.local/generations/<generation>/ | 从文件读取，核验哈希 |
