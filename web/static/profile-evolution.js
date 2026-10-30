@@ -15,7 +15,7 @@
   <section id="peReview" hidden><h3>逐项对比并采纳</h3><p>年龄为病历日期时的年龄。旧用药默认历史记录，不能推定仍在使用。替换会覆盖所选旧值；未选内容保持原样。</p><div id="peCandidates"></div><button type="button" id="peApply">将选中项保存为待确认草稿</button><button type="button" id="peDiscard">丢弃候选</button></section>
   <hr><h3>档案维护</h3><button type="button" id="peHistory">加载最近50个版本</button><button type="button" id="peExport">导出当前档案 JSON</button><div id="peVersions"></div><p id="peFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
-  const el=id=>document.getElementById(id), labels={age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况'};
+  const el=id=>document.getElementById(id), labels={age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'};
   let identity=null,epoch=0,busy=false,record=null,batch=null;
   function message(value){el('peFeedback').textContent=value;}
   function lock(value){busy=value;dialog.querySelectorAll('button,input,select,textarea').forEach(node=>{if(node.id!=='peClose')node.disabled=value;});}

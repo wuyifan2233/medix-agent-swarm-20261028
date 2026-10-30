@@ -109,14 +109,14 @@ function pendingMessage() {
   row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真听你说</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
   $('messages').append(row); scrollDown(); return row;
 }
-function resultMessage(row, result, userText) {
+function resultMessage(row, result, userText, jobId) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
   profileNote.textContent = result.profile_used
-    ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
+    ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状",followups:"建议与待核实事项"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
     : '本轮未使用健康档案。';
   main.append(profileNote);
-  const update=document.createElement('button'); update.type='button'; update.className='retry-button'; update.textContent='筛选本轮内容，选择加入健康档案'; update.onclick=()=>{ if(main.querySelector('.conversation-profile-picker'))return; window.MedixInlineProfilePicker?.(main,userText); }; main.append(update);
+  const update=document.createElement('button'); update.type='button'; update.className='retry-button'; update.textContent='筛选本轮内容，选择加入健康档案'; update.onclick=()=>{ if(main.querySelector('.conversation-profile-picker'))return; window.MedixInlineProfilePicker?.(main,userText,jobId); }; main.append(update);
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
   const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
   const meta = document.createElement('div'); meta.className = 'message-meta';
@@ -179,7 +179,7 @@ async function submit(message, images, retryRow) {
       row.querySelector('.phase-label').textContent = status.label;
       const chips = row.querySelector('.pending-steps'); chips.replaceChildren();
       status.steps.forEach((step, i) => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = `${i < status.steps.length - 1 ? '✓ ' : ''}${step.label.replace('正在', '')}`; chips.append(chip); });
-      if (status.status === 'completed') { resultMessage(row, status.result, message); break; }
+      if (status.status === 'completed') { resultMessage(row, status.result, message, data.job_id); break; }
       if (status.status === 'failed') throw new Error(status.error || '分析未能完成，请稍后重试。');
     }
   } catch (error) {

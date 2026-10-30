@@ -4,7 +4,7 @@
   tools.innerHTML = `<button type="button" id="hpOpen">我的健康档案</button><label><input type="checkbox" id="hpUse" disabled>本次为本人咨询，参考已确认档案</label><small id="hpStatus">登录后可编辑；默认不使用档案</small>`;
   document.querySelector('.composer-region').prepend(tools);
   const fieldChoices=document.createElement('details');fieldChoices.id='hpFieldChoices';fieldChoices.innerHTML='<summary>本轮允许参考的字段</summary>';
-  for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药',symptoms:'症状与近期身体状况'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
+  for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
   const dialog = document.createElement('dialog'); dialog.id = 'healthProfileDialog'; dialog.className = 'health-profile-dialog'; dialog.setAttribute('aria-labelledby','hpTitle');
   dialog.innerHTML = `<div class="hp-heading"><h2 id="hpTitle">我的健康档案</h2><button type="button" id="hpClose">关闭</button></div>
   <nav class="hp-steps" aria-label="档案使用步骤"><span><b>01</b>填写健康信息</span><span><b>02</b>核对并确认</span><span><b>03</b>对话中按需使用</span></nav>
@@ -15,7 +15,7 @@
   <div class="hp-confirm"><label><input type="checkbox" id="hpAck">我已核对已保存的各项内容，理解它们是自述历史记录，不能代表当前情况。</label><button type="button" id="hpConfirm" disabled>确认已保存的档案</button></div>
   <details><summary>清空档案</summary><p>清空本账号的结构化档案并作废确认。不会删除其他模块的聊天或云端记忆。</p><button type="button" id="hpDelete">清空我的档案</button></details><p id="hpFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
-  const el = id => document.getElementById(id), names = {conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况'};
+  const el = id => document.getElementById(id), names = {conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况',followups:'建议与待核实事项（非病情事实）'};
   let record = null, identity = null, epoch = 0, dirty = false, working = false, chatBusy = false;
   const date = value => value ? new Date(value*1000).toLocaleString() : '未确认';
   const feedback = text => { el('hpFeedback').textContent = text; };
@@ -38,7 +38,7 @@
     const list = el(`hp-${field}-items`); if (list.children.length >= 20) { feedback('每类最多20条记录。'); return; }
     const row = document.createElement('div'); row.className = 'hp-item'; input(row,'name',field === 'medications' ? '药品名称' : '名称',item.name,80);
     const wrap = document.createElement('label'); wrap.textContent = '记录性质'; const select = document.createElement('select'); select.dataset.field = 'status';
-    for (const [value,text] of [['reported','曾报告 / 待核对现状'],['historical','明确为历史记录'],['current','本人确认当前使用 / 存在'],['stopped','本人确认已停用'],['unknown','不确定']]) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
+    for (const [value,text] of (field==='followups' ? [['reported','待核实 / 待跟进'],['historical','历史建议 / 已归档'],['current','本人选择跟进中（非已执行）'],['stopped','不再跟进'],['unknown','待核实（非病情事实）']] : [['reported','曾报告 / 待核对现状'],['historical','明确为历史记录'],['current','本人确认当前使用 / 存在'],['stopped','本人确认已停用'],['unknown','不确定']])) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
     select.value = item.status || 'reported'; wrap.append(select); row.append(wrap);
     if (field === 'medications') { input(row,'dose','记录剂量（可空）',item.dose,60); input(row,'frequency','记录频次（可空）',item.frequency,60); }
     input(row,'note','补充说明 / 病历日期（可空）',item.note);

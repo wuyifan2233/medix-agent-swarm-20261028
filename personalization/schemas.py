@@ -8,7 +8,7 @@ class StrictModel(BaseModel):
 
 
 class Source(StrictModel):
-    kind: Literal['manual', 'report', 'conversation'] = 'manual'
+    kind: Literal['manual', 'report', 'conversation', 'assistant'] = 'manual'
     label: str = Field(default='本人填写', max_length=100)
     report_date: date | None = None
     excerpt: str = Field(default='', max_length=240)
@@ -48,6 +48,7 @@ class ProfileData(StrictModel):
     allergies: History = Field(default_factory=History)
     medications: MedicationHistory = Field(default_factory=MedicationHistory)
     symptoms: History = Field(default_factory=History)
+    followups: History = Field(default_factory=History)
     field_sources: dict[Literal['age','sex'], Source] = Field(default_factory=dict)
 
 

@@ -367,7 +367,7 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     if sum(job["status"] in {"running", "queued"} for job in jobs.values()) >= 6:
         raise HTTPException(429, "正在处理的请求较多，请稍后重试。")
     job_id = uuid.uuid4().hex
-    job = {"id": job_id, "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
+    job = {"id": job_id, "request_text": message.strip(), "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
     jobs[job_id] = job
     executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember,
@@ -381,7 +381,7 @@ def job_status(job_id: str, user: CurrentUser = Depends(require_user)):
     job = jobs.get(job_id)
     if not job or job["owner_user_id"] != user.id:
         raise HTTPException(404, "未找到这次分析，请重新提问。")
-    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started"}}
+    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started", "request_text"}}
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")

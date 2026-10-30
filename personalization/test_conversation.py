@@ -66,3 +66,47 @@ class ConversationAPI(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class AssistantNoteGuards(unittest.TestCase):
+    def test_answer_can_only_be_saved_as_separate_uncertain_note(self):
+        answer='建议记录头痛持续时间，并在持续不适时就医。'
+        item=fact(answer);item.field='followups'
+        candidates,_=review_facts('我头痛',[item],answer)
+        note=candidates[0]
+        self.assertEqual(note['field'],'followups')
+        self.assertEqual(note['source']['kind'],'assistant')
+        self.assertEqual(note['value']['status'],'unknown')
+        self.assertTrue(note['uncertain'])
+        item.field='conditions'
+        with self.assertRaises(HTTPException):review_facts('我头痛',[item],answer)
+        item.field='followups'
+        with self.assertRaises(HTTPException):review_facts('我头痛',[item],'另一条回答')
+
+
+class AssistantNoteAPI(ConversationAPI):
+    def test_answer_ownership_selection_and_draft(self):
+        from web.app import jobs
+        text='我这两天头痛';answer='建议记录头痛持续时间。';item=fact(answer);item.field='followups'
+        jobs['note-test']={'owner_user_id':self.a.id,'request_text':text,'status':'completed','result':{'answer':answer}}
+        payload={'text':text,'job_id':'note-test','subject':'self','consent_to_model':True,'expected_revision':0}
+        try:
+            self.assertEqual(self.other.post('/api/profile/conversation-candidates',json=payload).status_code,404)
+            with patch('personalization.conversation_updates.assess',AsyncMock(return_value=[item])) as model:
+                result=self.client.post('/api/profile/conversation-candidates',json=payload)
+                model.assert_awaited_once_with(text,answer)
+            self.assertEqual(result.status_code,201,result.text)
+            self.assertEqual(self.client.get('/api/profile').json()['revision'],0)
+            batch=result.json();selection={'candidate_id':batch['candidates'][0]['id'],'action':'append'}
+            path='/api/profile/imports/'+batch['id']+'/apply'
+            self.assertEqual(self.client.post(path,json={'expected_revision':0,'selections':[selection]}).status_code,422)
+            selection['acknowledge_uncertainty']=True
+            saved=self.client.post(path,json={'expected_revision':0,'selections':[selection]})
+            self.assertEqual(saved.status_code,200,saved.text)
+            data=saved.json();self.assertFalse(data['usable'])
+            self.assertEqual(data['data']['conditions']['items'],[])
+            self.assertEqual(data['data']['medications']['items'],[])
+            self.assertEqual(data['data']['followups']['items'][0]['source']['kind'],'assistant')
+            payload['text']='不匹配'
+            self.assertEqual(self.client.post('/api/profile/conversation-candidates',json=payload).status_code,409)
+        finally:jobs.pop('note-test',None)
