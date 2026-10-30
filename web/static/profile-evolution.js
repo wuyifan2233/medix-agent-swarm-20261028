@@ -53,6 +53,12 @@
       if(['age','sex'].includes(candidate.field))add('replace','明确替换基础字段');
       else {add('append',candidate.existing?.status==='none_reported'?'追加（将自述无记录改为有记录）':'追加并保留旧条目');(candidate.existing?.items||[]).forEach((item,index)=>{if(sameRecord(item.name,candidate.value.name))add('replace:'+index,`更新同名记录：${item.name}`);});}
       card.append(select);
+      if(select.children.length===1){
+        select.hidden=true;
+        const explanation=document.createElement('p');explanation.className='profile-apply-note';
+        explanation.textContent=['age','sex'].includes(candidate.field)?'采纳后将更新'+labels[candidate.field]+'，原值可在历史版本中查看。':(candidate.existing?.status==='none_reported'?'采纳后追加保存，并将“自述无记录”改为“有记录”。':'采纳后追加保存，保留已有记录。');
+        card.append(explanation);
+      }
       if(candidate.uncertain){const label=document.createElement('label');label.className='pe-check';const ack=document.createElement('input');ack.type='checkbox';ack.dataset.role='uncertainty';label.append(ack,document.createTextNode('我已核对这条不确定内容；它仍作为待核对记录保存'));card.append(label);}
       el('peCandidates').append(card);
     }

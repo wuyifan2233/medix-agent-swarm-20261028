@@ -134,3 +134,5 @@
 .answer-profile-reference summary{cursor:pointer;line-height:1.7}
 .answer-profile-reference .profile-reference{border:0;background:transparent;padding:5px 0 0;margin:6px 0 0;font-size:11px;line-height:1.8;color:#718580}
 @media(max-width:600px){.answer-profile-actions{padding:14px;margin-top:16px}.answer-profile-action-row{align-items:stretch;flex-direction:column;gap:12px}.answer-profile-save{width:100%;padding:11px}.answer-profile-action-row strong{font-size:13px}}
+
+.profile-apply-note{font-size:12px;line-height:1.7;color:#5d7b73;margin:10px 0 4px}

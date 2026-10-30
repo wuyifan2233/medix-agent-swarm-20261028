@@ -46,6 +46,12 @@
           if(['age','sex'].includes(candidate.field))option('replace','明确替换此字段');
           else{option('append','追加并保留现有条目');(candidate.existing?.items || []).forEach((item,index)=>{if(sameRecord(item.name,candidate.value.name))option('replace:'+index,'更新同名记录：'+item.name);});}
           modeLabel.append(mode);card.append(legend,choice,evidence,previous,modeLabel);
+          if(mode.children.length===1){
+            modeLabel.hidden=true;
+            const explanation=document.createElement('p');explanation.className='profile-apply-note';
+            explanation.textContent=['age','sex'].includes(candidate.field)?'采纳后将更新'+labels[candidate.field]+'，原值可在历史版本中查看。':(candidate.existing?.status==='none_reported'?'采纳后追加保存，并将“自述无记录”改为“有记录”。':'采纳后追加保存，保留已有记录。');
+            card.append(explanation);
+          }
           if(candidate.uncertain){const warning=document.createElement('label'),ack=document.createElement('input');ack.type='checkbox';ack.dataset.role='uncertain';warning.append(ack,document.createTextNode('我已核对；助手建议仅作待核实事项保存，不代表诊断、已执行或正在用药'));card.append(warning);}
           el('items').append(card);
         }
