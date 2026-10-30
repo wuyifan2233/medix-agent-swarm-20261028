@@ -217,7 +217,11 @@ async def analyze(job, payload, session_id, memory_user_id):
 
     stage(job, "knowledge", "正在检索本地医学资料")
     kb = MedicalKnowledgeBase()
+    direct = kb.search(retrieval_query(question, observed, None), top_k=10) if snapshot else []
     candidates = kb.search(retrieval_query(question, observed, snapshot), top_k=10)
+    if snapshot:
+        # Keep evidence about the actual question even if profile terms dominate embeddings.
+        candidates = [hit for pair in zip(candidates, direct) for hit in pair] + candidates[len(direct):] + direct[len(candidates):]
     hits, seen = [], set()
     for hit in candidates:
         fingerprint = hit["content"].strip()

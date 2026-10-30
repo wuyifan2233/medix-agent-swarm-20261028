@@ -153,7 +153,8 @@ class ProfileTests(unittest.TestCase):
     def capture_analysis(self,user_id,snapshot,session='shared',remember=False,images=None,tool_requests=None):
         captured={}
         class KB:
-            def search(self,query,top_k): captured['query']=query; return []
+            def search(self,query,top_k):
+                captured['query']=query; captured.setdefault('queries',[]).append(query); return []
         class Client:
             async def close(self): pass
         class VisionClient:
@@ -188,6 +189,9 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('不是当前诊断',result_a['prompt'])
         self.assertIn('不擅自合并或覆盖',result_a['prompt'])
         self.assertTrue(result_a['result']['profile_used'])
+        self.assertEqual(len(result_a['queries']),2)
+        self.assertNotIn('A私有标签',result_a['queries'][0])
+        self.assertIn('A私有标签',result_a['queries'][1])
 
     def test_opt_out_drops_prior_profile_history_and_does_not_write_profile(self):
         snapshot=self.saved(); before=copy.deepcopy(snapshot)

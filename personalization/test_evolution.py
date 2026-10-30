@@ -165,3 +165,20 @@ class EvolutionTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class PersonalizedContextTests(unittest.TestCase):
+    def test_status_aware_retrieval_and_actionable_answer_contract(self):
+        from personalization.test_profile import sample
+        snapshot={'revision':1,'confirmed_at':time.time(),'data':sample('测试病史')}
+        snapshot['data']['medications']={'status':'reported','items':[{'name':'测试药','status':'stopped','note':''}]}
+        query=retrieval_query('本次问题','',snapshot)
+        self.assertIn('本次问题',query)
+        self.assertIn('用药:测试药（已停用）',query)
+        prompt=profile_context(snapshot)
+        for expected in ['结合你的档案','具体建议一一对应','不强行制造差异','不能把旧症状当作现在仍存在','不能据性别推断妊娠']:
+            self.assertIn(expected,prompt)
+        scoped=select_fields(snapshot,['allergies'])
+        self.assertNotIn('测试病史',profile_context(scoped)+retrieval_query('问题','',scoped))
+        self.assertNotIn('测试药',profile_context(scoped)+retrieval_query('问题','',scoped))
+        self.assertEqual(profile_context(None),'')
