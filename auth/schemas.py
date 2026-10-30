@@ -65,3 +65,17 @@ def public_user(user):
 class PhoneCredentials(StrictModel):
     phone_number: str = Field(pattern=r"^1[3-9][0-9]{9}$")
     password: str = Field(min_length=1, max_length=128)
+
+
+class NicknameChange(StrictModel):
+    nickname: str = Field(min_length=1, max_length=20)
+
+    @field_validator("nickname", mode="before")
+    @classmethod
+    def clean_nickname(cls, value):
+        if not isinstance(value, str):
+            raise ValueError("请输入昵称")
+        value = value.strip()
+        if not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError("昵称不能为空，且不能包含换行或控制字符")
+        return value

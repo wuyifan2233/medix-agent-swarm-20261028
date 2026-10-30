@@ -20,7 +20,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image, ImageOps, UnidentifiedImageError
 from loguru import logger
 from urllib.parse import urlsplit
-from auth.dependencies import require_user, WRITE_METHODS
+from auth.dependencies import require_user, require_admin, WRITE_METHODS
 from auth.router import router as auth_router
 from auth.sms_router import router as sms_router
 from auth.schemas import CurrentUser
@@ -145,6 +145,11 @@ def index():
 @app.get("/login")
 def login_page():
     return RedirectResponse("/?login=1", status_code=303)
+
+
+@app.get("/admin")
+def admin_page(user=Depends(require_admin)):
+    return FileResponse(STATIC / "admin.html")
 
 
 @app.get("/account")

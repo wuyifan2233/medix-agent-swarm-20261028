@@ -11,6 +11,10 @@ class AvatarUpload(StrictModel):
     data: str = Field(max_length=2_800_000)
 
 
+class AvatarPreset(StrictModel):
+    preset: int = Field(ge=1, le=8, strict=True)
+
+
 def normalize_avatar(data):
     try:
         prefix, encoded = data.split(",", 1)

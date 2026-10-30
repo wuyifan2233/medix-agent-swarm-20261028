@@ -1,6 +1,8 @@
 import time
 import math
 import uuid
+import secrets
+import string
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
 from sqlalchemy import delete, func, select, update
@@ -268,7 +270,11 @@ def register_phone(data: PhoneUnbind, request: Request, response: Response):
         name = "用户" + phone[-4:]
         if db.scalar(select(User.id).where(User.username == name)):
             name += "_" + uuid.uuid4().hex[:8]
-        row = User(id=str(uuid.uuid4()), username=name, display_name="MediX " + name,
+        nickname = "用户_" + "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
+        while db.scalar(select(User.id).where(User.display_name == nickname)):
+            nickname = "用户_" + "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
+        row = User(id=str(uuid.uuid4()), username=name, display_name=nickname,
+            avatar_data=f"/assets/avatars/robot-{secrets.randbelow(8)+1}.svg",
             phone_number=phone, password_hash=hashed, has_password=True, role="user")
         db.add(row)
         try:

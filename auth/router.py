@@ -4,8 +4,9 @@ from sqlalchemy import func, select, update
 
 from auth.dependencies import require_admin, require_user, service
 from auth.models import AuthSession, User
-from auth.avatar import AvatarUpload, normalize_avatar
+from auth.avatar import AvatarUpload, AvatarPreset, normalize_avatar
 from auth.schemas import Credentials, CurrentUser, PasswordChange, Registration, StatusChange, public_user
+from auth.schemas import NicknameChange
 
 router = APIRouter()
 
@@ -80,6 +81,29 @@ def update_avatar(data: AvatarUpload, request: Request, user: CurrentUser = Depe
     return {"avatar_url": avatar}
 
 
+@router.patch("/api/auth/nickname")
+def update_nickname(data: NicknameChange, request: Request, user: CurrentUser = Depends(require_user)):
+    auth = service(request)
+    auth.limit("nickname", client_ip(request), user.id)
+    with auth.sessions() as db:
+        row = db.get(User, user.id)
+        row.display_name = data.nickname
+        row.updated_at = time.time()
+        db.commit()
+    return {"nickname": data.nickname}
+
+
+@router.put("/api/auth/avatar/preset")
+def update_avatar_preset(data: AvatarPreset, request: Request, user: CurrentUser = Depends(require_user)):
+    avatar = f"/assets/avatars/robot-{data.preset}.svg"
+    with service(request).sessions() as db:
+        row = db.get(User, user.id)
+        row.avatar_data = avatar
+        row.updated_at = time.time()
+        db.commit()
+    return {"avatar_url": avatar}
+
+
 @router.delete("/api/auth/avatar", status_code=204)
 def reset_avatar(request: Request, user: CurrentUser = Depends(require_user)):
     with service(request).sessions() as db:
@@ -120,10 +144,21 @@ def change_password(data: PasswordChange, request: Request, response: Response,
 
 @router.get("/api/admin/users")
 def users(request: Request, offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100),
+          q: str = Query("", max_length=60),
           user: CurrentUser = Depends(require_admin)):
     with service(request).sessions() as db:
-        rows = db.scalars(select(User).order_by(User.created_at, User.id).offset(offset).limit(limit)).all()
-        return {"items": [public_user(row) for row in rows], "total": db.scalar(select(func.count()).select_from(User))}
+        predicate = (User.display_name.contains(q, autoescape=True) | User.phone_number.contains(q, autoescape=True)) if q else True
+        rows = db.scalars(select(User).where(predicate).order_by(User.created_at.desc(), User.id).offset(offset).limit(limit)).all()
+        return {"items": [public_user(row) for row in rows], "total": db.scalar(select(func.count()).select_from(User).where(predicate))}
+
+
+@router.get("/api/admin/overview")
+def admin_overview(request: Request, user: CurrentUser = Depends(require_admin)):
+    with service(request).sessions() as db:
+        total = db.scalar(select(func.count()).select_from(User))
+        active = db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(True)))
+        admins = db.scalar(select(func.count()).select_from(User).where(User.role == "admin"))
+    return {"total": total, "active": active, "disabled": total-active, "admins": admins}
 
 
 @router.patch("/api/admin/users/{user_id}/status")

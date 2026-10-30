@@ -14,7 +14,7 @@
   }
   function position() {
     const rect = trigger.getBoundingClientRect();
-    const width = Math.min(248, innerWidth - 24);
+    const width = Math.min(rect.width, 224, innerWidth - 24);
     const above = rect.top - 12, below = innerHeight - rect.bottom - 12;
     const upwards = above >= Math.min(220, below);
     menu.style.width = `${width}px`;
@@ -95,5 +95,9 @@
   window.addEventListener('medix-login-request', close);
   window.addEventListener('medix-signout', close);
   window.addEventListener('medix-auth-change', event => render(event.detail));
+  const adminLink=document.createElement('a');adminLink.href='/admin';adminLink.className='profile-menu-item';adminLink.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>管理后台</span>';adminLink.hidden=true;
+  document.getElementById('profileSettings').after(adminLink);
+  function renderAdmin(user){adminLink.hidden=user?.role!=='admin';}
+  window.addEventListener('medix-auth-change',e=>renderAdmin(e.detail));MedixAuth.ready.then(renderAdmin).catch(()=>{});
   MedixAuth.ready.then(render).catch(() => render(null));
 })();

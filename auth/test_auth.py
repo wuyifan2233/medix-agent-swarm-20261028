@@ -219,6 +219,8 @@ class AuthTests(unittest.TestCase):
             result=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
             self.assertEqual(result.status_code,200,result.text)
             user=result.json()["user"]
+            self.assertRegex(user["avatar_url"],r"^/assets/avatars/robot-[1-8]\.svg$")
+            self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"],user["avatar_url"])
             self.client.headers["X-CSRF-Token"] = result.json()["csrf_token"]
             with self.sessions() as db:
                 self.assertEqual(db.query(User).count(),2)
@@ -343,6 +345,46 @@ class AuthTests(unittest.TestCase):
             self.client.headers["X-CSRF-Token"]=r.json()["csrf_token"]
             self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,400)
             self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000001","password":PASSWORD}).status_code,401)
+
+    def test_admin_overview_search_and_page_guard(self):
+        self.register();self.register("leader","admin");self.login()
+        self.assertEqual(self.client.get("/admin").status_code,403)
+        self.assertEqual(self.client.get("/api/admin/overview").status_code,403)
+        self.login(username="leader")
+        result=self.client.get("/api/admin/overview")
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json(),{"total":2,"active":2,"disabled":0,"admins":1})
+        self.assertEqual(self.client.get("/admin").status_code,200)
+        result=self.client.get("/api/admin/users",params={"q":"alice"})
+        self.assertEqual(result.json()["total"],1)
+        self.assertEqual(result.json()["items"][0]["display_name"],"alice")
+        self.assertEqual(self.client.get("/api/admin/users",params={"q":"%"}).json()["total"],0)
+
+    def test_nickname_changes_only_current_users_display_name(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        result=self.client.patch("/api/auth/nickname",json={"nickname":"  小明  "})
+        self.assertEqual(result.status_code,200,result.text)
+        current=self.client.get("/api/auth/me").json()
+        self.assertEqual(current["display_name"],"小明")
+        self.assertEqual(current["id"],alice.id)
+        with self.sessions() as db:
+            self.assertEqual(db.get(User,bob.id).display_name,"bob")
+            self.assertEqual(db.get(User,alice.id).username,"alice")
+        for nickname in ["   ","x"*21,"bad\nname"]:
+            self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":nickname}).status_code,422)
+        self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":"名字","user_id":bob.id}).status_code,422)
+        self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":"名字"},headers={"X-CSRF-Token":""}).status_code,403)
+
+    def test_avatar_presets_are_validated_and_user_scoped(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":3}).status_code,200)
+        self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"],"/assets/avatars/robot-3.svg")
+        with self.sessions() as db:
+            self.assertIsNone(db.get(User,bob.id).avatar_data)
+            self.assertEqual(db.get(User,alice.id).avatar_data,"/assets/avatars/robot-3.svg")
+        for value in [0,9,"../file",True]:
+            self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":value}).status_code,422)
+        self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":1},headers={"X-CSRF-Token":""}).status_code,403)
 
     def test_sms_limits_wrong_codes_purpose_and_expiry(self):
         from auth.models import SmsChallenge

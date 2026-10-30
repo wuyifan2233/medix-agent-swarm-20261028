@@ -127,3 +127,17 @@ input[aria-invalid="true"]{border-color:#c88992}
 
 .security-phone-change{cursor:pointer}
 .security-phone-change:hover{background:#f8f9fc}
+
+.nickname-edit{display:inline-flex;vertical-align:middle;margin-left:8px;padding:5px;border:0;border-radius:6px;background:transparent;color:#929db6}
+.nickname-edit svg{width:16px;height:16px}
+.nickname-edit:hover{background:#edf0ff;color:#6375e9}
+
+.avatar-picker{width:460px}
+.avatar-preset-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 12px;margin:20px 0 24px}
+.avatar-preset{display:flex;flex-direction:column;align-items:center;gap:8px;border:1px solid transparent;background:transparent;padding:7px;border-radius:12px;color:#8a95a9;font-size:11px}
+.avatar-preset img{display:block;width:100%;max-width:72px;height:auto;border-radius:50%}
+.avatar-preset:hover{background:#f5f7fc}
+.avatar-preset[aria-pressed="true"]{border-color:#8593e9;background:#f0f3ff;color:#6575cf}
+.avatar-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.avatar-picker-footer button{margin:0}
+@media(max-width:380px){.avatar-preset-grid{gap:8px}.avatar-preset{padding:4px}.avatar-picker{padding:20px}}

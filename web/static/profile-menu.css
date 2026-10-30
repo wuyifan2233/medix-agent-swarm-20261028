@@ -10,7 +10,7 @@
 .profile-trigger .profile-more { width: 16px; height: 16px; margin-left: auto; flex-shrink: 0; color: #929db5; }
 .profile-menu {
   display: none; position: fixed; inset: auto; margin: 0; z-index: 80;
-  width: 248px; max-width: calc(100vw - 24px); overflow: auto; overscroll-behavior: contain;
+  width: 224px; max-width: calc(100vw - 24px); overflow: auto; overscroll-behavior: contain;
   border: 1px solid #e6e9f2; border-radius: 14px; padding: 7px;
   background: #fff; color: #3e4961; box-shadow: 0 10px 35px #24345718, 0 2px 8px #24345708;
 }
@@ -26,8 +26,8 @@
 .profile-menu-item:hover, .profile-menu-item:focus-visible { background: #f3f5fb; color: #5368c9; }
 .profile-menu-item:disabled { cursor: wait; opacity: .55; }
 .profile-menu-divider { height: 1px; margin: 5px 8px; background: #eef0f6; }
-.profile-menu .profile-logout { color: #9b6c77; }
-.profile-menu .profile-logout svg { color: #ac8790; }
+.profile-menu .profile-logout { color: #69758e; }
+.profile-menu .profile-logout svg { color: #8895ae; }
 
 .profile-trigger:focus,.profile-trigger:focus-visible{outline:none;box-shadow:none}
 .profile-trigger[data-keyboard-focus="true"]:focus-visible{outline:2px solid #9aa9f6;outline-offset:2px}
