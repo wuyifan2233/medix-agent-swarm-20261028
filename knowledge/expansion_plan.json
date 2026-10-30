@@ -1,0 +1,7 @@
+{
+  "minimum_independent_originals": 3000,
+  "language_preference": "Chinese",
+  "embedding": "BAAI/bge-small-zh-v1.5",
+  "disease_and_drug_coverage": "title matches plus explicit gaps; not clinical completeness",
+  "publication": "only after minimum validated originals; raw text not distributed"
+}

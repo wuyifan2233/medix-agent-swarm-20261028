@@ -8,6 +8,23 @@ MediX 是一个本地运行的健康问答项目，支持文字提问、图片�
 
 当前版本适合本地演示和开发。医学资料及模型回答需要核实，不能替代医生诊断。
 
+## 证据版快速启动（本地 BGE）
+
+```powershell
+git clone -b feature/knowledge_db https://github.com/wuyifan2233/medix-agent-swarm-20261028.git
+cd medix-agent-swarm-20261028
+conda create -n medix python=3.12 pip -y
+conda activate medix
+python -m pip install -r requirements.kb.txt
+python run_kb_demo.py
+```
+
+打开 http://127.0.0.1:8766/ ，等待“知识库就绪”。无需.env.local或API Key即可检索与查看原文。首次启动会联网获取来源清单中的中文原文及固定版本BGE模型，在本机分块并构建512维Milvus索引；不是克隆后立即离线可用。首次处理3298篇需要较长时间，进度在启动终端；下载中断后重启会复用已校验的逐篇缓存。若部分来源失效，只在至少3000篇独立原文可用时发布，并在knowledge/.local/download-status.json记录缺源；不以少量样例冒充完整扩库。
+
+后续启动复用本机全文和向量，默认库在knowledge/data/evidence/<版本>/milvus.db/，无需原电脑绝对路径。首次准备完毕后可在断网情况下检索，前提是相同版本的模型、原文和索引缓存均在；聊天生成仍需自行配置API。可用`python run_kb_demo.py --prepare-only`提前准备（先关闭占用该版本库的服务）。配置模板为.env.example，真实密钥只放被忽略的.env.local。
+
+公开仓库不包含新采集平台禁止未经许可转载的全文、快照或包含正文的证据数据库；已有旧版样例库继续保留。来源清单与获取、建库代码随仓库提供。完整设计与来源分层见[knowledge/DESIGN.md](knowledge/DESIGN.md)。
+
 ## 技术栈与本版落地情况
 
 按 Demo 题目梳理的技术栈如下。**题目涉及的组件不等于本版已经全部使用**，以下分别标明当前实现与待接入部分。

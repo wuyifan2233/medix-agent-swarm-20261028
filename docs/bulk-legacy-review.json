@@ -1,0 +1,63 @@
+{
+  "notice": "Metadata and literal term audit only; not a clinical assessment. Original fixture gate remains failed.",
+  "cases": [
+    {
+      "id": "m01",
+      "titles": [
+        "对乙酰氨基酚",
+        "对乙酰氨基酚"
+      ],
+      "literal_terms": {
+        "感冒药": false
+      },
+      "applicability": [
+        "needs_confirmation",
+        "needs_confirmation"
+      ]
+    },
+    {
+      "id": "m02",
+      "titles": [
+        "复方感冒灵颗粒",
+        "复方感冒灵颗粒",
+        "对乙酰氨基酚"
+      ],
+      "literal_terms": {
+        "感冒药": true
+      },
+      "applicability": [
+        "needs_confirmation",
+        "needs_confirmation",
+        "needs_confirmation"
+      ]
+    },
+    {
+      "id": "m04",
+      "titles": [
+        "氯雷他定",
+        "氯雷他定",
+        "荨麻疹"
+      ],
+      "literal_terms": {
+        "抗组胺": true
+      },
+      "applicability": [
+        "needs_confirmation",
+        "needs_confirmation",
+        "needs_confirmation"
+      ]
+    },
+    {
+      "id": "p04",
+      "titles": [
+        "口服补液盐",
+        "口服补液盐"
+      ],
+      "literal_terms": {},
+      "applicability": [
+        "needs_confirmation",
+        "needs_confirmation"
+      ]
+    }
+  ]
+}

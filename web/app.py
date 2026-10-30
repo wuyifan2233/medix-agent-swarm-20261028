@@ -60,12 +60,17 @@ def normalize_image(item):
 
 def warmup():
     try:
+        if os.environ.get('MEDIX_KB_MODE') == 'evidence':
+            health.update(knowledge_stage='preparing_sources')
+            from knowledge.initialize import ensure_sources
+            ensure_sources()
+            health.update(knowledge_stage='loading_index')
         if os.environ.get('MEDIX_KB_MODE') != 'evidence':
             from knowledge.scripts.migrate_legacy_db import migrate
             migrate()
         from knowledge.milvus_kb import MedicalKnowledgeBase
         kb = MedicalKnowledgeBase()
-        health.update(knowledge="ready", documents=kb.count_documents())
+        health.update(knowledge="ready", knowledge_stage="ready", documents=kb.count_documents())
         if os.environ.get('MEDIX_KB_MODE') == 'evidence':
             health.update(mode='evidence', source_documents=len(kb.documents), version=kb.version,
                           embedding=kb.embedding_model.identity,
@@ -116,14 +121,16 @@ def status():
 
 
 @app.get('/api/knowledge/catalog')
-def knowledge_catalog():
+def knowledge_catalog(offset: int = 0, limit: int = 50):
     if health.get('mode') != 'evidence' or health['knowledge'] != 'ready':
         raise HTTPException(503, '证据库尚未就绪；使用 run_kb_demo.py 启动')
     from knowledge.evidence import EvidenceKnowledgeBase
     kb=EvidenceKnowledgeBase()
-    return {'version':kb.version,'chunks':len(kb.rows),'documents':[
+    if offset<0 or not 1<=limit<=100:raise HTTPException(400,'来源分页范围无效')
+    return {'version':kb.version,'chunks':len(kb.rows),'document_total':len(kb.documents),
+            'next_offset':offset+limit if offset+limit<len(kb.documents) else None,'documents':[
         {key:d['metadata'].get(key) for key in ('id','title','publisher','published_at','url','source_checked','clinical_reviewed','use_conditions','audiences','evidence_kind')}
-        for d in kb.documents]}
+        for d in kb.documents[offset:offset+limit]]}
 
 
 @app.get('/api/knowledge/explore')

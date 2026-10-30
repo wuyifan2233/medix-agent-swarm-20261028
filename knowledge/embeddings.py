@@ -5,6 +5,7 @@ import numpy as np
 
 GITEE_URL = 'https://ai.gitee.com/v1'
 QWEN_MODEL = 'Qwen3-Embedding-8B'
+BGE_REVISION = '7999e1d3359715c523056ef9478215996d62a620'
 QUERY_INSTRUCTION = 'Given a medical question, retrieve relevant passages that answer the question'
 
 
@@ -104,18 +105,20 @@ class GiteeQwenEmbedding:
 class LocalBGEEmbedding:
     def __init__(self):
         from sentence_transformers import SentenceTransformer
+        import torch
+        torch.set_num_threads(min(8,os.cpu_count() or 1))
         model='BAAI/bge-small-zh-v1.5'
         cache=Path(os.environ.get('HF_HOME',str(Path.home()/'.cache/huggingface')))
-        available=sorted((cache/'hub/models--BAAI--bge-small-zh-v1.5/snapshots').glob('*'))
-        path=str(available[-1]) if available else model
-        self.model_instance=SentenceTransformer(path,device='cpu')
+        snapshot=cache/'hub/models--BAAI--bge-small-zh-v1.5/snapshots'/BGE_REVISION
+        path=str(snapshot) if snapshot.is_dir() else model
+        self.model_instance=SentenceTransformer(path,device='cpu',**({} if snapshot.is_dir() else {'revision':BGE_REVISION}))
         self.tokenizer=self.model_instance.tokenizer
         self.dimension=self.model_instance.get_sentence_embedding_dimension()
         self.identity={'provider':'local','model':model,'dimension':self.dimension,
-                       'revision':Path(path).name if available else model,'normalization':'l2'}
+                       'revision':BGE_REVISION,'normalization':'l2'}
 
     def encode_documents(self,texts):
-        return normalize_vectors(self.model_instance.encode(texts,normalize_embeddings=True,show_progress_bar=False),self.dimension,len(texts))
+        return normalize_vectors(self.model_instance.encode(texts,batch_size=32,normalize_embeddings=True,show_progress_bar=len(texts)>100),self.dimension,len(texts))
 
     def encode_query(self,text):
         return self.encode_documents([text])[0]
@@ -132,7 +135,7 @@ class SiliconFlowQwenEmbedding(GiteeQwenEmbedding):
 
 
 def create_embedder():
-    provider=load_setting('MEDIX_EMBEDDING_PROVIDER','gitee').lower()
+    provider=load_setting('MEDIX_EMBEDDING_PROVIDER','local').lower()
     if provider=='gitee':return GiteeQwenEmbedding()
     if provider=='siliconflow':return SiliconFlowQwenEmbedding()
     if provider=='local':return LocalBGEEmbedding()

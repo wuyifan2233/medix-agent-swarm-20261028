@@ -17,6 +17,8 @@ class QueryPolicyTests(unittest.TestCase):
             self.assertFalse(insufficient_medication(q),q)
         for q in ['孩子布洛芬吃多少毫升','虚构：我吃了一片布洛芬，现在该怎么办','怀孕了氯雷他定能吃吗','降压药能停药吗']:
             self.assertTrue(insufficient_medication(q),q)
+        self.assertTrue(insufficient_medication('头孢克洛吃多少毫克'))
+        self.assertTrue(insufficient_medication('华法林和阿司匹林能合用吗'))
 
     def test_followup_uses_user_topic_and_new_topic_resets(self):
         history=[{'role':'user','content':'高血压日常管理'},{'role':'assistant','content':'布洛芬'}]
@@ -27,6 +29,8 @@ class QueryPolicyTests(unittest.TestCase):
 
     def test_population_matching_is_not_inferred_from_disease_alone(self):
         child={'audiences':['children']}
+        self.assertEqual(applicability({'audiences':['unspecified']},'unspecified'),'needs_confirmation')
+        self.assertEqual(applicability({'audiences':['unspecified']},'adults'),'needs_confirmation')
         self.assertEqual(applicability(child,requested_audience('成人鼻炎')),'mismatch')
         self.assertEqual(applicability(child,requested_audience('鼻炎')),'needs_confirmation')
         self.assertEqual(applicability(child,requested_audience('儿童鼻炎')),'matched')
