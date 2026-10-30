@@ -1,6 +1,6 @@
 # main_copy 集成入口（优先阅读）
 
-先阅读 docs/INTEGRATION.md 与 docs/AUTH-INTEGRATION.md。统一安装 requirements.integration.txt，启动 run_web.py；本机验证 Python3.10。业务数据库只有一份，Alembic 单一 head 20261030_14，公共向量索引和云端 Mem0 用途独立。禁止重新引入匿名浏览器身份或独立业务 SQLite。请勿直接运行旧版 main.py 的未隔离记忆逻辑作为网页入口。集成回归执行 python scripts/verify_integration.py。以下原模块交付说明作为历史/模块背景，和本节冲突时以本节及当前代码为准。
+启动与团队验收先阅读 docs/TEAM-VALIDATION.md，代码接入阅读 docs/INTEGRATION.md 与 docs/AUTH-INTEGRATION.md。统一安装 requirements.integration.txt，启动 run_web.py；本机验证 Python3.10。业务数据库只有一份，Alembic 单一 head 20261030_14，公共向量索引和云端 Mem0 用途独立。禁止重新引入匿名浏览器身份或独立业务 SQLite。请勿直接运行旧版 main.py 的未隔离记忆逻辑作为网页入口。集成回归执行 python scripts/verify_integration.py。以下原模块交付说明作为历史/模块背景，和本节冲突时以本节及当前代码为准。
 
 # MediX 项目协作指南
 

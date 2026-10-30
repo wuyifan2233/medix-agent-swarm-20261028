@@ -1,6 +1,6 @@
 # MediX · 多 Agent 健康助手
 
-> **main_copy 集成版**：先阅读 [集成与启动说明](docs/INTEGRATION.md)。所有安装入口统一到 `requirements.integration.txt`，通过 `python run_web.py` 自动初始化统一业务数据库。成员各自历史验收记录不等于本集成版的外部服务验收。
+> **全组联调先看 [拉取、配置与功能验收说明](docs/TEAM-VALIDATION.md)**。统一方案见 [集成说明](docs/INTEGRATION.md)，AI接入规则见 [账号对接](docs/AUTH-INTEGRATION.md)。下文保留部分原模块背景，启动与验收以这三份说明及当前代码为准。
 
 > 知识库负责人交付的可选证据版：见 [构建、运行、评测与合入说明](docs/KNOWLEDGE_DELIVERY.md)。使用 `requirements.kb.txt` 和 `run_kb_demo.py`（默认端口 8766）；普通入口继续兼容原有样例库。
 
@@ -43,7 +43,7 @@ python run_kb_demo.py
 
 ### 账号与基础权限（本功能分支新增）
 
-网页现在需要账号登录。首次运行前安装更新后的 `requirements.web.txt`，可运行 `python scripts/create_admin.py` 交互创建管理员；开发环境支持在 `/login` 注册普通账号。数据库迁移在网页启动前自动执行，也可手动运行 `python -m storage.migrate`。账号数据库默认保存到被 Git 忽略的 `.medix-data/app.db`。
+首页可直接浏览，业务功能需要手机号账号登录。按全组联调说明安装 `requirements.integration.txt` 并配置短信后注册；管理员基于本机已注册账号设置，使用 `scripts/set_admin.py --phone`，不要沿用旧用户名创建流程。网页启动自动执行数据库迁移，默认业务库为被 Git 忽略的 `.medix-data/app.db`。
 
 首页可直接浏览，登录后才能提问。未登录时右上角显示“登录”；登录后通过左下角头像和用户名打开账号菜单，再进入账号设置或退出登录。注册时使用默认头像，可在设置中点击头像上传 JPG、PNG、WebP（最大 2 MB），选图后可拖动、缩放并预览裁剪区域，确认保存后更新，也可恢复默认头像。图片压缩后按用户保存到本地数据库，刷新和重新登录后保留。
 

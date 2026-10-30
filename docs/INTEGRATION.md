@@ -1,5 +1,7 @@
 # main_copy 集成记录
 
+全组拉取启动及逐项验收先看 [TEAM-VALIDATION.md](TEAM-VALIDATION.md)。
+
 本分支从 main 的 b0dcf55 创建。成员分支保持不变，集成修复只提交 main_copy。
 
 ## 固定的交付版本
