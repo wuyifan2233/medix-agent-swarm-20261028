@@ -176,7 +176,7 @@ class ProfileTests(unittest.TestCase):
         job={'owner_user_id':user_id,'started':time.monotonic(),'steps':[]}
         payload={'message':'请分析本次病历，日期尚未确认','images':images or [],'remember':remember,'profile_snapshot':snapshot}
         from config import LLM_CONFIG
-        with patch('web.app.render_reply',AsyncMock(side_effect=lambda answer,*args:(answer,'applied'))), patch.dict(LLM_CONFIG, {'api_key':'test-only-placeholder'}), patch('core.LLMClient', VisionClient), patch.dict('sys.modules',{'knowledge.milvus_kb':SimpleNamespace(MedicalKnowledgeBase=KB),'swarm':SimpleNamespace(SwarmCoordinator=Coordinator)}):
+        with patch('web.app.resolve_patient',AsyncMock(return_value={'patient':'self','subject':'self','label':'本人','corrects_previous':False,'confirms_previous':False,'needs_confirmation':False,'should_store':False,'memory_reason':'fixture'})), patch('web.report_reader.read_reports',AsyncMock(return_value={'text':'虚构病历：2020年记录，血压120/80，归属待核对','warnings':[],'images':[]})), patch('web.app.render_reply',AsyncMock(side_effect=lambda answer,*args:(answer,'applied'))), patch.dict(LLM_CONFIG, {'api_key':'test-only-placeholder'}), patch('core.LLMClient', VisionClient), patch.dict('sys.modules',{'knowledge.milvus_kb':SimpleNamespace(MedicalKnowledgeBase=KB),'swarm':SimpleNamespace(SwarmCoordinator=Coordinator)}):
             asyncio.run(analyze(job,payload,session,f'medix:test:user:{user_id}'))
         captured['result']=job['result']; return captured
 

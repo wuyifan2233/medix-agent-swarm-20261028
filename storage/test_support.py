@@ -39,6 +39,12 @@ def account_clients():
                 client.close()
             contexts.clear()
             jobs.clear()
+            from reminders.service import reset_service
+            from qq.bridge import reset_bridge as reset_qq
+            from wechat.bridge import reset_bridge as reset_wechat
+            reset_service()
+            reset_qq()
+            reset_wechat()
             from storage.business import engine_for
             for cached_url in (url,):
                 # Return pooled SQLite connections before removing the temporary directory.

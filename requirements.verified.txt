@@ -1,2 +1,2 @@
-# 兼容原安装入口；统一使用当前运行环境的依赖清单。
--r requirements.txt
+# Unified main_copy installation entry.
+-r requirements.integration.txt

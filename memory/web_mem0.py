@@ -35,7 +35,7 @@ class WebMem0Memory:
         from config import MEM0_CONFIG
         key = self.api_key if self.api_key is not None else MEM0_CONFIG.get("api_key", "")
         if not key:
-            raise Mem0Error("尚未配置 Mem0 密钥，请在 config.py 填写 LOCAL_MEM0_API_KEY 后重启。")
+            raise Mem0Error("尚未配置 Mem0 密钥，请在本地 .env.local 填写 MEM0_API_KEY 后重启。")
         try:
             with httpx.Client(base_url="https://api.mem0.ai", headers={"Authorization": "Token " + key},
                               timeout=20, transport=self.transport, follow_redirects=False) as client:
@@ -153,7 +153,8 @@ class WebMem0Memory:
         response = self._request("POST", "/v3/memories/search/", {
             "query": question, "filters": {"user_id": self.namespace(owner, patient)}, "top_k": 30})
         with self.local.connect() as db:
-            db.execute("CREATE TABLE IF NOT EXISTS mem0_exclusions(owner TEXT, session TEXT, source_session TEXT, PRIMARY KEY(owner,session,source_session))")
+            if self.local.path is not None:
+                db.execute("CREATE TABLE IF NOT EXISTS mem0_exclusions(owner TEXT, session TEXT, source_session TEXT, PRIMARY KEY(owner,session,source_session))")
             excluded = {row[0] for row in db.execute("SELECT source_session FROM mem0_exclusions WHERE owner=? AND session=?", (owner, session))}
         results, seen, checked_ids = [], set(), set()
         query_topics = set(topics(question))
@@ -226,7 +227,8 @@ class WebMem0Memory:
         if not row: return False
         if action == "exclude":
             with self.local.connect() as db:
-                db.execute("CREATE TABLE IF NOT EXISTS mem0_exclusions(owner TEXT, session TEXT, source_session TEXT, PRIMARY KEY(owner,session,source_session))")
+                if self.local.path is not None:
+                    db.execute("CREATE TABLE IF NOT EXISTS mem0_exclusions(owner TEXT, session TEXT, source_session TEXT, PRIMARY KEY(owner,session,source_session))")
                 db.execute("INSERT OR IGNORE INTO mem0_exclusions VALUES(?,?,?)", (owner, session, row["metadata"]["session_id"]))
         elif action == "retire":
             metadata = dict(row["metadata"], active=False)

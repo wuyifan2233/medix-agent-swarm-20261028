@@ -15,6 +15,7 @@ agents:
       - assess_risk
       - search_history
       - search_similar_cases
+      - scheduled_reminder
 
     # 禁止的行为
     forbidden_actions:

@@ -19,7 +19,7 @@ class WebBoundaryTests(unittest.TestCase):
         url = "sqlite:///" + (Path(self.temp.name) / "web.db").as_posix()
         upgrade_database(url)
         self.engine, sessions = make_database(url)
-        settings = AuthSettings(url, False, frozenset({"http://testserver"}), True)
+        settings = AuthSettings(url, False, frozenset({"http://testserver"}), True, password_registration_enabled=True)
         app.state.auth_service = AuthService(sessions, settings)
         user = app.state.auth_service.register(Registration(username="alice", display_name="Alice", password="Test-Password2026!"))
         self.user_id = user.id

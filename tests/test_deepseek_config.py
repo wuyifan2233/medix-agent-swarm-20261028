@@ -12,14 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 class DeepSeekConfigTests(unittest.TestCase):
     def test_deepseek_overrides_openai_without_changing_memory_key(self):
         with patch.dict(os.environ, {"MEDIX_CONFIG_PATH": str(ROOT / "absent-config.py"),
-                                     "DEEPSEEK_API_KEY": "dummy-deepseek", "OPENAI_API_KEY": "dummy-openai",
+                                     "MEDIX_LLM_PROVIDER": "deepseek", "DEEPSEEK_API_KEY": "dummy-deepseek", "OPENAI_API_KEY": "dummy-openai",
                                      "MEM0_API_KEY": "dummy-memory"}, clear=True):
             config = runpy.run_path(str(ROOT / "config.py"))
         llm = config["LLM_CONFIG"]
         self.assertEqual(llm["api_key"], "dummy-deepseek")
         self.assertEqual(llm["model_name"], "deepseek-flash")
         self.assertEqual(llm["base_url"], "https://api.deepseek.com")
-        self.assertEqual(llm["extra_body"]["thinking"]["type"], "disabled")
+        self.assertEqual(llm["request_defaults"]["extra_body"]["thinking"]["type"], "enabled")
         self.assertEqual(config["MEM0_CONFIG"]["api_key"], "dummy-memory")
 
     def test_openai_fallback_remains_available(self):

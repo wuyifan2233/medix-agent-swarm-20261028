@@ -1,3 +1,9 @@
+## main_copy 2026-10-30 集成验收
+
+`python scripts/verify_integration.py`：311 项通过，使用合成账号与模拟外部服务。本地 BGE/Milvus 实际初始化 180 条并检索返回3条。浏览器检查1366×768、390×844，登录与设置弹窗正常，控制台无错误。统一安装清单通过 pip 全新环境 dry-run 解析；未在全新电脑安装。实际短信、LLM/VLM、证据嵌入、Mem0、微信/QQ外部通信待独立配置联调。详细边界见 INTEGRATION.md。
+
+以下为成员原分支的历史验证记录，不代表已在集成版复现真实服务调用。
+
 ## 2026-10-30 问答执行失败补充回归
 
 `python -m unittest web.test_web web.test_provider_errors memory.test_case_memory -q`：25 项通过。

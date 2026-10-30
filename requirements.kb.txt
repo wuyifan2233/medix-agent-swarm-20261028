@@ -1,3 +1,2 @@
--r requirements.web.txt
-jieba==0.42.1
-rank-bm25==0.2.2
+# Unified main_copy installation entry.
+-r requirements.integration.txt

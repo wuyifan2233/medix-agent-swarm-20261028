@@ -98,6 +98,18 @@ class LeadAgent:
 
 ## 任务分配策略
 
+### 策略 0：定时提醒 → 只分配 1 个 ConsultationAgent
+**问题特征**：
+- 用户要求提醒吃药、挂号、就诊、复诊，或到点叫自己
+- 查看、修改、取消已经设过的提醒
+
+不要把这类日程交给 DiagnosticAgent 或 ResearchAgent。
+用户描述胸痛、呼吸困难、大出血时，不要安排提醒任务，只让 ConsultationAgent 建议立即就医。
+
+**示例**：
+- "提醒我明天早上 8 点吃阿司匹林" → ConsultationAgent
+- "取消刚才的用药提醒" → ConsultationAgent
+
 ### 策略 1：简单问题 → 1 个 Agent（ConsultationAgent）
 **问题特征**：
 - 单一常见症状（感冒、发烧、头痛、咳嗽）

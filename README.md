@@ -1,5 +1,7 @@
 # MediX · 多 Agent 健康助手
 
+> **main_copy 集成版**：先阅读 [集成与启动说明](docs/INTEGRATION.md)。所有安装入口统一到 `requirements.integration.txt`，通过 `python run_web.py` 自动初始化统一业务数据库。成员各自历史验收记录不等于本集成版的外部服务验收。
+
 > 知识库负责人交付的可选证据版：见 [构建、运行、评测与合入说明](docs/KNOWLEDGE_DELIVERY.md)。使用 `requirements.kb.txt` 和 `run_kb_demo.py`（默认端口 8766）；普通入口继续兼容原有样例库。
 
 MediX 是一个本地运行的健康问答项目，支持文字提问、图片解读、多轮追问、按需多 Agent 协作，以及本地医学资料检索。网页采用蓝紫色健康助手界面，也保留命令行入口。

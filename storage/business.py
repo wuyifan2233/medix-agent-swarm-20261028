@@ -36,6 +36,10 @@ class Connection:
         self.driver.row_factory = sqlite3.Row
         self.tables = tables or {}
 
+    @property
+    def total_changes(self):
+        return self.driver.total_changes
+
     def sql(self, sql):
         if not self.tables:
             return sql

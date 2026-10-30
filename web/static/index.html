@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
 <link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=4"><link rel="stylesheet" href="/assets/auth-modal.css?v=10"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/source-highlights.js" defer></script><script src="/assets/family-summary.js" defer></script><script src="/assets/app.js?v=5" defer></script><script src="/assets/password-policy.js?v=5" defer></script><script src="/assets/login.js?v=11" defer></script>
-<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=5"><script src="/assets/profile-menu.js?v=12" defer></script><link rel="stylesheet" href="/assets/settings.css?v=22"><script src="/assets/avatar-crop.js?v=1" defer></script><script src="/assets/settings.js?v=13" defer></script><script src="/assets/sms-login.js?v=10" defer></script><script src="/assets/password-reset.js?v=5" defer></script><script src="/assets/phone-register.js?v=5" defer></script><script src="/assets/account-delete.js?v=4" defer></script><script src="/assets/security-overview.js?v=3" defer></script><script src="/assets/phone-change.js?v=1" defer></script><script src="/assets/form-validation.js?v=3" defer></script><script src="/assets/nickname.js?v=1" defer></script><script src="/assets/avatar-picker.js?v=1" defer></script><link rel="stylesheet" href="/assets/health-profile.css"><link rel="stylesheet" href="/assets/profile-evolution.css"><link rel="stylesheet" href="/assets/conversation-picker.css"><link rel="stylesheet" href="/assets/profile-theme.css"><link rel="stylesheet" href="/assets/reply-preferences.css"><script src="/assets/health-profile.js" defer></script><script src="/assets/profile-evolution.js" defer></script><script src="/assets/conversation-picker.js" defer></script><script src="/assets/reply-preferences.js" defer></script></head>
+<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=5"><script src="/assets/profile-menu.js?v=12" defer></script><link rel="stylesheet" href="/assets/settings.css?v=22"><script src="/assets/avatar-crop.js?v=1" defer></script><script src="/assets/settings.js?v=13" defer></script><script src="/assets/sms-login.js?v=10" defer></script><script src="/assets/password-reset.js?v=5" defer></script><script src="/assets/phone-register.js?v=5" defer></script><script src="/assets/account-delete.js?v=4" defer></script><script src="/assets/security-overview.js?v=3" defer></script><script src="/assets/phone-change.js?v=1" defer></script><script src="/assets/form-validation.js?v=3" defer></script><script src="/assets/nickname.js?v=1" defer></script><script src="/assets/avatar-picker.js?v=1" defer></script><link rel="stylesheet" href="/assets/health-profile.css"><link rel="stylesheet" href="/assets/profile-evolution.css"><link rel="stylesheet" href="/assets/conversation-picker.css"><link rel="stylesheet" href="/assets/profile-theme.css"><link rel="stylesheet" href="/assets/reply-preferences.css"><script src="/assets/health-profile.js" defer></script><script src="/assets/profile-evolution.js" defer></script><script src="/assets/conversation-picker.js" defer></script><script src="/assets/reply-preferences.js" defer></script><link rel="stylesheet" href="/assets/channels.css"></head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -40,7 +40,33 @@
 <button class="nav-item" id="memoryDemo"><svg><use href="#i-chat"/></svg><span>体验记忆新功能</span><span class="nav-tag">虚构演示</span></button>
 <label class="case-context-label" for="caseContext">接着哪个病例聊</label><select id="caseContext"><option value="">新对话，不关联历史</option></select><div class="conversation-heading">本次对话<span>仅本次保留</span></div>
 <div class="current-chat"><span class="current-dot"></span><span id="chatTitle">新的健康对话</span></div>
-<div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
+<details class="channel-panel"><summary>聊天渠道与提醒</summary><p class="channel-limit">本机每个渠道仅供一个 MediX 账号连接，QQ需回复绑定码确认。</p><div class="conversation-heading">定时提醒<span id="reminderCount"></span></div>
+<div id="reminderList" class="reminder-list" aria-live="polite"></div>
+<p id="reminderEmpty" class="reminder-empty">还没有即将到来的提醒</p>
+<div class="wechat-card" id="wechatCard">
+<div class="channel-switch" role="tablist" aria-label="选择微信或 QQ">
+<button type="button" id="pickWechat" aria-pressed="true">微信</button>
+<button type="button" id="pickQq" aria-pressed="false">QQ</button>
+</div>
+<div class="wechat-heading"><span id="channelTitle">微信 MediX</span><small id="wechatState">未连接</small></div>
+<p id="wechatHint">用微信扫码，把 MediX 加到聊天列表。手机上的对话会同步到这里，提醒也会发到微信。</p>
+<img id="wechatQr" alt="用微信扫描，添加 MediX" hidden>
+<form id="qqFriendForm" class="wechat-code" hidden>
+<label class="sr-only" for="qqFriendId">好友 QQ 号</label>
+<input id="qqFriendId" inputmode="numeric" maxlength="11" placeholder="好友 QQ 号" autocomplete="off">
+<button type="submit">添加好友</button>
+</form>
+<form id="wechatCodeForm" class="wechat-code" hidden>
+<label class="sr-only" for="wechatCode">配对码</label>
+<input id="wechatCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="输入配对码">
+<button type="submit">确认</button>
+</form>
+<div class="wechat-actions">
+<button type="button" id="wechatLogin">扫码添加</button>
+<button type="button" id="wechatLogout" hidden>断开</button>
+</div>
+</div>
+</details><div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
 </div>
 <div class="sidebar-bottom">
 <div class="service-heading">为每一次提问做准备<span class="local-badge">本地版</span></div>

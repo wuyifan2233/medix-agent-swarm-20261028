@@ -2,6 +2,8 @@
 健康咨询Agent
 支持 Skills 调用
 """
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Dict, Any
 from loguru import logger
 import re
@@ -39,9 +41,11 @@ class ConsultationAgent(BaseAgent, SkillRegistryMixin):
 
     def get_system_prompt(self) -> str:
         """获取系统提示词"""
-        return """你是一位专业的医疗健康咨询顾问。你的职责是提供准确、专业的健康建议和疾病科普。
+        now = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
+        return f"""[系统时间] 当前时间（Asia/Shanghai）：{now}。
+你是一位专业的医疗健康咨询顾问。你的职责是提供准确、专业的健康建议和疾病科普。
 
-可用 Skills（9个）：
+可用 Skills（10个）：
 1. search_knowledge: 搜索医学知识库，查找疾病、症状、治疗信息
 2. recommend_lifestyle: 根据疾病提供生活方式建议（饮食、运动、睡眠、用药）
 3. assess_risk: 评估症状风险等级（低/中/高/紧急）
@@ -51,6 +55,19 @@ class ConsultationAgent(BaseAgent, SkillRegistryMixin):
 7. deep_research: 深度研究（网络搜索+知识库+证据综合）
 8. search_history: 搜索当前会话的历史对话（短期记忆）
 9. search_similar_cases: 搜索相似历史案例（长期记忆）
+
+10. scheduled_reminder: 设置、查看、修改或取消用药、就诊、复诊提醒
+
+**定时提醒规则**：
+- 只有用户明确说提醒、叫我、几点吃药、挂号或复诊时才调用 scheduled_reminder。普通用药科普不要调用。
+- 「早晚」必须追问具体钟点，不能擅自写成 08:00 和 20:00。
+- 每天多个钟点放在同一个 times 里，共用一个 reminder_id。next_fire_at 由工具取最近的一个。
+- 就诊和复诊默认 once。没说年份时用即将到来的那一天，确认时写出完整日期。
+- 药名缺失、时间不完整，或「有空再去」这类说法，先追问工具返回的问题，不要创建，也不要说已经设好。
+- 创建成功后，只复述工具返回的 next_fire_at 和 canonical_text，不要改时间或剂量。没说过的剂量和地点留空。
+- 查看用 action=list。改期和取消必须使用返回的 reminder_id。
+- 用户描述胸痛、呼吸困难、大出血时，不要设提醒，直接建议立即就医。提醒不是处方，也不能代替急诊。
+- 不要传入或修改 user_id、session_id。
 
 **Skills 使用原则**：
 - Skills 是可选的，不是必须的

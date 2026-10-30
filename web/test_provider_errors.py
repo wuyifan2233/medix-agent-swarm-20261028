@@ -30,20 +30,26 @@ class ProviderPropagationTests(unittest.IsolatedAsyncioTestCase):
 class ProviderJobTests(unittest.TestCase):
     def test_failed_auth_job_is_nonretryable_and_redacted(self):
         from web.app import run_job, health
-        job = {}
-        with patch.dict(health, knowledge='ready'), patch('web.app.analyze', new=AsyncMock(side_effect=auth_error())):
-            run_job(job, {}, 'synthetic', 'synthetic')
+        from storage.test_support import account_clients
+        with account_clients() as accounts:
+            owner=accounts.users[0].id
+            job = {'owner_user_id':owner}
+            with patch.dict(health, knowledge='ready'), patch('web.app.analyze', new=AsyncMock(side_effect=auth_error())):
+                run_job(job, {}, 'synthetic', owner)
         self.assertEqual(job['status'],'failed')
         self.assertFalse(job['retryable'])
         self.assertEqual(job['error_code'],'provider_configuration')
-        self.assertIn('LOCAL_BASE_URL',job['error'])
+        self.assertIn('BASE_URL',job['error'])
         self.assertNotIn('private-provider-response',job['error'])
 
-    def test_missing_key_has_nonretryable_submission_detail(self):
-        import uuid, config
-        from fastapi.testclient import TestClient
-        from web.app import app
-        with patch.dict(config.LLM_CONFIG,api_key=''):
-            r=TestClient(app).post('/api/chat',json={'message':'synthetic','chat_id':str(uuid.uuid4())})
-        self.assertEqual(r.status_code,503)
-        self.assertFalse(r.json()['detail']['retryable'])
+    def test_missing_key_is_nonretryable(self):
+        import config
+        from web.app import run_job,health
+        from storage.test_support import account_clients
+        with account_clients() as accounts, patch.dict(config.LLM_CONFIG,api_key=''), patch.dict(health,knowledge='ready'):
+            owner=accounts.users[0].id
+            job={'owner_user_id':owner,'steps':[]}
+            run_job(job,{'images':[]},'synthetic',owner)
+            self.assertEqual(job['status'],'failed')
+            self.assertFalse(job['retryable'])
+            self.assertIn('API Key',job['error'])
