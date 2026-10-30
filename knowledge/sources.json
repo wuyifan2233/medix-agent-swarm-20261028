@@ -186,6 +186,104 @@
       "required_terms": [
         "哮喘"
       ]
+    },
+    {
+      "id": "diabetes_myths",
+      "title": "走出2型糖尿病的认识误区",
+      "url": "https://www.cma.org.cn/art/2022/8/5/art_4584_46938.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-08-05",
+      "type": "health_education",
+      "topics": [
+        "糖尿病",
+        "水果",
+        "饮食"
+      ],
+      "required_terms": [
+        "水果",
+        "糖尿病"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "diabetes_diet",
+      "title": "想控制血糖的人看过来——告诉你“如何合理地吃饭”",
+      "url": "https://www.cma.org.cn/art/2023/7/17/art_4584_51835.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-07-17",
+      "type": "health_education",
+      "topics": [
+        "糖尿病",
+        "血糖",
+        "饮食",
+        "水果"
+      ],
+      "required_terms": [
+        "GI",
+        "水果"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "hypertension_intro",
+      "title": "教您了解高血压",
+      "url": "https://www.cma.org.cn/art/2023/6/15/art_4584_51335.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-06-15",
+      "type": "health_education",
+      "topics": [
+        "高血压",
+        "饮食",
+        "食盐"
+      ],
+      "required_terms": [
+        "高血压",
+        "5克"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "hypertension_standard2019",
+      "title": "中国高血压健康管理规范（2019）",
+      "url": "https://csc.cma.org.cn/art/2020/5/8/art_619_34440.html",
+      "publisher": "中华医学会心血管病学分会",
+      "published_at": "2020-05-08",
+      "type": "clinical_guideline",
+      "topics": [
+        "高血压",
+        "饮食",
+        "运动",
+        "水果"
+      ],
+      "required_terms": [
+        "高血压",
+        "管理"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "clinical_guideline",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "2019版健康管理规范，非最新版本；非药品说明书"
     }
   ]
 }

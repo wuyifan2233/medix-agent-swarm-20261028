@@ -120,16 +120,22 @@ class EvidenceKnowledgeBase:
                     for rank,cid in enumerate(ids,1):ranks[cid]=ranks.get(cid,0)+1/(60+rank)
                 ranked = sorted(ranks,key=lambda cid:(-ranks[cid],cid))
                 subjects={term for term in ('对乙酰氨基酚','布洛芬','氯雷他定','口服补液盐','高血压','糖尿病','流感','鼻炎','哮喘','胃肠炎','腹泻') if term in query}
-                hits=[];seen=set();audience_excluded=0
+                hits=[];seen=set();audience_excluded=0;per_document={}
                 for cid in ranked:
                     row=self.by_id[cid]
                     if similarities.get(cid,-1)<.4 or row['content'] in seen:continue
                     if subjects and not subjects.intersection(row['metadata']['topics']):continue
+                    subtopics=[word for word in ('水果','血压计','食盐') if word in query]
+                    if subtopics and not all(word in row['content'] for word in subtopics):continue
+                    if '饮食' in query and not any(word in row['content'] for word in ('饮食','膳食','食物')):continue
                     suitability=applicability(row['metadata'],audience)
                     if suitability=='mismatch':
                         audience_excluded+=1
                         continue
                     seen.add(row['content'])
+                    doc_id=row['metadata']['doc_id']
+                    if per_document.get(doc_id,0)>=2:continue
+                    per_document[doc_id]=per_document.get(doc_id,0)+1
                     hits.append({**row,'score':similarities[cid],'rrf_score':ranks[cid],'applicability':suitability})
                 hits,trace['rerank']=rerank_candidates(self.reranker,query,hits,top_k)
                 trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits),audience_excluded=audience_excluded)

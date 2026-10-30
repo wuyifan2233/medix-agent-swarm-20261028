@@ -64,7 +64,7 @@ class QueryPolicyTests(unittest.TestCase):
             (local/'manifest.json').write_text(original)
             registry=root/'sources.json';registry.write_text(json.dumps({'documents':[{'id':'x'}]}))
             with patch.object(fetcher,'LOCAL',local),patch.object(fetcher,'REGISTRY',registry),patch.object(fetcher,'fetch',side_effect=RuntimeError('synthetic fetch failure')):
-                with self.assertRaises(RuntimeError):fetcher.main()
+                with self.assertRaises(RuntimeError):fetcher.main([])
             self.assertEqual((local/'manifest.json').read_text(),original)
 
     def test_source_labels_are_present_without_refetching_snapshots(self):

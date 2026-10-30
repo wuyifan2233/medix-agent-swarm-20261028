@@ -126,6 +126,20 @@ def knowledge_catalog():
         for d in kb.documents]}
 
 
+@app.get('/api/knowledge/explore')
+def knowledge_explore():
+    from knowledge.corpus import LOCAL
+    import hashlib
+    root=LOCAL/'open_datasets'
+    if not (root/'manifest.json').exists():return {'datasets':[],'questions':[]}
+    manifest=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+    entry=next(d for d in manifest['datasets'] if d['use']=='question_exploration_only')
+    data=(root/'questions.json').read_bytes()
+    if hashlib.sha256(data).hexdigest()!=entry['sha256']:
+        raise HTTPException(503,'开源问法样本校验失败，请重新导入')
+    return {'datasets':manifest['datasets'],'questions':json.loads(data)}
+
+
 @app.get('/api/knowledge/retrieve')
 async def knowledge_retrieve(q: str = ''):
     if health.get('mode') != 'evidence' or health['knowledge'] != 'ready':
@@ -217,6 +231,20 @@ async def analyze(job, payload, session_id, memory_user_id):
     enriched += "\n\n请优先直接回答用户问题，总长尽量不超过600字。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
 
     stage(job, "agents", "正在由专业助手分析与整合")
+    from runtime_settings import load_setting
+    if evidence_mode and not observed and not payload['remember'] and load_setting('MEDIX_EVIDENCE_GENERATOR','direct')=='direct':
+        from knowledge.answering import generate_answer
+        stage(job, 'answer', '正在按原文生成逐句引用（单次请求）')
+        generated = await generate_answer(retrieval_query, sources, retrieval['message'])
+        job['result'] = {**generated, 'sources':sources, 'tools':[], 'agents':['evidence_reader'],
+                        'swarm_enabled':False, 'image_count':0, 'image_context_used':False,
+                        'memory_enabled':False, 'elapsed':round(time.monotonic()-job['started'],1),
+                        'partial':False, 'retrieval':retrieval['trace'], 'retrieval_status':retrieval['status'],
+                        'generation':'model', 'invalid_citations':[]}
+        history=previous.get('history',[])+[{'role':'user','content':retrieval_query[:1200]},
+                                         {'role':'assistant','content':generated['answer'][:1800]}]
+        contexts[session_id]={'image_observations':'','history':history[-6:],'updated':time.time()}
+        return
     coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"], memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
     trace = []

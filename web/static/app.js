@@ -108,7 +108,7 @@ function resultMessage(row, result) {
     const summary = document.createElement('summary'); summary.textContent = '逐句核对回答引用'; panel.append(summary);
     result.evidence_links.forEach(item => {
       const line = document.createElement('p'); line.textContent = item.text;
-      const note = document.createElement('small'); note.textContent = item.status === 'verbatim_match' ? ' · 原文逐字匹配（不代表临床审核）' : item.status === 'uncited' ? ' · 未提供引用' : ' · 引用存在，支持关系待核对'; line.append(note);
+      const note = document.createElement('small'); note.textContent = item.status === 'verbatim_match' ? ' · 原文逐字匹配（不代表临床审核）' : item.status === 'quote_located' ? ' · 已定位所引原文，支持关系请核对' : item.status === 'uncited' ? ' · 未提供引用' : ' · 引用存在，支持关系待核对'; line.append(note);
       item.citations.forEach(id => { const source = result.sources.find(s => s.citation === id); if (!source) return;
         const button = document.createElement('button'); button.type = 'button'; button.className = 'citation'; button.textContent = `核对 [${id}]`;
         button.onclick = () => showEvidence(source, item.quotes.find(q => q.citation === id)?.quote || ''); line.append(button); });
@@ -116,7 +116,7 @@ function resultMessage(row, result) {
     }); main.append(panel);
   }
   const meta = document.createElement('div'); meta.className = 'message-meta';
-  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求 · 原文定位' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
   const elapsed = document.createElement('span'); elapsed.textContent = `${result.elapsed} 秒`; meta.append(elapsed); main.append(meta);
   if (result.image_observations) {
@@ -284,13 +284,14 @@ function retrievalDetails(trace) {
   details.append(summary, text); return details;
 }
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
+const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）'};
 function showEvidence(source, quote = '') {
   if (!source) return;
   $('dialogTitle').textContent = source.title;
   const content = $('dialogContent'); content.replaceChildren();
   const provenance = document.createElement('p'); provenance.textContent = `${source.publisher} · ${source.published_at || '日期未注明'}\n来源已核对（机构、链接与原文），未作临床审核。`;
   const section = document.createElement('p'); section.textContent = `章节：${source.section} · 本地原文字符位置：${source.start_char}`;
-  const audience = document.createElement('p'); audience.textContent = `资料类型：${source.evidence_kind === 'popular_science' ? '健康科普，非核准药品说明书' : source.evidence_kind || '未注明'}。适用范围：${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}。${source.applicability === 'needs_confirmation' ? '当前未确认提问者是否属于该人群，请核对后使用。' : '范围标签仅说明原文主题，不代表个人适用性确认。'}`;
+  const audience = document.createElement('p'); audience.textContent = `资料类型：${evidenceKindLabels[source.evidence_kind] || source.evidence_kind || '未注明'}。适用范围：${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}。${source.applicability === 'needs_confirmation' ? '当前未确认提问者是否属于该人群，请核对后使用。' : '范围标签仅说明原文主题，不代表个人适用性确认。'}`;
   const excerpt = document.createElement('pre'); excerpt.className = 'evidence-text';
   const terms = (quote ? [quote] : source.highlight_terms || []).filter(t => t.length >= 2);
   if (terms.length) {
@@ -303,6 +304,7 @@ function showEvidence(source, quote = '') {
   const version = document.createElement('small'); version.textContent = `来源快照 SHA-256：${source.content_sha256}`;
   content.append(provenance, audience, section, excerpt, link, document.createElement('hr'), version);
   if (!$('infoDialog').open) $('infoDialog').showModal();
+  if (quote) requestAnimationFrame(() => excerpt.querySelector('mark')?.scrollIntoView({block:'center'}));
 }
 async function openKnowledge() {
   $('dialogTitle').textContent = '医学证据库';
@@ -326,8 +328,17 @@ async function openKnowledge() {
     const response = await fetch('/api/knowledge/catalog'); const data = await response.json(); if (!response.ok) throw new Error(data.detail);
     catalogNode.replaceChildren();
     const count = document.createElement('p'); count.textContent = `${data.documents.length} 份来源 · ${data.chunks} 个独立片段 · 版本 ${data.version}`; catalogNode.append(count);
-    data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}｜${(doc.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}｜健康科普`; catalogNode.append(p); });
+    data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}｜${(doc.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}｜${evidenceKindLabels[doc.evidence_kind] || '类型未注明'}`; catalogNode.append(p); });
   } catch (error) { catalogNode.textContent = error.message; }
+  try {
+    const response = await fetch('/api/knowledge/explore'); if (!response.ok) return; const data = await response.json();
+    if (!data.questions.length) return;
+    const section = document.createElement('details'); const title = document.createElement('summary'); title.textContent = '中文开源问法探索（非证据）'; section.append(title);
+    const note = document.createElement('p'); note.textContent = '以下问题取自开源问答样本，仅用于探索；答案仍需检索原文。点击只填入检索框，不调用聊天模型。'; section.append(note);
+    data.questions.slice(0,12).forEach(item => { const p = document.createElement('p'); const button = document.createElement('button'); button.type = 'button'; button.textContent = item.question;
+      button.onclick = () => { $('evidenceQuery').value = item.question; $('evidenceQuery').focus(); }; p.append(button); section.append(p); });
+    const datasets = document.createElement('p'); datasets.textContent = data.datasets.map(d => `${d.id}：${d.selected_rows} 条，${d.use === 'question_exploration_only' ? '问法探索' : '独立评测'}`).join('；'); section.append(datasets); content.append(section);
+  } catch {}
 }
 $('refreshPrompts').onclick = () => {
   questionGroup = (questionGroup + 1) % questionGroups.length;

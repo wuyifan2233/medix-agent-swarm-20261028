@@ -84,8 +84,10 @@ class GiteeQwenEmbedding:
                 vectors=[item.embedding for item in sorted(data,key=lambda item:item.index)]
             except EmbeddingError:
                 raise
-            except Exception:
-                raise EmbeddingError(f'{self.provider} embedding request failed; check credentials, quota and network') from None
+            except Exception as exc:
+                status=getattr(exc,'status_code',None)
+                suffix=f' (HTTP {status})' if isinstance(status,int) else ''
+                raise EmbeddingError(f'{self.provider} embedding request failed{suffix}; check credentials, quota and network') from None
             batches.append(normalize_vectors(vectors,self.dimension,len(batch)))
         return np.concatenate(batches)
 
