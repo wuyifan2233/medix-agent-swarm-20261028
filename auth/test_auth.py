@@ -290,6 +290,23 @@ class AuthTests(unittest.TestCase):
             db.get(User,user.id).has_password=False;db.commit()
         self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000006","password":PASSWORD}).status_code,401)
 
+    def test_phone_password_login_never_sends_or_verifies_sms(self):
+        user = self.register()
+        with self.sessions() as db:
+            db.get(User, user.id).phone_number = "13800000009"
+            db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = False
+            response = self.client.post("/api/auth/phone/login", json={
+                "phone_number":"13800000009", "password":PASSWORD})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["user"]["id"], user.id)
+            rejected = self.client.post("/api/auth/phone/login", json={
+                "phone_number":"13800000009", "password":"incorrect"})
+            self.assertEqual(rejected.status_code, 401)
+            sms.send.assert_not_called()
+            sms.verify.assert_not_called()
+
     def test_account_deletion_requires_sms_and_releases_phone(self):
         user=self.register();other=self.register("bob");self.login()
         phone="13800000005"
