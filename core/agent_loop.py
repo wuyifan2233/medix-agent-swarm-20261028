@@ -344,6 +344,8 @@ class AgentLoop:
         }
 
         # 添加 tool_calls（OpenAI 格式）
+        if llm_response.reasoning_content is not None:
+            message['reasoning_content'] = llm_response.reasoning_content
         if llm_response.tool_calls:
             message['tool_calls'] = [
                 {

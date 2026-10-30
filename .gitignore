@@ -67,3 +67,8 @@ memory/agents/
 *.db-shm
 output/playwright/
 .playwright-cli/
+
+knowledge/.local/
+knowledge/data/evidence/
+
+.venv-integration/

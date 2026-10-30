@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {
+      "id": "cold",
+      "title": "咳嗽这种小病没你想的那么简单",
+      "url": "https://www.cma.org.cn/art/2022/12/5/art_4584_48537.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-12-05",
+      "type": "health_education",
+      "topics": [
+        "感冒",
+        "咳嗽",
+        "抗生素"
+      ],
+      "required_terms": [
+        "感冒"
+      ]
+    },
+    {
+      "id": "flu",
+      "title": "流感为什么可以致命",
+      "url": "https://www.cma.org.cn/art/2022/11/10/art_4584_48236.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-11-10",
+      "type": "health_education",
+      "topics": [
+        "流感"
+      ],
+      "required_terms": [
+        "流感"
+      ]
+    },
+    {
+      "id": "rhinitis",
+      "title": "对于儿童过敏性鼻炎你不得不知道的事",
+      "url": "https://www.cma.org.cn/art/2023/2/28/art_4584_49777.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-02-28",
+      "type": "health_education",
+      "topics": [
+        "过敏性鼻炎",
+        "鼻炎"
+      ],
+      "required_terms": [
+        "鼻炎"
+      ]
+    },
+    {
+      "id": "diarrhea",
+      "title": "炎热夏季要注意预防胃肠炎",
+      "url": "https://www.cma.org.cn/art/2024/8/19/art_4584_58116.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2024-08-19",
+      "type": "health_education",
+      "topics": [
+        "腹泻",
+        "胃肠炎"
+      ],
+      "required_terms": [
+        "腹泻"
+      ]
+    },
+    {
+      "id": "hypertension",
+      "title": "关于高血压还有多少是你不知道的",
+      "url": "https://www.cma.org.cn/art/2023/2/15/art_4584_49615.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-02-15",
+      "type": "lifestyle",
+      "topics": [
+        "高血压",
+        "血压"
+      ],
+      "required_terms": [
+        "高血压"
+      ]
+    },
+    {
+      "id": "diabetes",
+      "title": "糖尿病患者应该如何通过运动控糖",
+      "url": "https://www.cma.org.cn/art/2024/4/1/art_4584_55977.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2024-04-01",
+      "type": "lifestyle",
+      "topics": [
+        "糖尿病",
+        "运动",
+        "血糖"
+      ],
+      "required_terms": [
+        "糖尿病"
+      ]
+    },
+    {
+      "id": "paracetamol",
+      "title": "请注意家庭用药的这些常见误区",
+      "url": "https://www.cma.org.cn/art/2022/8/22/art_4584_47145.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-08-22",
+      "type": "medicine",
+      "topics": [
+        "对乙酰氨基酚",
+        "感冒药",
+        "重复用药"
+      ],
+      "required_terms": [
+        "对乙酰氨基酚"
+      ]
+    },
+    {
+      "id": "ibuprofen",
+      "title": "疼痛救星布洛芬你真的熟悉它吗",
+      "url": "https://imm.xju.edu.cn/info/1043/1312.htm",
+      "publisher": "新疆大学药学院（转载科普中国）",
+      "published_at": null,
+      "type": "medicine",
+      "topics": [
+        "布洛芬",
+        "止痛药"
+      ],
+      "required_terms": [
+        "布洛芬"
+      ]
+    },
+    {
+      "id": "loratadine",
+      "title": "来去匆匆的神秘风团——荨麻疹",
+      "url": "https://www.cma.org.cn/art/2024/7/2/art_4584_57381.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2024-07-02",
+      "type": "medicine",
+      "topics": [
+        "氯雷他定",
+        "抗组胺药",
+        "荨麻疹"
+      ],
+      "required_terms": [
+        "氯雷他定"
+      ]
+    },
+    {
+      "id": "ors",
+      "title": "儿童腹泻这么常见为什么还要就医检查",
+      "url": "https://www.cma.org.cn/art/2022/8/9/art_4584_46977.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-08-09",
+      "type": "medicine",
+      "topics": [
+        "口服补液盐",
+        "腹泻",
+        "脱水"
+      ],
+      "required_terms": [
+        "口服补液盐"
+      ]
+    },
+    {
+      "id": "literacy",
+      "title": "科学测量血压您真的学会了吗",
+      "url": "https://www.cma.org.cn/art/2022/6/15/art_4584_45483.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-06-15",
+      "type": "health_education",
+      "topics": [
+        "家庭血压",
+        "测量血压",
+        "血压记录"
+      ],
+      "required_terms": [
+        "血压"
+      ]
+    },
+    {
+      "id": "medication",
+      "title": "哮喘患者的居家生活应注意什么",
+      "url": "https://www.cma.org.cn/art/2024/4/7/art_4584_56018.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2024-04-07",
+      "type": "health_education",
+      "topics": [
+        "合理用药",
+        "哮喘",
+        "生活方式"
+      ],
+      "required_terms": [
+        "哮喘"
+      ]
+    },
+    {
+      "id": "diabetes_myths",
+      "title": "走出2型糖尿病的认识误区",
+      "url": "https://www.cma.org.cn/art/2022/8/5/art_4584_46938.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-08-05",
+      "type": "health_education",
+      "topics": [
+        "糖尿病",
+        "水果",
+        "饮食"
+      ],
+      "required_terms": [
+        "水果",
+        "糖尿病"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "diabetes_diet",
+      "title": "想控制血糖的人看过来——告诉你“如何合理地吃饭”",
+      "url": "https://www.cma.org.cn/art/2023/7/17/art_4584_51835.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-07-17",
+      "type": "health_education",
+      "topics": [
+        "糖尿病",
+        "血糖",
+        "饮食",
+        "水果"
+      ],
+      "required_terms": [
+        "GI",
+        "水果"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "hypertension_intro",
+      "title": "教您了解高血压",
+      "url": "https://www.cma.org.cn/art/2023/6/15/art_4584_51335.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-06-15",
+      "type": "health_education",
+      "topics": [
+        "高血压",
+        "饮食",
+        "食盐"
+      ],
+      "required_terms": [
+        "高血压",
+        "5克"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "医学机构健康科普，非药品说明书"
+    },
+    {
+      "id": "hypertension_standard2019",
+      "title": "中国高血压健康管理规范（2019）",
+      "url": "https://csc.cma.org.cn/art/2020/5/8/art_619_34440.html",
+      "publisher": "中华医学会心血管病学分会",
+      "published_at": "2020-05-08",
+      "type": "clinical_guideline",
+      "topics": [
+        "高血压",
+        "饮食",
+        "运动",
+        "水果"
+      ],
+      "required_terms": [
+        "高血压",
+        "管理"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "clinical_guideline",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "2019版健康管理规范，非最新版本；非药品说明书"
+    }
+  ]
+}
