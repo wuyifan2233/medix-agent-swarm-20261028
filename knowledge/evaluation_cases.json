@@ -28,5 +28,14 @@
  {"id":"s02","kind":"needs_information","query":"怀孕了氯雷他定能吃吗"},
  {"id":"s03","kind":"needs_information","query":"肾功能不好对乙酰氨基酚用多少"},
  {"id":"s04","kind":"needs_information","query":"布洛芬和对乙酰氨基酚可以一起吃吗"},
- {"id":"s05","kind":"needs_information","query":"血压正常了我能停药吗"}
+ {"id":"s05","kind":"needs_information","query":"血压正常了我能停药吗"},
+ {"id":"p01","kind":"in_domain","query":"高血压患者水果能不能吃","expected_docs":["hypertension"],"evidence_terms":["水果","饮食"]},
+ {"id":"p02","kind":"in_domain","query":"血压高平时怎样管理","expected_docs":["hypertension"],"evidence_terms":["膳食","运动"]},
+ {"id":"p03","kind":"in_domain","query":"儿童过敏性鼻炎有哪些症状","expected_docs":["rhinitis"],"evidence_terms":["鼻塞","喷嚏"]},
+ {"id":"p04","kind":"audience_mismatch","query":"成人鼻炎如何护理"},
+ {"id":"p05","kind":"knowledge_gap","query":"氯雷他定有哪些禁忌","expected_gap":"missing_product_label"},
+ {"id":"p06","kind":"needs_information","query":"虚构：我吃了一片布洛芬，现在该怎么办"},
+ {"id":"p07","kind":"knowledge_gap","query":"糖尿病患者水果能不能吃","expected_gap":"missing_subtopic"},
+ {"id":"p08","kind":"in_domain","query":"那饮食应该注意什么","history":[{"role":"user","content":"高血压如何管理"}],"expected_docs":["hypertension"],"evidence_terms":["膳食","饮食"]},
+ {"id":"p09","kind":"in_domain","query":"糖尿病怎样运动","history":[{"role":"user","content":"高血压如何管理"}],"expected_docs":["diabetes"],"evidence_terms":["运动"]}
 ]

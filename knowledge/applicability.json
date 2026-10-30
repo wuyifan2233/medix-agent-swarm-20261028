@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "notice": "项目整理的资料范围标签，不代表临床审核或个人诊疗适用性确认。",
+  "documents": {
+    "cold": {"audiences": ["general"], "evidence_kind": "popular_science"},
+    "flu": {"audiences": ["general"], "evidence_kind": "popular_science"},
+    "rhinitis": {"audiences": ["children"], "evidence_kind": "popular_science"},
+    "diarrhea": {"audiences": ["adults"], "evidence_kind": "popular_science"},
+    "hypertension": {"audiences": ["adults"], "evidence_kind": "popular_science"},
+    "diabetes": {"audiences": ["adults"], "evidence_kind": "popular_science"},
+    "paracetamol": {"audiences": ["general"], "evidence_kind": "popular_science"},
+    "ibuprofen": {"audiences": ["general"], "evidence_kind": "popular_science"},
+    "loratadine": {"audiences": ["general"], "evidence_kind": "popular_science"},
+    "ors": {"audiences": ["children"], "evidence_kind": "popular_science"},
+    "literacy": {"audiences": ["older_adults"], "evidence_kind": "popular_science"},
+    "medication": {"audiences": ["general"], "evidence_kind": "popular_science"}
+  }
+}

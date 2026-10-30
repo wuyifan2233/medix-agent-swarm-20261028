@@ -6,7 +6,7 @@ from unittest.mock import patch
 import httpx
 import numpy as np
 from openai import OpenAI
-from knowledge.embeddings import GiteeQwenEmbedding, EmbeddingError, normalize_vectors, create_embedder, load_api_key
+from knowledge.embeddings import GiteeQwenEmbedding, SiliconFlowQwenEmbedding, EmbeddingError, normalize_vectors, create_embedder, load_api_key, load_setting
 
 
 class Tokenizer:
@@ -14,6 +14,24 @@ class Tokenizer:
 
 
 class EmbeddingTests(unittest.TestCase):
+    def test_siliconflow_embedding_contract_and_separate_identity(self):
+        def handler(request):
+            self.assertEqual(str(request.url),'https://api.siliconflow.cn/v1/embeddings')
+            body=json.loads(request.content)
+            self.assertEqual(body['model'],'Qwen/Qwen3-Embedding-8B');self.assertEqual(body['dimensions'],4096)
+            self.assertEqual(request.headers['authorization'],'Bearer sf-test')
+            return httpx.Response(200,json={'data':[{'index':0,'embedding':[1.0]+[0.0]*4095}]})
+        client=OpenAI(api_key='sf-test',base_url='https://api.siliconflow.cn/v1',http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+        self.addCleanup(client.close)
+        backend=SiliconFlowQwenEmbedding(client=client,tokenizer=Tokenizer())
+        self.assertEqual(backend.encode_query('q').shape,(4096,))
+        self.assertEqual(backend.identity['provider'],'siliconflow')
+        self.assertNotEqual(backend.identity['endpoint'],'https://ai.gitee.com/v1')
+
+    def test_non_secret_settings_can_be_selected_in_local_file(self):
+        with patch.dict(os.environ,{'MEDIX_EMBEDDING_PROVIDER':''}),patch('dotenv.dotenv_values',return_value={'MEDIX_EMBEDDING_PROVIDER':'siliconflow'}),patch('knowledge.embeddings.SiliconFlowQwenEmbedding') as factory:
+            create_embedder();factory.assert_called_once()
+
     def backend(self, handler):
         client=OpenAI(api_key='unit-test-token',base_url='https://ai.gitee.com/v1',max_retries=0,
                       http_client=httpx.Client(transport=httpx.MockTransport(handler)))

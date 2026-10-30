@@ -16,7 +16,11 @@ def digest(value):
 
 def load_corpus():
     manifest = json.loads((LOCAL / 'manifest.json').read_text(encoding='utf-8'))
+    generation=manifest.get('generation')
+    if generation and not re.fullmatch(r'[a-f0-9]{16}',generation):raise ValueError('Invalid corpus generation')
+    content_root=LOCAL/'generations'/generation if generation else LOCAL
     registry = json.loads(REGISTRY.read_text(encoding='utf-8'))['documents']
+    labels=json.loads((ROOT/'applicability.json').read_text(encoding='utf-8'))['documents']
     expected = {d['id']: d for d in registry}
     if {d['id'] for d in manifest['documents']} != set(expected):
         raise ValueError('Local corpus does not match source registry; fetch sources again')
@@ -25,10 +29,10 @@ def load_corpus():
         source = expected[metadata['id']]
         if any(metadata.get(k) != source.get(k) for k in source):
             raise ValueError('Source registry changed; fetch sources again')
-        text = (LOCAL / 'documents' / (metadata['id'] + '.md')).read_text(encoding='utf-8')
+        text = (content_root / 'documents' / (metadata['id'] + '.md')).read_text(encoding='utf-8')
         if digest(text) != metadata['content_sha256']:
             raise ValueError('Snapshot hash mismatch: ' + metadata['id'])
-        docs.append({'id': metadata['id'], 'content': text, 'metadata': metadata})
+        docs.append({'id': metadata['id'], 'content': text, 'metadata': {**metadata,**labels.get(metadata['id'],{})}})
     return docs
 
 

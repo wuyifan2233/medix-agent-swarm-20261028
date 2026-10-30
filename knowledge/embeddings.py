@@ -1,4 +1,4 @@
-"""Embedding backends: Gitee Qwen API or explicit local BGE fallback."""
+"""Embedding backends: Gitee/SiliconFlow Qwen API or explicit local BGE."""
 import os
 from pathlib import Path
 import numpy as np
@@ -8,12 +8,16 @@ QWEN_MODEL = 'Qwen3-Embedding-8B'
 QUERY_INSTRUCTION = 'Given a medical question, retrieve relevant passages that answer the question'
 
 
-def load_api_key(name):
+def load_setting(name,default=''):
     if os.environ.get(name,'').strip():
         return os.environ[name].strip()
     from dotenv import dotenv_values
     path=Path(__file__).resolve().parents[1]/'.env.local'
-    return (dotenv_values(path,encoding='utf-8-sig').get(name) or '').strip()
+    return (dotenv_values(path,encoding='utf-8-sig').get(name) or default).strip()
+
+
+def load_api_key(name):
+    return load_setting(name)
 
 
 def load_gitee_key():
@@ -38,13 +42,18 @@ def normalize_vectors(vectors, dimension, count):
 
 
 class GiteeQwenEmbedding:
+    provider='gitee'
+    endpoint=GITEE_URL
+    model_name=QWEN_MODEL
+    key_name='GITEE_AI_API_KEY'
+
     def __init__(self, client=None, tokenizer=None):
-        key = load_gitee_key()
-        if client is None and not key:
-            raise EmbeddingError('请设置 GITEE_AI_API_KEY 后重建 Qwen 证据索引；离线 BGE 请显式设置 MEDIX_EMBEDDING_PROVIDER=local')
-        self.model = QWEN_MODEL
+        key = load_gitee_key() if self.provider=='gitee' else load_api_key(self.key_name)
+        if client is None and (not key or key.lower()=='xxx'):
+            raise EmbeddingError(f'请在 .env.local 或环境变量设置 {self.key_name}；离线 BGE 请显式设置 MEDIX_EMBEDDING_PROVIDER=local')
+        self.model = self.model_name
         self.dimension = 4096
-        self.batch_size = int(os.environ.get('MEDIX_EMBEDDING_BATCH_SIZE', '8'))
+        self.batch_size = int(load_setting('MEDIX_EMBEDDING_BATCH_SIZE', '8'))
         if not 1 <= self.batch_size <= 1000:
             raise ValueError('MEDIX_EMBEDDING_BATCH_SIZE must be 1–1000')
         self.query_instruction = QUERY_INSTRUCTION
@@ -54,10 +63,10 @@ class GiteeQwenEmbedding:
         self.tokenizer = tokenizer
         if client is None:
             from openai import OpenAI
-            client = OpenAI(api_key=key, base_url=GITEE_URL, timeout=30.0, max_retries=2)
+            client = OpenAI(api_key=key, base_url=self.endpoint, timeout=30.0, max_retries=2)
         self.client = client
         # Separate provider, dimension and query template even if vector sizes match.
-        self.identity = {'provider':'gitee','endpoint':GITEE_URL,'model':self.model,
+        self.identity = {'provider':self.provider,'endpoint':self.endpoint,'model':self.model,
                          'dimension':self.dimension,'normalization':'l2',
                          'query_instruction':self.query_instruction,'document_instruction':'',
                          'tokenizer':'Qwen/Qwen3-Embedding-8B',
@@ -81,7 +90,7 @@ class GiteeQwenEmbedding:
             except EmbeddingError:
                 raise
             except Exception:
-                raise EmbeddingError('Gitee embedding request failed; check credentials, quota and network') from None
+                raise EmbeddingError(f'{self.provider} embedding request failed; check credentials, quota and network') from None
             batches.append(normalize_vectors(vectors,self.dimension,len(batch)))
         return np.concatenate(batches)
 
@@ -118,8 +127,16 @@ class LocalBGEEmbedding:
         pass
 
 
+class SiliconFlowQwenEmbedding(GiteeQwenEmbedding):
+    provider='siliconflow'
+    endpoint='https://api.siliconflow.cn/v1'
+    model_name='Qwen/Qwen3-Embedding-8B'
+    key_name='SILICONFLOW_API_KEY'
+
+
 def create_embedder():
-    provider=os.environ.get('MEDIX_EMBEDDING_PROVIDER','gitee').lower()
+    provider=load_setting('MEDIX_EMBEDDING_PROVIDER','gitee').lower()
     if provider=='gitee':return GiteeQwenEmbedding()
+    if provider=='siliconflow':return SiliconFlowQwenEmbedding()
     if provider=='local':return LocalBGEEmbedding()
-    raise ValueError('MEDIX_EMBEDDING_PROVIDER must be gitee or local')
+    raise ValueError('MEDIX_EMBEDDING_PROVIDER must be gitee, siliconflow or local')

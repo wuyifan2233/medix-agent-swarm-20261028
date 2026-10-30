@@ -13,27 +13,14 @@ from knowledge.embeddings import create_embedder, normalize_vectors
 from knowledge.reranking import create_reranker, rerank_candidates
 from knowledge.bootstrap import validate_target
 from knowledge.corpus import LOCAL, CHUNK_VERSION, chunk_document, digest, load_corpus
-
-ALIASES = {'扑热息痛': '对乙酰氨基酚', '拉肚子': '腹泻', '流行性感冒': '流感', '血压高': '高血压'}
-
-
-def normalize_query(query):
-    query = query.strip()
-    for old, new in ALIASES.items():
-        query = query.replace(old, new)
-    return query
-
+from knowledge.query_policy import normalize_query, insufficient_medication, requested_audience, applicability, knowledge_gap
 
 def tokens(text):
     return [x.lower() for x in jieba.cut_for_search(text) if re.search(r'[\w\u4e00-\u9fff]', x)]
 
 
-def insufficient_medication(query):
-    """Conservative demo boundary; not a medical diagnostic or dosage engine."""
-    return bool(re.search(r'吃几|吃多少|用多少|多少毫[克升]|几毫[克升]|剂量|加量|停药|换药|能吃吗|能不能吃|可以吃吗|一起吃|混着吃', query))
-
-
 def validate_citations(answer, count):
+    answer=re.sub(r'\[(\d+(?:\s*[,，]\s*\d+)+)\]',lambda m:''.join('['+n+']' for n in re.findall(r'\d+',m[1])),answer)
     invalid = sorted({int(n) for n in re.findall(r'\[(\d+)\]', answer) if not 1 <= int(n) <= count})
     answer = re.sub(r'\[(\d+)\]', lambda m: m.group() if 1 <= int(m[1]) <= count else '（引用无效）', answer)
     return answer, invalid
@@ -60,7 +47,7 @@ class EvidenceKnowledgeBase:
             self.rows = [chunk for doc in docs for chunk in chunk_document(doc, self.embedding_model.tokenizer)]
             if not self.rows or len({r['id'] for r in self.rows}) != len(self.rows):
                 raise ValueError('Empty corpus or duplicate chunk IDs')
-            self.version = digest(json.dumps({'chunks':[(r['id'],r['metadata']['content_sha256'],r['metadata']['url']) for r in self.rows],'embedding':self.embedding_model.identity,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))[:16]
+            self.version = digest(json.dumps({'chunks':[(r['id'],r['metadata']['content_sha256'],r['metadata']['url']) for r in self.rows],'metadata':[d['metadata'] | {'retrieved_at':''} for d in docs],'embedding':self.embedding_model.identity,'chunker':CHUNK_VERSION},sort_keys=True,ensure_ascii=False))[:16]
             # MEDIX_DB_PATH remains the legacy database setting. Evidence uses its own
             # versioned root so migration cannot accidentally insert bundled samples.
             import tempfile
@@ -107,7 +94,9 @@ class EvidenceKnowledgeBase:
         if not isinstance(query,str) or not query.strip() or len(query)>8000 or not 1<=top_k<=20:
             raise ValueError('Query must be 1–8000 characters and top_k 1–20')
         query = normalize_query(query)
-        trace = {'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version,'rerank':{'status':'skipped' if self.reranker else 'disabled'}}
+        audience=requested_audience(query)
+        gap=knowledge_gap(query,self.documents)
+        trace = {'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version,'audience':audience,'knowledge_gap':gap,'rerank':{'status':'skipped' if self.reranker else 'disabled'}}
         if insufficient_medication(query):
             return {'status':'needs_information','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库提供基础科普，不能据此确定个人用药、剂量或联合用药。请提供具体制剂、规格、年龄、相关病史及当前用药，并咨询医生或药师。'}
         # This is a deliberately small demo corpus: do not claim general medicine
@@ -130,17 +119,23 @@ class EvidenceKnowledgeBase:
                 for ids in ([h['id'] for h in dense],sparse):
                     for rank,cid in enumerate(ids,1):ranks[cid]=ranks.get(cid,0)+1/(60+rank)
                 ranked = sorted(ranks,key=lambda cid:(-ranks[cid],cid))
-                subjects={term for term in ('对乙酰氨基酚','布洛芬','氯雷他定','口服补液盐','高血压','糖尿病','流感','过敏性鼻炎','哮喘','胃肠炎','腹泻') if term in query}
-                hits=[];seen=set()
+                subjects={term for term in ('对乙酰氨基酚','布洛芬','氯雷他定','口服补液盐','高血压','糖尿病','流感','鼻炎','哮喘','胃肠炎','腹泻') if term in query}
+                hits=[];seen=set();audience_excluded=0
                 for cid in ranked:
                     row=self.by_id[cid]
                     if similarities.get(cid,-1)<.4 or row['content'] in seen:continue
-                    if subjects and not any(s in row['content'] or s in row['metadata']['topics'] for s in subjects):continue
+                    if subjects and not subjects.intersection(row['metadata']['topics']):continue
+                    suitability=applicability(row['metadata'],audience)
+                    if suitability=='mismatch':
+                        audience_excluded+=1
+                        continue
                     seen.add(row['content'])
-                    hits.append({**row,'score':similarities[cid],'rrf_score':ranks[cid]})
+                    hits.append({**row,'score':similarities[cid],'rrf_score':ranks[cid],'applicability':suitability})
                 hits,trace['rerank']=rerank_candidates(self.reranker,query,hits,top_k)
-                trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits))
-                return {'status':'ok' if hits else 'no_results','hits':hits,'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'' if hits else '当前知识库资料不足，未找到足够相关的证据。'}
+                trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits),audience_excluded=audience_excluded)
+                message=gap['message'] if gap else ''
+                if not hits and not message:message='当前没有适合所述人群的相关资料。' if audience_excluded else '当前知识库资料不足，未找到足够相关的证据。'
+                return {'status':'ok' if hits else 'no_results','hits':hits,'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':message}
         except Exception as exc:
             return {'status':'error','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'知识库检索故障：'+type(exc).__name__}
 
@@ -156,5 +151,7 @@ def evidence_sources(hits, query=''):
              'published_at':r['metadata'].get('published_at'),'url':r['metadata']['url'],
              'section':r['metadata']['section'],'start_char':r['metadata']['start_char'],
              'source_checked':r['metadata']['source_checked'],'clinical_reviewed':False,
+             'audiences':r['metadata'].get('audiences',['unspecified']),'evidence_kind':r['metadata'].get('evidence_kind','unspecified'),
+             'applicability':r.get('applicability','needs_confirmation'),
              'content_sha256':r['metadata']['content_sha256'],
              'highlight_terms':list(dict.fromkeys(t for t in tokens(normalize_query(query)) if len(t)>=2))[:16]} for i,r in enumerate(hits,1)]

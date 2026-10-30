@@ -3,7 +3,7 @@ import math
 import os
 import time
 import httpx
-from knowledge.embeddings import load_api_key
+from knowledge.embeddings import load_api_key,load_setting
 
 URL='https://api.siliconflow.cn/v1/rerank'
 MODEL='Qwen/Qwen3-Reranker-8B'
@@ -47,7 +47,7 @@ class SiliconFlowReranker:
 
 
 def create_reranker():
-    provider=os.environ.get('MEDIX_RERANK_PROVIDER','none').lower()
+    provider=load_setting('MEDIX_RERANK_PROVIDER','none').lower()
     if provider=='none':return None
     if provider=='siliconflow':return SiliconFlowReranker()
     raise ValueError('MEDIX_RERANK_PROVIDER must be none or siliconflow')

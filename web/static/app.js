@@ -103,6 +103,18 @@ function resultMessage(row, result) {
     answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => showEvidence(result.sources.find(s => s.citation === Number(button.dataset.citation))));
     main.append(retrievalDetails(result.retrieval));
   }
+  if (result.generation === 'model' && result.evidence_links?.length) {
+    const panel = document.createElement('details'); panel.className = 'observations';
+    const summary = document.createElement('summary'); summary.textContent = '逐句核对回答引用'; panel.append(summary);
+    result.evidence_links.forEach(item => {
+      const line = document.createElement('p'); line.textContent = item.text;
+      const note = document.createElement('small'); note.textContent = item.status === 'verbatim_match' ? ' · 原文逐字匹配（不代表临床审核）' : item.status === 'uncited' ? ' · 未提供引用' : ' · 引用存在，支持关系待核对'; line.append(note);
+      item.citations.forEach(id => { const source = result.sources.find(s => s.citation === id); if (!source) return;
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'citation'; button.textContent = `核对 [${id}]`;
+        button.onclick = () => showEvidence(source, item.quotes.find(q => q.citation === id)?.quote || ''); line.append(button); });
+      panel.append(line);
+    }); main.append(panel);
+  }
   const meta = document.createElement('div'); meta.className = 'message-meta';
   const tags = [result.generation === 'not_called' ? '仅检索原文' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
@@ -266,16 +278,21 @@ function retrievalDetails(trace) {
   const text = document.createElement('p'); text.textContent = `语义召回 ${trace.vector_candidates} 段 · 关键词召回 ${trace.keyword_candidates} 段 → 合并 ${trace.merged_candidates} 段 → 相关性过滤后提供 ${trace.selected} 段证据。检索耗时 ${trace.elapsed_ms} 毫秒。分数用于排序，不代表医学可信度。`;
   if (trace.rerank?.status === 'ok') text.textContent += ` 已对 ${trace.rerank.candidates} 段候选完成相关性重排。`;
   if (trace.rerank?.status === 'degraded') text.textContent += ` ${trace.rerank.message}`;
+  if (trace.context_rewritten) text.textContent += ` 已结合本轮主题检索：${trace.query}`;
+  if (trace.audience_excluded) text.textContent += ` 已排除 ${trace.audience_excluded} 段人群不匹配资料。`;
+  if (trace.knowledge_gap) text.textContent += ` ${trace.knowledge_gap.message}`;
   details.append(summary, text); return details;
 }
-function showEvidence(source) {
+const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
+function showEvidence(source, quote = '') {
   if (!source) return;
   $('dialogTitle').textContent = source.title;
   const content = $('dialogContent'); content.replaceChildren();
   const provenance = document.createElement('p'); provenance.textContent = `${source.publisher} · ${source.published_at || '日期未注明'}\n来源已核对（机构、链接与原文），未作临床审核。`;
   const section = document.createElement('p'); section.textContent = `章节：${source.section} · 本地原文字符位置：${source.start_char}`;
+  const audience = document.createElement('p'); audience.textContent = `资料类型：${source.evidence_kind === 'popular_science' ? '健康科普，非核准药品说明书' : source.evidence_kind || '未注明'}。适用范围：${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}。${source.applicability === 'needs_confirmation' ? '当前未确认提问者是否属于该人群，请核对后使用。' : '范围标签仅说明原文主题，不代表个人适用性确认。'}`;
   const excerpt = document.createElement('pre'); excerpt.className = 'evidence-text';
-  const terms = (source.highlight_terms || []).filter(t => t.length >= 2);
+  const terms = (quote ? [quote] : source.highlight_terms || []).filter(t => t.length >= 2);
   if (terms.length) {
     const pattern = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
     String(source.content).split(pattern).forEach(part => { const node = document.createElement(terms.includes(part) ? 'mark' : 'span'); node.textContent = part; excerpt.append(node); });
@@ -284,7 +301,7 @@ function showEvidence(source) {
   try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) link.href = url.href; } catch {}
   link.target = '_blank'; link.rel = 'noopener noreferrer';
   const version = document.createElement('small'); version.textContent = `来源快照 SHA-256：${source.content_sha256}`;
-  content.append(provenance, section, excerpt, link, document.createElement('hr'), version);
+  content.append(provenance, audience, section, excerpt, link, document.createElement('hr'), version);
   if (!$('infoDialog').open) $('infoDialog').showModal();
 }
 async function openKnowledge() {
@@ -309,7 +326,7 @@ async function openKnowledge() {
     const response = await fetch('/api/knowledge/catalog'); const data = await response.json(); if (!response.ok) throw new Error(data.detail);
     catalogNode.replaceChildren();
     const count = document.createElement('p'); count.textContent = `${data.documents.length} 份来源 · ${data.chunks} 个独立片段 · 版本 ${data.version}`; catalogNode.append(count);
-    data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}`; catalogNode.append(p); });
+    data.documents.forEach(doc => { const p = document.createElement('p'); p.textContent = `${doc.title}｜${doc.publisher}｜${doc.published_at || '日期未注明'}｜${(doc.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}｜健康科普`; catalogNode.append(p); });
   } catch (error) { catalogNode.textContent = error.message; }
 }
 $('refreshPrompts').onclick = () => {

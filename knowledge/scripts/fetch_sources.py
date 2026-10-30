@@ -3,6 +3,7 @@ import concurrent.futures
 import datetime
 import json
 import re
+import tempfile
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -12,7 +13,7 @@ from bs4 import BeautifulSoup
 from knowledge.corpus import LOCAL, REGISTRY, digest
 
 
-def fetch(source):
+def fetch(source,destination=LOCAL):
     response = requests.get(source['url'], timeout=45)
     response.raise_for_status()
     if urlparse(response.url).hostname != urlparse(source['url']).hostname:
@@ -35,9 +36,9 @@ def fetch(source):
     # Mark only genuine short section labels; do not invent medical summaries.
     paragraphs = [('## ' + p if len(p) < 65 and re.match(r'^(?:[一二三四五六七八九十]+[、．.]|[（(][一二三四五六七八九十]+[）)])', p) else p) for p in paragraphs]
     text = '# ' + source['title'] + '\n\n' + '\n\n'.join(paragraphs) + '\n'
-    html_path = LOCAL / 'snapshots' / (source['id'] + '.html')
+    html_path = destination / 'snapshots' / (source['id'] + '.html')
     html_path.write_bytes(response.content)
-    (LOCAL / 'documents' / (source['id'] + '.md')).write_text(text, encoding='utf-8')
+    (destination / 'documents' / (source['id'] + '.md')).write_text(text, encoding='utf-8')
     return {**source, 'retrieved_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'content_sha256': digest(text), 'snapshot_sha256': __import__('hashlib').sha256(response.content).hexdigest(),
             'source_checked': True, 'clinical_reviewed': False,
@@ -46,13 +47,24 @@ def fetch(source):
 
 
 def main():
+    LOCAL.mkdir(parents=True,exist_ok=True)
+    staging=Path(tempfile.mkdtemp(prefix='.stage-',dir=LOCAL))
     for folder in ['documents', 'snapshots']:
-        (LOCAL / folder).mkdir(parents=True, exist_ok=True)
+        (staging / folder).mkdir(parents=True, exist_ok=True)
     sources = json.loads(REGISTRY.read_text(encoding='utf-8'))['documents']
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        docs = list(pool.map(fetch, sources))
+        docs = list(pool.map(lambda source:fetch(source,staging), sources))
     manifest = {'documents': sorted(docs, key=lambda d: d['id'])}
-    (LOCAL / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    generation=digest(json.dumps(manifest,sort_keys=True,ensure_ascii=False))[:16]
+    target=LOCAL/'generations'/generation
+    target.parent.mkdir(parents=True,exist_ok=True)
+    if not staging.resolve().is_relative_to(LOCAL.resolve()) or not target.resolve().is_relative_to(LOCAL.resolve()):
+        raise ValueError('Corpus generation must remain within the local corpus directory')
+    staging.replace(target)
+    manifest['generation']=generation
+    temp_manifest=LOCAL/'manifest.pending.json'
+    temp_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    temp_manifest.replace(LOCAL/'manifest.json')
     print(json.dumps({'fetched': len(docs), 'directory': str(LOCAL)}, ensure_ascii=False))
 
 if __name__ == '__main__':

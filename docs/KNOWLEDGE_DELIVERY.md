@@ -12,7 +12,7 @@
 
 ### Gitee Qwen3-Embedding-8B（证据版默认后端）
 
-嵌入接口为 `POST https://ai.gitee.com/v1/embeddings`，使用独立的 `GITEE_AI_API_KEY`，不要复用或覆盖聊天模型的 `OPENAI_API_KEY`。请求使用 `model=Qwen3-Embedding-8B`、`encoding_format=float`、显式 `dimensions=4096`，并严格校验响应。2026-10-29 实测省略 dimensions 时 Gitee 返回 1024 维，因此不能依赖原生模型维度推断服务端默认值。配置模板见根目录 `.env.example`；可复制成被 Git 忽略的 `.env.local` 保存本机默认凭据。嵌入后端只读取其中的 `GITEE_AI_API_KEY`，进程环境变量优先；其他开关仍用环境变量。
+嵌入接口为 `POST https://ai.gitee.com/v1/embeddings`，使用独立的 `GITEE_AI_API_KEY`，不要复用或覆盖聊天模型的 `OPENAI_API_KEY`。请求使用 `model=Qwen3-Embedding-8B`、`encoding_format=float`、显式 `dimensions=4096`，并严格校验响应。2026-10-29 实测省略 dimensions 时 Gitee 返回 1024 维，因此不能依赖原生模型维度推断服务端默认值。配置模板见根目录 `.env.example`；可复制成被 Git 忽略的 `.env.local` 保存本机默认凭据。嵌入及重排配置支持从 `.env.local` 读取，进程环境变量优先；模型缓存等其余运行配置继续使用环境变量。
 
 在本机 PowerShell 通过隐藏输入设置凭据，再执行下方构建和运行命令：
 
@@ -54,6 +54,18 @@ python run_kb_demo.py --port 8766
 
 再次构建相同来源不会重复插入。构建验证 chunk ID 和条目数；不完整索引会失败并要求选择新的根目录，不删除或覆盖旧数据。更新来源后先构建、评测，通过后再重启证据入口。回滚使用旧语料/代码版本及旧索引目录；不要手工覆盖正在使用的索引。
 
+## 2026-10-30 优化交付
+
+- `MEDIX_EMBEDDING_PROVIDER=gitee|siliconflow|local` 可在 `.env.local` 中选择。硅基流动使用 `SILICONFLOW_API_KEY`、`https://api.siliconflow.cn/v1/embeddings` 和 `Qwen/Qwen3-Embedding-8B`，显式 4096 维；请求契约已用模拟 HTTP 验证，尚未真实调用。官方文档：[Embedding 接口](https://api-docs.siliconflow.cn/docs/api/embeddings-post)。更换后端必须先停止服务、构建并评测，后端/endpoint/model 都进入版本身份，即使同维度也不能混用向量。`MEDIX_RERANK_PROVIDER` 独立选择是否重排。
+- 食物问题不再仅因“能吃吗”进入用药信息不足分支；增加血压高/血糖高等检索别名。短追问从最近用户消息继承主题，明确的新主题不继承；这是有限规则，不是通用意图模型。
+- `knowledge/applicability.json` 标注当前 12 份资料的人群和科普属性。明确不匹配的人群被过滤，未明确人群的查询会展示需要核对范围；标签不是临床审核。
+- 缺少说明书、缺少水果专题时显示资料缺口；回答生成提示也包含该缺口。逐句引用面板区分原文逐字匹配、引用待核对与未引用，不用编号有效性宣称语义支持。
+- 下载改为完整暂存并校验后，原子切换来源清单；失败不会覆盖在用正文。保留旧布局读取能力及历史 generation，运行数据仍不提交。
+
+本次 51 项测试通过；真实 Gitee 39 个检索用例全部通过，其中库内 25/25、库外 5/5、信息不足 6/6，另有资料缺口和人群不匹配检查。版本 `b2a633d17120f15b`，12 份资料、56 个 chunk，本次预热检索 p95 为 4039.9 ms，超过 2000 ms 延迟门槛，因此性能门槛未通过；详见 `docs/optimization-evaluation.json`。远程请求延迟波动明显，另一次运行 p95 达到 9475.6 ms，不能保证路演实时响应。这是固定小测试集的检索验证，尚未验证真实聊天生成、硅基流动嵌入或重排效果。
+
+后续权威数据源及接入顺序见 [数据源扩展调研](KNOWLEDGE_SOURCES_ROADMAP.md)。新增来源尚未入库。
+
 ## 与同事 feature/rag 的兼容
 
 本功能分支基于 `origin/feature/rag` 的 `9902806`，复用了同事的路径验证逻辑，保留自动入库修复。已实测独立空库首次初始化导入 180 行，再次初始化仍为 180 行，检索有结果；其 11 项测试通过。
@@ -86,7 +98,7 @@ python run_kb_demo.py --port 8766
 - `retrieve(query, top_k=3, filter_type=None)`：返回 `status`（`ok/no_results/needs_information/error`）、`hits`、`message`、`trace`。
 - `search()`：兼容旧技能；错误抛出异常，无结果返回空列表。
 - `GET /api/knowledge/catalog`：来源清单、版本和片段数。
-- `GET /api/knowledge/retrieve?q=...`：无 Key 检索，包含来源和检索过程，查询仅接受 1–8000 字；不落盘查询。仅在 evidence 模式就绪后可用。
+- `GET /api/knowledge/retrieve?q=...`：无需聊天 Key 的检索，远程嵌入后端仍需要对应 Key；包含来源和检索过程，查询仅接受 1–8000 字；不落盘查询。仅在 evidence 模式就绪后可用。
 - `GET /api/health`：增加 `mode=evidence`、`source_documents` 和 `version`。
 - 聊天结果增加 `retrieval`、`retrieval_status`、`generation`、`invalid_citations`，来源包含完整证据、机构、日期、原始 URL、原文位置和哈希。
 
@@ -95,11 +107,11 @@ python run_kb_demo.py --port 8766
 ## 验证与路演
 
 ```powershell
-python -m unittest knowledge.test_embeddings knowledge.test_reranking knowledge.test_bootstrap knowledge.test_evidence web.test_web -v
+python -m unittest knowledge.test_embeddings knowledge.test_reranking knowledge.test_bootstrap knowledge.test_evidence knowledge.test_query_policy web.test_web -v
 python knowledge/scripts/evaluate_evidence.py
 ```
 
-评测集为 `knowledge/evaluation_cases.json`：20 个库内问题、5 个库外问题、5 个用药信息不足问题。命中要求 top-3 中存在预期来源，且片段包含预先标注的证据词；不是答案准确率，也不是独立医疗基准。脚本同时验证全部 chunk 的 token 预算、原文位置、唯一 ID 和索引条目数。结果写入忽略提交的 `verification_evidence.json`，交付记录保存在 `docs/evidence-evaluation.json`。本机未配置 API Key，真实模型回答质量未验证。
+评测集为 `knowledge/evaluation_cases.json`：现为 39 题，25 个库内问题、5 个库外问题、6 个用药信息不足问题，另有 1 个人群不匹配和 2 个资料缺口问题。命中要求 top-3 中存在预期来源，且片段包含预先标注的证据词；不是答案准确率，也不是独立医疗基准。脚本同时验证全部 chunk 的 token 预算、原文位置、唯一 ID 和索引条目数。结果写入忽略提交的 `verification_evidence.json`，交付记录保存在 `docs/evidence-evaluation.json`。本机已配置 Gitee 嵌入 Key，但未配置聊天模型 Key，真实生成回答质量未验证。
 
 2026-10-29 本机交付验证：27 项回归测试通过；库内 Hit@3 为 20/20，库外与信息不足各 5/5，预热检索 p95 为 180.3 ms。重复构建条目数仍为 71；网页实际完成无 Key 聊天原文返回、引用点击、来源展开、高亮及 390px 窄屏无横向溢出检查。延迟为本机固定语料结果，不是通用性能承诺。信息不足项验证的是规则提示，不是模型回答质量。
 
