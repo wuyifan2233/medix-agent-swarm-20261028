@@ -34,6 +34,7 @@ from personalization.store import ProfileStore
 from personalization.middleware import ProfileBodyLimit
 from personalization.memory_tools import memory_tool_result
 from personalization.report_imports import router as report_import_router
+from personalization.conversation_updates import router as conversation_profile_router
 from personalization.context import profile_context, retrieval_query, scope as profile_scope
 from personalization.context import select_fields, PROFILE_FIELDS
 
@@ -113,6 +114,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(report_import_router)
+app.include_router(conversation_profile_router)
 
 
 @app.exception_handler(RequestValidationError)

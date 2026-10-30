@@ -5,7 +5,7 @@ from personalization.schemas import ProfileData
 from datetime import datetime, timezone
 
 
-PROFILE_FIELDS=('age','sex','conditions','allergies','medications')
+PROFILE_FIELDS=('age','sex','conditions','allergies','medications','symptoms')
 
 
 def select_fields(snapshot, fields):
@@ -34,7 +34,7 @@ def retrieval_query(question, observed, snapshot):
         recorded=data.get('field_sources',{}).get('age',{}).get('report_date') or ''
         terms.append(f"{recorded}记录年龄{data['age']}岁")
     terms.append({"male": "男性", "female": "女性"}.get(data["sex"], ""))
-    for field in ("conditions", "allergies", "medications"):
+    for field in ("conditions", "allergies", "medications", "symptoms"):
         terms.extend(item["name"] for item in data[field]["items"])
     return base + "\n用户确认的历史背景（非本次症状）：" + "；".join(filter(None, terms))[:900]
 

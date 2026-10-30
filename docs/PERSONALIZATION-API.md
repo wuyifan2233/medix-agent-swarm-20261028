@@ -1,5 +1,31 @@
 # 个性化档案接口文档 v2
 
+## 对话更新扩展（2026-10-30）
+
+新增 `POST /api/profile/conversation-candidates`：
+
+```json
+{"text":"我这两天头痛", "subject":"self", "consent_to_model":true, "expected_revision":3}
+```
+
+需登录和CSRF，text最多8000字符。它只生成候选，不直接保存档案。
+响应兼容病历候选的id/base_revision/candidates，另有clarifications（需用户澄清的问题）和notice。
+候选仍通过 `/api/profile/imports/{id}/apply` 逐项采纳，再通过 `/api/profile/confirm` 主动确认。
+它并非核验病情真伪：source.kind=conversation，来源标签固定为“本人对话自述（未经医学核实）”。
+source.report_date在此表示整理自述的日期，原话中发病时间保留在note，不根据日期推算病情。
+
+新增ProfileData.symptoms，与conditions等列表同构，用于症状与近期身体状况，不等同于确诊病史。
+profile_fields现在也允许symptoms；省略字段范围时兼容读取全部六类字段。
+source.kind增加conversation。旧档案缺少symptoms时按未知空列表读取，无须数据库迁移。
+
+每个事实分别研判归属与语气：他人、假设、否定和纯提问不进入候选；归属不明、推断疾病需澄清。
+疑似的本人描述保留不确定标记，采纳时必须单独确认，并以unknown保存。
+只有明确自述确诊/医生诊断的内容才能提出conditions候选，仍不代表系统验证过该诊断。
+仅使用用户原话，不从助手回答或公共检索片段提取个人事实；证据不是原话子串时拒绝。
+
+网页每次回答旁提供“从本次描述更新健康档案”。点击后预填本次用户文字，用户核对本人归属和模型处理授权，再点提取。
+普通问答默认不自动提取或写档案，关闭“参考档案”开关也不等于同意更新档案，两种授权独立。
+
 适用本地分支：`health-profile-evolution`。基于 `167ec3f`，新增代码未推送远程。
 基础地址：`http://127.0.0.1:8765`。日期采用 `YYYY-MM-DD`；时间戳采用 Unix 秒。
 

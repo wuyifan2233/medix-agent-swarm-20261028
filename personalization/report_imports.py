@@ -37,7 +37,7 @@ class ReportInput(StrictModel):
 
 
 class Extracted(StrictModel):
-    field: Literal['age','sex','conditions','allergies','medications']
+    field: Literal['age','sex','conditions','allergies','medications','symptoms']
     value: int | str | dict
     evidence: str = Field(min_length=1,max_length=240)
     uncertain: bool = Field(strict=True)
@@ -184,7 +184,7 @@ def apply(import_id:str,command:ApplyImport,request:Request,user:CurrentUser=Dep
         current=public(db.get(HealthProfile,user.id))
         if row.consumed or row.base_revision!=command.expected_revision or current['revision']!=command.expected_revision: conflict()
         by_id={item['id']:item for item in row.candidates};seen=set(); targets=set();data=current['data']
-        original_sizes={field:len(data[field]['items']) for field in ('conditions','allergies','medications')}
+        original_sizes={field:len(data[field]['items']) for field in ('conditions','allergies','medications','symptoms')}
         for selection in command.selections:
             item=by_id.get(selection.candidate_id)
             if item is None or selection.candidate_id in seen: raise HTTPException(422,'候选不存在或重复选择。')

@@ -4,7 +4,7 @@
   tools.innerHTML = `<button type="button" id="hpOpen">我的健康档案</button><label><input type="checkbox" id="hpUse" disabled>本次为本人咨询，参考已确认档案</label><small id="hpStatus">登录后可编辑；默认不使用档案</small>`;
   document.querySelector('.composer-region').prepend(tools);
   const fieldChoices=document.createElement('details');fieldChoices.id='hpFieldChoices';fieldChoices.innerHTML='<summary>本轮允许参考的字段</summary>';
-  for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
+  for(const [field,label] of Object.entries({age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏',medications:'用药',symptoms:'症状与近期身体状况'})){const wrap=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.dataset.profileField=field;wrap.append(input,document.createTextNode(label));fieldChoices.append(wrap);}tools.append(fieldChoices);
   const dialog = document.createElement('dialog'); dialog.id = 'healthProfileDialog'; dialog.className = 'health-profile-dialog'; dialog.setAttribute('aria-labelledby','hpTitle');
   dialog.innerHTML = `<div class="hp-heading"><h2 id="hpTitle">我的健康档案</h2><button type="button" id="hpClose">关闭</button></div>
   <p>仅记录本人信息。保存后请逐项核对并主动确认。病历图片、模型推断不会自动写入；未知不等于没有疾病、过敏或用药。年龄为来源记录时的年龄，请核对病历日期，不自动推算。</p>
@@ -13,7 +13,7 @@
   <div class="hp-confirm"><label><input type="checkbox" id="hpAck">我已核对已保存的各项内容，理解它们是自述历史记录，不能代表当前情况。</label><button type="button" id="hpConfirm" disabled>确认已保存的档案</button></div>
   <details><summary>清空档案</summary><p>清空本账号的结构化档案并作废确认。不会删除其他模块的聊天或云端记忆。</p><button type="button" id="hpDelete">清空我的档案</button></details><p id="hpFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
-  const el = id => document.getElementById(id), names = {conditions:'基础病史',allergies:'过敏记录',medications:'用药记录'};
+  const el = id => document.getElementById(id), names = {conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况'};
   let record = null, identity = null, epoch = 0, dirty = false, working = false, chatBusy = false;
   const date = value => value ? new Date(value*1000).toLocaleString() : '未确认';
   const feedback = text => { el('hpFeedback').textContent = text; };

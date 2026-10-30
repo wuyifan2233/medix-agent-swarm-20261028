@@ -4,18 +4,18 @@
   const open=document.createElement('button'); open.type='button';open.id='peOpen';open.textContent='从病历提取 / 历史版本 / 导出';
   base.querySelector('.hp-heading').after(open);
   const dialog=document.createElement('dialog');dialog.id='profileEvolutionDialog';dialog.className='health-profile-dialog';dialog.setAttribute('aria-labelledby','peTitle');
-  dialog.innerHTML=`<div class="hp-heading"><h2 id="peTitle">病历辅助建档</h2><button type="button" id="peClose">关闭</button></div>
+  dialog.innerHTML=`<div class="hp-heading"><h2 id="peTitle">病历与本人自述更新</h2><button type="button" id="peClose">关闭</button></div>
   <p>先确认病历归属和日期，再提取候选。提取不等于确诊；不清晰或疑似条目需要额外核对，所有选项默认不采纳。</p>
-  <form id="peForm"><label>病历名称<input id="peLabel" required maxlength="100" placeholder="例如：2025年门诊记录"></label><label>病历日期<input type="date" id="peDate" required></label>
-  <label>病历文字<textarea id="peText" maxlength="12000" rows="5" placeholder="粘贴病历原文；也可添加图片"></textarea></label>
+  <form id="peForm"><label>信息来源<select id="peMode"><option value="report">病历文字或图片</option><option value="conversation">本人对话自述（未经医学核实）</option></select></label><label>信息名称<input id="peLabel" required maxlength="100" placeholder="例如：2025年门诊记录"></label><label>病历日期<input type="date" id="peDate" required></label>
+  <label>原始描述 / 病历文字<textarea id="peText" maxlength="12000" rows="5" placeholder="粘贴病历原文；也可添加图片"></textarea></label>
   <label>病历图片（PNG / JPEG / WebP，最多3张，每张8MB）<input id="peFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
-  <label class="pe-check"><input type="checkbox" id="peSelf" required>我确认这是本人的病历，日期已核对</label>
+  <label class="pe-check"><input type="checkbox" id="peSelf" required>我确认描述属于本人实际经历，不是假设或他人情况；病历日期已核对</label>
   <label class="pe-check"><input type="checkbox" id="peConsent" required>我同意将上述文字与图片发送给配置的模型服务进行提取</label>
   <button type="submit">提取候选信息</button></form>
   <section id="peReview" hidden><h3>逐项对比并采纳</h3><p>年龄为病历日期时的年龄。旧用药默认历史记录，不能推定仍在使用。替换会覆盖所选旧值；未选内容保持原样。</p><div id="peCandidates"></div><button type="button" id="peApply">将选中项保存为待确认草稿</button><button type="button" id="peDiscard">丢弃候选</button></section>
   <hr><h3>档案维护</h3><button type="button" id="peHistory">加载最近50个版本</button><button type="button" id="peExport">导出当前档案 JSON</button><div id="peVersions"></div><p id="peFeedback" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
-  const el=id=>document.getElementById(id), labels={age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏记录',medications:'用药记录'};
+  const el=id=>document.getElementById(id), labels={age:'年龄',sex:'性别',conditions:'基础病史',allergies:'过敏记录',medications:'用药记录',symptoms:'症状与近期身体状况'};
   let identity=null,epoch=0,busy=false,record=null,batch=null;
   function message(value){el('peFeedback').textContent=value;}
   function lock(value){busy=value;dialog.querySelectorAll('button,input,select,textarea').forEach(node=>{if(node.id!=='peClose')node.disabled=value;});}
@@ -58,6 +58,12 @@
     message(batch.candidates.length ? '请选择需要采纳的候选。保存后仍需回到档案页面主动确认。' : '没有提取到有原文依据的候选，请检查原文或手动填写。');
   }
   open.onclick=()=>run(async mine=>{if(!await MedixAuth.requireLogin())return;identity=MedixAuth.user.id;record=await api('/api/profile');if(mine!==epoch)return;dialog.showModal();message('当前档案版本 '+record.revision+'。本页面不会自动采纳任何字段。');});
+  window.MedixConversationUpdate=async text=>{
+    if(!await MedixAuth.requireLogin())return;
+    if(batch){dialog.showModal();message('请先采纳或丢弃当前候选，再整理新的对话。');return;}
+    identity=MedixAuth.user.id;el('peMode').value='conversation';el('peLabel').value='本人对话自述';el('peDate').value=new Date().toLocaleDateString('en-CA');el('peDate').required=false;el('peText').value=text || '';el('peFiles').value='';el('peSelf').checked=false;el('peConsent').checked=false;dialog.showModal();message('请确认这是本人实际经历，并授权整理。系统无法核实病情真伪，不会自动保存或确诊。');
+  };
+  el('peMode').onchange=()=>{el('peDate').required=el('peMode').value==='report';};
   el('peClose').onclick=()=>dialog.close();
   el('peForm').onsubmit=event=>{event.preventDefault();run(async mine=>{
     if(batch){message('请先丢弃或采纳当前候选，再重新提取。');return;}
@@ -65,8 +71,11 @@
     if(files.length>3 || files.some(file=>file.size>8*1024*1024 || !['image/png','image/jpeg','image/webp'].includes(file.type)))throw new Error('请使用最多3张PNG、JPEG或WebP图片，每张不超过8MB。');
     const images=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('图片读取失败'));reader.readAsDataURL(file);})));if(mine!==epoch)return;
     message('正在提取，请稍候。提取不修改档案。');
-    const result=await api('/api/profile/imports',{method:'POST',body:JSON.stringify({text:el('peText').value.trim(),images,label:el('peLabel').value.trim(),report_date:el('peDate').value,subject:'self',consent_to_model:el('peConsent').checked,expected_revision:record.revision})});
-    if(mine!==epoch)return;batch=result;el('peFiles').value='';el('peText').value='';renderBatch();
+    const conversation=el('peMode').value==='conversation';
+    if(conversation && images.length)throw new Error('对话更新只整理用户文字；图片请选病历模式。');
+    const payload=conversation ? {text:el('peText').value.trim(),subject:'self',consent_to_model:el('peConsent').checked,expected_revision:record.revision} : {text:el('peText').value.trim(),images,label:el('peLabel').value.trim(),report_date:el('peDate').value,subject:'self',consent_to_model:el('peConsent').checked,expected_revision:record.revision};
+    const result=await api(conversation?'/api/profile/conversation-candidates':'/api/profile/imports',{method:'POST',body:JSON.stringify(payload)});
+    if(mine!==epoch)return;batch=result;el('peFiles').value='';el('peText').value='';renderBatch(); if(result.clarifications?.length)message(result.clarifications.join('；')+'。请补充清晰描述后重新提取，不能直接作为档案事实。');
   });};
   el('peApply').onclick=()=>run(async mine=>{
     const selections=[...el('peCandidates').children].filter(card=>card.querySelector('[data-role=selected]').checked).map(card=>{const value=card.querySelector('[data-role=action]').value;return {candidate_id:card.dataset.candidate,action:value.split(':')[0],target_index:value.includes(':')?Number(value.split(':')[1]):null,acknowledge_uncertainty:card.querySelector('[data-role=uncertainty]')?.checked||false};});
