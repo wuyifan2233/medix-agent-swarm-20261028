@@ -1,7 +1,7 @@
 # MediX 项目协作指南
 
 ## 本分支的证据库交付
-- 最新完整设计与演示步骤先读 `knowledge/DESIGN.md`。当前16份中文原文、Qwen版186块；`import_open_datasets.py`导入独立问法/评测素材，不把CMB答案或社区回答混入主证据。纯文字默认`MEDIX_EVIDENCE_GENERATOR=direct`单次生成，quote仅证明原文存在。新测试`knowledge.test_answering`。本机Gitee免费调用受限后，已显式选择siliconflow并实测独立索引，代码默认仍gitee。
+- 最新完整设计与演示步骤先读 `knowledge/DESIGN.md`。当前19份中文原文、Qwen版202块；`import_open_datasets.py`导入独立问法/评测素材，不把CMB答案或社区回答混入主证据。纯文字默认`MEDIX_EVIDENCE_GENERATOR=direct`单次生成，quote仅证明原文存在。新测试`knowledge.test_answering`。本机Gitee免费调用受限后，已显式选择siliconflow并实测独立索引，代码默认仍gitee。
 - 证据版默认嵌入后端为 Gitee `Qwen3-Embedding-8B`，通过 `GITEE_AI_API_KEY` 配置；`MEDIX_EMBEDDING_PROVIDER=local` 可显式使用 BGE。`MEDIX_EMBEDDING_PROVIDER=siliconflow` 支持硅基流动 `Qwen/Qwen3-Embedding-8B`，使用 `SILICONFLOW_API_KEY`；所有后端必须使用独立版本索引，不允许自动回退或迁入旧向量。真实 Gitee 验证需有 Key；`knowledge.test_embeddings` 使用模拟 HTTP。
 - `.env.local` 保存本机默认 `GITEE_AI_API_KEY` 和 `SILICONFLOW_API_KEY`，环境变量优先；该文件不得提交或展示。`MEDIX_RERANK_PROVIDER=none` 默认关闭可选硅基流动 Qwen 重排；填 Key 后显式设为 `siliconflow`，此开关不选择 embedding 后端；嵌入与重排开关均支持 `.env.local`。
 - 先读 `docs/KNOWLEDGE_DELIVERY.md`。本分支基于同事 `feature/rag`，保留默认集合的空库自动初始化。

@@ -1,6 +1,6 @@
 # 本地医学证据库交付与合入说明
 
-> 当前完整设计与最新操作步骤见 [knowledge/DESIGN.md](../knowledge/DESIGN.md)。2026-10-30扩展交付：16份中文原文、186块，两个中文开源数据集辅助接入；本机显式选择硅基流动Embedding，纯文字证据问答默认单次生成。最新验证见 `docs/live-demo-validation.json`；下文12份来源等数字是此前交付记录。
+> 当前完整设计与最新操作步骤见 [knowledge/DESIGN.md](../knowledge/DESIGN.md)。2026-10-30扩展交付：19份中文原文、202块，两个中文开源数据集辅助接入；本机显式选择硅基流动Embedding，纯文字证据问答默认单次生成。最新验证见 `docs/live-demo-validation.json`；下文12份来源等数字是此前交付记录。
 
 ## 范围与当前数据
 

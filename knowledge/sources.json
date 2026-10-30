@@ -284,6 +284,76 @@
       "language": "zh",
       "jurisdiction": "CN",
       "document_kind": "2019版健康管理规范，非最新版本；非药品说明书"
+    },
+    {
+      "id": "bp_home",
+      "title": "电子血压计还是水银血压计？高血压患者在家监测血压要注意以下四点！",
+      "url": "https://www.cma.org.cn/art/2023/3/23/art_4584_50046.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2023-03-23",
+      "type": "health_education",
+      "topics": [
+        "高血压",
+        "血压计",
+        "测量"
+      ],
+      "required_terms": [
+        "上臂式",
+        "血压计"
+      ],
+      "audiences": [
+        "adults"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "机构发布健康科普，非药品说明书"
+    },
+    {
+      "id": "nasal_rinse",
+      "title": "正确清理鼻腔，不再鼻塞张口！",
+      "url": "https://www.cma.org.cn/art/2024/3/7/art_4584_55656.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2024-03-07",
+      "type": "health_education",
+      "topics": [
+        "鼻炎",
+        "过敏性鼻炎",
+        "鼻腔冲洗"
+      ],
+      "required_terms": [
+        "鼻腔",
+        "冲洗"
+      ],
+      "audiences": [
+        "general"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "机构发布健康科普，非药品说明书"
+    },
+    {
+      "id": "rhinitis_general",
+      "title": "过敏性鼻炎能治好吗？有哪些好的治疗方法？",
+      "url": "https://www.cma.org.cn/art/2022/12/5/art_4584_48544.html",
+      "publisher": "中华医学会科学普及部",
+      "published_at": "2022-12-05",
+      "type": "health_education",
+      "topics": [
+        "鼻炎",
+        "过敏性鼻炎"
+      ],
+      "required_terms": [
+        "过敏性鼻炎"
+      ],
+      "audiences": [
+        "general"
+      ],
+      "evidence_kind": "popular_science",
+      "language": "zh",
+      "jurisdiction": "CN",
+      "document_kind": "机构发布健康科普，非药品说明书"
     }
   ]
 }
