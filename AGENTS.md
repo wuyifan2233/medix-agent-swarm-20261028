@@ -44,6 +44,7 @@
 - 医学回答及随附资料未构成医学准确性认证；验证使用虚构数据。
 
 ## 修改与验证
+- 修改知识库数据、存储、分块、检索、生成prompt或引用交互时，必须在同一提交同步 `knowledge/DESIGN.md`，保留历史验证报告；文档描述当前真实行为和默认配置。
 - 保持现有 Python 模块结构和原生 HTML/CSS/JavaScript，避免无关重构。
 - 基础检查：`conda run -n medix python -m unittest web.test_web -v`。
 - 核心离线检查：`conda run -n medix python verify_runtime.py offline` 和 `conda run -n medix python verify_runtime.py regression`。

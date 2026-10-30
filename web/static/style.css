@@ -26,3 +26,9 @@ button.source-card:hover{border-color:#8d7bdc;background:#f7f4ff}
 .info-dialog:has(.evidence-text),.info-dialog:has(.evidence-search){width:min(780px,calc(100vw - 32px));max-width:none}
 .info-dialog:has(.evidence-text) .dialog-content,.info-dialog:has(.evidence-search) .dialog-content{font-size:14px;line-height:1.85}
 .evidence-text{font-size:14px}
+
+/* Sentence-level source previews: native popover supports Escape and light dismiss. */
+.source-pill{display:inline-flex;max-width:100%;vertical-align:middle;margin:3px 0 3px 8px;padding:3px 9px;border:1px solid #d2dcf4;border-radius:20px;background:#f0f5ff;color:#344d83;font-size:11px;line-height:1.6;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.source-pill:hover{background:#e3ecff;border-color:#8ba7d9}.evidence-hint{font-size:12px;color:#53627d;margin-bottom:14px}.grounded-sentence{line-height:1.95;margin:0 0 16px}.sentence-caution{display:block;color:#775c29;font-size:11px;margin-top:3px}
+.citation-preview{position:fixed;inset:auto;margin:0;width:min(410px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:20px;border:1px solid #d7e0ef;border-radius:16px;background:white;color:#263653;box-shadow:0 12px 48px #23396330;font:14px/1.7 "Segoe UI","Microsoft YaHei",sans-serif;z-index:1000}
+.citation-preview strong{font-size:15px}.citation-preview p{margin:7px 0;font-size:12px;color:#50617b}.citation-preview blockquote{margin:14px 0;padding:12px;border-left:3px solid #7897d6;background:#f3f6fc;white-space:pre-wrap;overflow-wrap:anywhere}.citation-preview small{font-size:11px;color:#665d43}.preview-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:15px}.preview-actions button,.preview-actions a{font-size:12px;color:#31568b}.preview-actions button{border:1px solid #cdd8ea;background:#f5f8ff;border-radius:8px;padding:6px 10px}.preview-actions a{text-decoration:underline}

@@ -94,26 +94,48 @@ function pendingMessage() {
   row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真听你说</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
   $('messages').append(row); scrollDown(); return row;
 }
+window.addEventListener('resize', () => document.querySelectorAll('.citation-preview:popover-open').forEach(card => card.hidePopover()));
+function citationPreview(trigger, source, quote = '') {
+  document.querySelectorAll('.citation-preview').forEach(node => node.remove());
+  const card = document.createElement('div'); card.className = 'citation-preview'; card.setAttribute('popover', 'auto'); card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', '引用来源预览');
+  const heading = document.createElement('strong'); heading.textContent = source.title;
+  const provenance = document.createElement('p'); provenance.className = 'preview-provenance'; provenance.textContent = `${source.publisher || '来源未注明'} · ${source.published_at || '日期未注明'}`;
+  const scope = document.createElement('p'); scope.textContent = `${evidenceKindLabels[source.evidence_kind] || '类型未注明'} · ${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}`;
+  const text = document.createElement('blockquote'); text.textContent = quote || source.excerpt || '暂无可定位的原文摘录';
+  const note = document.createElement('small'); note.textContent = quote ? '摘录已在本地原文中定位；请核对是否支持这句话。' : '尚未定位到本句的直接摘录，请展开全文核对。';
+  const actions = document.createElement('div'); actions.className = 'preview-actions';
+  const full = document.createElement('button'); full.type = 'button'; full.textContent = '查看完整片段'; full.onclick = () => { card.hidePopover(); showEvidence(source, quote); }; actions.append(full);
+  try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) { const link = document.createElement('a'); link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '发布机构网页 ↗'; actions.append(link); } } catch {}
+  const close = document.createElement('button'); close.type = 'button'; close.textContent = '关闭'; close.onclick = () => { card.hidePopover(); trigger.focus(); }; actions.append(close);
+  card.append(heading, provenance, scope, text, note, actions); document.body.append(card); card.showPopover();
+  const rect = trigger.getBoundingClientRect(), width = card.offsetWidth, height = card.offsetHeight;
+  card.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - width - 12))}px`;
+  card.style.top = `${Math.max(12, Math.min(rect.bottom + 8, innerHeight - height - 12))}px`;
+}
 function resultMessage(row, result) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.generation === 'not_called' ? '本地证据检索 · 未调用模型' : result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
-  const answer = document.createElement('div'); answer.className = 'answer'; answer.innerHTML = richText(result.answer); main.append(answer);
-  if (result.retrieval) {
-    answer.innerHTML = answer.innerHTML.replace(/\[(\d+)\]/g, (match, n) => result.sources.some(s => s.citation === Number(n)) ? `<button type="button" class="citation" data-citation="${n}" aria-label="查看证据 ${n}">[${n}]</button>` : match);
-    answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => showEvidence(result.sources.find(s => s.citation === Number(button.dataset.citation))));
-    main.append(retrievalDetails(result.retrieval));
-  }
-  if (result.generation === 'model' && result.evidence_links?.length) {
-    const panel = document.createElement('details'); panel.className = 'observations';
-    const summary = document.createElement('summary'); summary.textContent = '逐句核对回答引用'; panel.append(summary);
+  const answer = document.createElement('div'); answer.className = 'answer'; main.append(answer);
+  const inline = result.generation === 'model' && result.evidence_links?.length;
+  if (inline) {
+    const hint = document.createElement('p'); hint.className = 'evidence-hint'; hint.textContent = '点击句旁来源，查看原文摘录与出处。'; answer.append(hint);
     result.evidence_links.forEach(item => {
-      const line = document.createElement('p'); line.textContent = item.text;
-      const note = document.createElement('small'); note.textContent = item.status === 'verbatim_match' ? ' · 原文逐字匹配（不代表临床审核）' : item.status === 'quote_located' ? ' · 已定位所引原文，支持关系请核对' : item.status === 'uncited' ? ' · 未提供引用' : ' · 引用存在，支持关系待核对'; line.append(note);
+      const line = document.createElement('p'); line.className = 'grounded-sentence';
+      const text = document.createElement('span'); text.textContent = item.text.replace(/\[\d+\]/g, '').trim(); line.append(text);
       item.citations.forEach(id => { const source = result.sources.find(s => s.citation === id); if (!source) return;
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'citation'; button.textContent = `核对 [${id}]`;
-        button.onclick = () => showEvidence(source, item.quotes.find(q => q.citation === id)?.quote || ''); line.append(button); });
-      panel.append(line);
-    }); main.append(panel);
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'source-pill';
+        button.textContent = `${source.publisher || '来源'} · ${id}`; button.setAttribute('aria-label', `查看本句来源 ${id}：${source.title}`); button.setAttribute('aria-haspopup', 'dialog');
+        button.onclick = () => citationPreview(button, source, item.quotes.find(q => q.citation === id)?.quote || ''); line.append(button); });
+      if (!item.citations.length) { const note = document.createElement('small'); note.className = 'sentence-caution'; note.textContent = '本句未附引用'; line.append(note); }
+      answer.append(line);
+    });
+  } else answer.innerHTML = richText(result.answer);
+  if (result.retrieval) {
+    if (!inline) {
+      answer.innerHTML = answer.innerHTML.replace(/\[(\d+)\]/g, (match, n) => result.sources.some(s => s.citation === Number(n)) ? `<button type="button" class="citation" data-citation="${n}" aria-label="查看证据 ${n}">[${n}]</button>` : match);
+      answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => citationPreview(button, result.sources.find(s => s.citation === Number(button.dataset.citation))));
+    }
+    main.append(retrievalDetails(result.retrieval));
   }
   const meta = document.createElement('div'); meta.className = 'message-meta';
   const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求 · 原文定位' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
@@ -125,8 +147,8 @@ function resultMessage(row, result) {
     const text = document.createElement('pre'); text.textContent = result.image_observations; block.append(summary, text); main.append(block);
   }
   if (result.sources.length) {
-    const block = document.createElement('details'); block.className = 'sources'; block.open = true;
-    const summary = document.createElement('summary'); summary.textContent = `本地检索参考 · ${result.sources.length} 个片段`;
+    const block = document.createElement('details'); block.className = 'sources'; block.open = !result.retrieval;
+    const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个（含可能未引用的片段）`;
     const grid = document.createElement('div'); grid.className = 'source-grid';
     result.sources.forEach(source => {
       const card = document.createElement(source.content ? 'button' : 'div'); card.className = 'source-card';
