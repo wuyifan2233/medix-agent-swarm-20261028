@@ -77,3 +77,4 @@ knowledge/data/evidence/
 *.sqlite3
 *.sqlite3-*
 *.db/
+.medix-data/

@@ -45,6 +45,10 @@ from personalization.reply_render import render_reply
 mimetypes.init()
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
+from datetime import datetime, timezone
+from memory.case_memory import CaseMemory, PATIENTS, patient_for, memory_context, referenced, MemoryConflict
+from memory.web_mem0 import WebMem0Memory, Mem0Error
+from memory.patient_resolver import resolve_patient
 from web import case_memory
 from web.case_context import prepare_context
 
@@ -55,6 +59,12 @@ MAX_BODY = 34 * 1024 * 1024
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="medix-chat")
 jobs = {}
 contexts = {}
+memory_edit_locks = {}
+memory_journal = CaseMemory()
+
+def get_web_memory(demo=False):
+    return CaseMemory(demo=True) if demo else WebMem0Memory(local=memory_journal)
+
 health = {"knowledge": "loading", "documents": 0}
 LABELS = {"search_knowledge": "检索医学知识库", "recommend_lifestyle": "整理生活方式建议",
           "assess_risk": "评估症状风险", "analyze_symptoms": "分析症状", "disease_code": "查询疾病编码",
@@ -230,6 +240,40 @@ async def knowledge_retrieve(q: str = ''):
     return {'status':result['status'],'message':result['message'],'sources':evidence_sources(result['hits'],q),'trace':result['trace']}
 
 
+def knowledge_document(filename):
+    directory = (ROOT / "knowledge" / "data" / "documents").resolve()
+    if not isinstance(filename,str) or Path(filename).name != filename or not filename.endswith('.txt'):
+        return None
+    source = (directory / filename).resolve()
+    return source if source.parent == directory and source.is_file() else None
+
+
+def knowledge_title(filename):
+    """Use the source document heading; a chunk may start mid-sentence."""
+    source = knowledge_document(filename)
+    if source:
+        try:
+            with source.open(encoding='utf-8-sig') as document:
+                for line in document:
+                    title = line.strip().lstrip('#').strip()
+                    if title: return title
+        except (OSError,UnicodeError):
+            pass
+    return filename if isinstance(filename,str) and filename.strip() and Path(filename).name == filename else '本地医学资料'
+
+
+def reference_focus(content, question):
+    """Pick the strongest question overlap inside the actual model reference."""
+    reference = content[:750]
+    query = re.sub(r"请.*?(?:回答|说明)|结合本地资料|注意事项|有哪些|日常", "", question)
+    compact = re.sub(r"[^\w\u4e00-\u9fff]", "", query)
+    terms = {compact[i:i+2] for i in range(len(compact)-1)}
+    paragraphs = [part.strip() for part in reference.split("\n\n") if len(part.strip()) >= 20]
+    scored = [(sum(term in paragraph for term in terms), paragraph) for paragraph in paragraphs]
+    best = max(scored, key=lambda item: item[0], default=(0, reference))
+    return best[1] if best[0] else reference
+
+
 def stage(job, name, label):
     job["stage"] = name
     job["label"] = label
@@ -278,6 +322,19 @@ async def analyze(job, payload, session_id, memory_user_id):
         finally:
             await client.client.close()
 
+    stage(job, "patient", "正在判断询问人物与长期记忆价值")
+    patient_resolution = await resolve_patient(question, previous, payload.get("patient", "auto"),
+                                               observations=observed if payload["images"] else '') if payload.get('owner') or payload['remember'] else {
+        'patient':'self','subject':'self','label':'本人','corrects_previous':False,'confirms_previous':False,
+        'needs_confirmation':False,'should_store':False,'memory_reason':'No account context'}
+    patient = patient_resolution["patient"]
+    # Do not carry another person's image/report or answers into a new subject.
+    if previous.get("patient") != patient or patient == "other":
+        if not payload["images"]: observed = ""
+    person_history = [row for row in previous.get("history", []) if row.get("patient", previous.get("patient")) == patient] if patient != "other" else []
+
+    if snapshot and patient != 'self':
+        raise ValueError('本轮询问对象不是本人，请关闭本人档案授权后重新提交。')
     stage(job, "knowledge", "正在检索本地医学资料")
     kb = MedicalKnowledgeBase()
     stage(job, "case", "正在结合本次信息与相关病例记录")
@@ -329,8 +386,9 @@ async def analyze(job, payload, session_id, memory_user_id):
             seen.add(fingerprint)
         if len(hits) == 3:
             break
-    sources = sources if evidence_mode else [{"title": hit["content"].splitlines()[0][:70],
+    sources = sources if evidence_mode else [{"title": knowledge_title(hit["metadata"].get("filename")),
                 "file": hit["metadata"].get("filename", "本地医学知识库"),
+                "content":hit["content"], "reference_excerpt":hit["content"][:750], "highlight_excerpt":reference_focus(hit["content"],question),
                 "excerpt": hit["content"][:220]} for hit in hits]
     enriched = question
     enriched += profile_context(snapshot)
@@ -357,6 +415,40 @@ async def analyze(job, payload, session_id, memory_user_id):
 
     enriched += preference_context(preferences) if preferences_used else ""
 
+    memory_user_id = payload.get('owner') or job.get('owner_user_id') or memory_user_id
+    memory_allowed = payload['remember'] and not snapshot and not preferences_used and not case['case_id']
+    memory_question = question
+    if patient_resolution["corrects_previous"] or patient_resolution["confirms_previous"]:
+        corrected_history = [row for row in previous.get("history", [])[-2:] if row.get("role") in {"user", "assistant"}]
+        person_history = [{**row, "patient":patient} for row in corrected_history]
+        last_user = next((row.get("content", "") for row in reversed(corrected_history) if row.get("role") == "user"), "")
+        if patient_resolution["corrects_previous"] and previous.get("last_saved_content"):
+            last_user = previous["last_saved_content"]
+        if last_user:
+            memory_question = "【用户前次原话】\n" + last_user + "\n【用户本次明确确认或更正人物】\n" + question
+    references = []
+    memory_error = False
+    memory_error_message = ""
+    memory_service = get_web_memory()
+    if memory_allowed and patient_resolution["corrects_previous"] and previous.get("last_saved_id"):
+        try:
+            changed = await asyncio.to_thread(memory_service.change, memory_user_id, previous["last_saved_id"], "retire")
+            if not changed: raise Mem0Error("未找到刚才的来源记录，请在记忆管理中核对。")
+        except Exception as exc:
+            memory_error = True
+            memory_error_message = str(exc) if isinstance(exc, Mem0Error) else "刚才的人物记忆未确认停用。"
+    if memory_allowed and patient != "other":
+        stage(job, "memory", "正在核对人物与历史记录的关联")
+        try:
+            references = memory_context(await asyncio.to_thread(memory_service.related, memory_user_id, session_id, memory_question, patient))
+        except Exception as exc:
+            memory_error = True
+            memory_error_message = str(exc) if isinstance(exc, Mem0Error) else "Mem0 检索未完成。"
+    request_context = {"current_time": datetime.now(timezone.utc).isoformat(), "recent_history": person_history,
+                       "memory_policy": "mem0" if memory_allowed else "off",
+                       "memory_references": references, "patient": patient_resolution["label"],
+                       "patient_resolution": patient_resolution,
+                       "patient_clarification": "人物不明确，请先确认本次是在询问谁，不能认作本人的病史。" if patient_resolution["needs_confirmation"] else ""}
     stage(job, "agents", "正在由专业助手分析与整合")
     from runtime_settings import load_setting
     if evidence_mode and not snapshot and not preferences_used and not case["case_id"] and not observed and not payload['remember'] and load_setting('MEDIX_EVIDENCE_GENERATOR','direct')=='direct':
@@ -372,7 +464,7 @@ async def analyze(job, payload, session_id, memory_user_id):
                                          {'role':'assistant','content':generated['answer'][:1800]}]
         contexts[session_id]={'image_observations':'','history':history[-6:],'updated':time.time()}
         return
-    coordinator = SwarmCoordinator(enable_long_term_memory=payload["remember"] and not snapshot and not preferences_used and not case["case_id"], memory_user_id=memory_user_id,
+    coordinator = SwarmCoordinator(enable_long_term_memory=False, memory_user_id=memory_user_id,
                                    persist_session_summaries=False)
     # AgentLoop has a separate process-wide singleton containing enriched prompts.
     # Only the sanitized web contexts above may cross request boundaries.
@@ -383,7 +475,12 @@ async def analyze(job, payload, session_id, memory_user_id):
         async def tracked(name, _original=original, **arguments):
             entry = {"name": name, "label": LABELS.get(name, name), "status": "running"}
             trace.append(entry)
-            response = memory_tool_result(name, arguments, previous, coordinator)
+            if name == 'search_similar_cases':
+                response = {'answer':references, 'total_found':len(references)}
+            elif name == 'search_history':
+                response = {'answer':person_history, 'total_messages':len(person_history)}
+            else:
+                response = None
             if response is None:
                 response = await _original(name, **arguments)
             entry["status"] = "failed" if response.get("success") is False or response.get("status") == "error" else "completed"
@@ -391,10 +488,22 @@ async def analyze(job, payload, session_id, memory_user_id):
         worker.skill_registry.execute = tracked
     try:
         analysis_session = f"{session_id}-case-{case['case_id']}" if case["case_id"] else session_id
-        result = await coordinator.process(enriched, context={"recent_history": previous.get("history", [])}, session_id=analysis_session)
+        result = await coordinator.process(enriched, context=request_context, session_id=analysis_session)
         answer = result.get("answer")
         if not answer or result.get("error"):
             raise RuntimeError("Agent did not return a complete answer")
+        answer, used_references = referenced(answer, references)
+        if patient_resolution["needs_confirmation"]:
+            clarification = "这次是在问你本人、父亲、母亲，还是其他人？" if patient_resolution["subject"] == "unknown" else "这次涉及多个人，想先讨论哪一位的情况？"
+            answer = clarification + "\n\n" + answer
+        saved_id = None
+        if memory_allowed and patient != "other" and patient_resolution.get('should_store',False):
+            try:
+                saved_id = await asyncio.to_thread(memory_service.save, memory_user_id, session_id, memory_question, patient,
+                                                  observed if payload["images"] else "")
+            except Exception as exc:
+                memory_error = True
+                memory_error_message = str(exc) if isinstance(exc, Mem0Error) else "Mem0 保存未完成。"
         presentation_status='off'
         if preferences_used:
             stage(job, "presentation", "正在按称呼、详略和呈现偏好整理回答")
@@ -409,7 +518,14 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "swarm_enabled": bool(result.get("swarm_enabled")), "agents": agents,
                          "image_count": len(payload["images"]), "image_observations": new_observed if payload["images"] and not case["case_id"] else "",
                          "image_context_used": bool(observed) and not payload["images"] and not bool(case["case_id"]),
-                         "memory_enabled": bool(coordinator.long_term_memory.enabled),
+                         "memory_enabled": memory_allowed, "memory_backend": "mem0",
+                         "patient_resolution": patient_resolution,
+                         "memory_decision": {"should_store":patient_resolution.get('should_store',False),
+                                             "reason":patient_resolution.get('memory_reason','')},
+                         "memory_error": memory_error_message, "memory_references": used_references,
+                         "memory_candidates": [r for r in references if r not in used_references],
+                         "memory_status": "error" if memory_error else ("saved" if saved_id else ("skipped" if memory_allowed else "off")),
+                         "memory_saved": {"id": saved_id, "content": memory_question, "patient": PATIENTS[patient]} if saved_id else None,
                          "profile_used": bool(snapshot),
                          "reply_preferences_used": preferences_used,
                          "reply_preferences_revision": preference_scope,
@@ -431,8 +547,12 @@ async def analyze(job, payload, session_id, memory_user_id):
             case_memory.save_analysis(payload["owner"], case["case_id"], answer, case["facts"])
         if evidence_mode:
             job['result'].update(retrieval=retrieval['trace'],retrieval_status=retrieval['status'],generation='model',invalid_citations=invalid,evidence_links=evidence_links(answer,sources))
-        history = previous.get("history", []) + [{"role":"user", "content":(evidence_query if evidence_mode else question)[:1200]}, {"role":"assistant", "content":answer[:1800]}]
-        contexts[session_id] = {"image_observations": observed, "history": history[-6:], "profile_scope":profile_scope(snapshot), "preference_scope":preference_scope, "updated":time.time()}
+        retained_history = previous.get("history", [])
+        if patient_resolution["corrects_previous"] or patient_resolution["confirms_previous"]:
+            retained_history = retained_history[:-2] + person_history
+        history = retained_history + [{"role":"user", "content":question[:1200], "patient":patient}, {"role":"assistant", "content":answer[:1800], "patient":patient}]
+        contexts[session_id] = {"image_observations": observed, "history": history[-6:], "patient":patient if patient != "other" else None, "last_saved_id":saved_id or (previous.get("last_saved_id") if previous.get("patient") == patient else None),
+                                "last_saved_content":memory_question if saved_id else (previous.get("last_saved_content") if previous.get("patient") == patient else None), "awaiting_patient_confirmation":patient_resolution["subject"] == "unknown", "profile_scope":profile_scope(snapshot), "preference_scope":preference_scope, "updated":time.time()}
     finally:
         coordinator.short_term_memory.clear_session(session_id)
         clients = {id(obj.llm_client): obj.llm_client for obj in [coordinator, *coordinator.worker_pool]}
@@ -521,7 +641,7 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     job = {"id": job_id, "request_text": message.strip(), "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
     jobs[job_id] = job
-    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": remember,
+    executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": bool(__import__("config").MEM0_CONFIG.get("api_key")),
                                   "profile_snapshot": snapshot, "owner":owner, "chat_id":chat_id, "case_id":case_id, "request_id":request_id},
                     f"web-{owner}-{chat_id}", f"medix:{app.state.auth_service.settings.namespace}:user:{owner}")
     return {"job_id": job_id}
@@ -538,6 +658,131 @@ def job_status(job_id: str, user: CurrentUser = Depends(require_user)):
 @app.get("/api/cases")
 def list_case_contexts(user: CurrentUser = Depends(require_user)):
     return {"cases": case_memory.list_cases(user.id)}
+
+
+
+
+def memory_account(request: Request, user: CurrentUser = Depends(require_user)):
+    request.state.account_user_id = user.id
+    return user
+
+def memory_owner(request, demo=False):
+    return request.state.account_user_id
+
+
+@app.get("/api/memories")
+def list_memories(request: Request, user: CurrentUser = Depends(memory_account), demo: bool = False, scope: str = "all"):
+    if scope not in {"all", "self", "family"}:
+        raise HTTPException(400, "记忆范围不正确。")
+    try:
+        return {"memories": get_web_memory(demo).list(memory_owner(request, demo), include_inactive=True, scope=scope),
+                "backend": "local_demo" if demo else "mem0"}
+    except Mem0Error as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.get("/api/knowledge/source/{filename}")
+def knowledge_source(filename: str):
+    source = knowledge_document(filename)
+    if source is None:
+        raise HTTPException(404, "未找到原始资料。")
+    return {"filename": filename, "title": knowledge_title(filename), "content": source.read_text(encoding="utf-8")}
+
+
+@app.post("/api/memories/{memory_id}")
+async def update_memory(memory_id: str, request: Request, user: CurrentUser = Depends(memory_account)):
+    try:
+        data = await request.json()
+        if not isinstance(data, dict): raise ValueError()
+        action = data.get("action")
+        if action not in {"exclude", "retire", "delete"}: raise ValueError()
+        demo = data.get("demo", False)
+        if not isinstance(demo, bool): raise ValueError()
+        chat_id = str(uuid.UUID(data.get("chat_id", "")))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(400, "记忆操作格式不正确。")
+    owner = memory_owner(request, demo)
+    try:
+        lock = memory_edit_locks.setdefault((owner,memory_id),asyncio.Lock())
+        async with lock:
+            changed = await asyncio.to_thread(get_web_memory(demo).change, owner, memory_id, action, f"web-{request.state.account_user_id}-{chat_id}")
+    except Mem0Error as exc:
+        raise HTTPException(503, str(exc)) from None
+    if not changed:
+        raise HTTPException(404, "未找到这条可用记录。")
+    # Old injected sources must not survive correction in short-term prompts.
+    session = f"web-{request.state.account_user_id}-{chat_id}"
+    from memory.short_term import ShortTermMemory
+    affected = [session] if action == "exclude" else [key for key in contexts if key.startswith(f"web-{request.state.account_user_id}-")]
+    for key in affected:
+        ShortTermMemory().clear_session(key)
+        contexts.pop(key, None)
+    return {"status": "completed", "backend": "local" if demo or memory_id.startswith("local:") else "mem0"}
+
+
+@app.post("/api/memories/{memory_id}/edit")
+async def edit_memory(memory_id: str, request: Request, user: CurrentUser = Depends(memory_account)):
+    try:
+        data = await request.json()
+        if not isinstance(data, dict): raise ValueError()
+        content, observations = data.get("content"), data.get("observations", "")
+        revision, demo = data.get("expected_revision"), data.get("demo",False)
+        if not isinstance(content,str) or not content.strip() or len(content)>8000: raise ValueError()
+        if not isinstance(observations,str) or len(observations)>16000: raise ValueError()
+        if type(revision) is not int or revision<0 or not isinstance(demo,bool): raise ValueError()
+        chat_id = str(uuid.UUID(data.get("chat_id", "")))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(400,"请填写有效的记忆内容（不超过8000字）和版本信息。")
+    owner = memory_owner(request,demo)
+    lock = memory_edit_locks.setdefault((owner,memory_id),asyncio.Lock())
+    try:
+        async with lock:
+            record = await asyncio.to_thread(get_web_memory(demo).update,owner,memory_id,content.strip(),observations,revision)
+    except MemoryConflict as exc:
+        raise HTTPException(409,str(exc)) from None
+    except Mem0Error as exc:
+        raise HTTPException(503,str(exc)) from None
+    if record is None: raise HTTPException(404,"未找到这条属于你的记忆。")
+    # All past answers may contain old values. Invalidate server context, retain visible replies.
+    session = f"web-{request.state.account_user_id}-{chat_id}"
+    from memory.short_term import ShortTermMemory
+    for key in {session, *(key for key in contexts if key.startswith(f"web-{request.state.account_user_id}-"))}:
+        contexts.pop(key,None)
+        ShortTermMemory().clear_session(key)
+    return {"status":"completed", "record":record,
+            "backend":"local" if demo or memory_id.startswith("local:") else "mem0"}
+
+
+@app.post("/api/memory/demo")
+async def memory_demo(request: Request, user: CurrentUser = Depends(memory_account)):
+    """Explicit synthetic walkthrough; real journal/matcher, no model or cloud calls."""
+    from datetime import datetime, timedelta, timezone
+    try:
+        data = await request.json()
+        chat_id = str(uuid.UUID(data.get("chat_id", "")))
+        scenario = data.get("scenario", "related")
+        if scenario not in {"related", "family", "unrelated"}: raise ValueError()
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(400, "演示参数不正确。")
+    owner = memory_owner(request, True)
+    get_web_memory(True).seed_demo(owner, (datetime.now(timezone.utc)-timedelta(days=7)).isoformat())
+    question = {"related": "我今天白天也头晕，这是上次那种不舒服吗？",
+                "family": "我爸爸今天头晕，需要先了解哪些情况？",
+                "unrelated": "我最近咳嗽，需要记录哪些信息？"}[scenario]
+    patient = patient_for(question)
+    session = f"web-{request.state.account_user_id}-{chat_id}"
+    refs = memory_context(get_web_memory(True).related(owner, session, question, patient))
+    if refs:
+        answer = "你之前提到晚上头晕，这次说白天也出现了。我参考了之前的记录 [M1]。发生时段的描述有所变化，但还不能确认是同一次不适。你上次的不适曾经完全缓解吗？"
+    elif scenario == "family":
+        answer = "这次是在问父亲的情况，我没有把你本人的历史记录作为父亲的病史。请先说说他头晕开始的时间、持续多久，以及是否还有其他不适。"
+    else:
+        answer = "没有找到本次可用的相关历史记录。我们从这次描述开始：不适持续多久了，还有哪些伴随情况？"
+    answer, used = referenced(answer, refs)
+    return {"question": question, "answer": answer, "agents": ["demo"], "sources": [], "tools": [],
+            "elapsed": 0, "memory_enabled": True, "memory_references": used, "memory_candidates": [],
+            "memory_status": "demo", "demo": True}
+
 
 
 app.mount("/assets", StaticFiles(directory=str(STATIC)), name="assets")

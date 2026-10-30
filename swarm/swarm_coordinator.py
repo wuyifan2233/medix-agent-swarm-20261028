@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from loguru import logger
+from openai import APIError
 
 from core import LLMClient
 from .shared_context import SharedContext
@@ -141,6 +142,9 @@ class SwarmCoordinator:
             enhanced_context["historical_cases"] = [
                 {
                     "summary": mem["content"],
+                    "memory_id": mem["memory_id"],
+                    "metadata": mem["metadata"],
+                    "timestamp": mem.get("timestamp"),
                     "score": mem["score"]
                 }
                 for mem in similar_memories
@@ -302,10 +306,13 @@ class SwarmCoordinator:
         # 等待所有 Worker 完成（或超时）
         timeout_occurred = False
         try:
-            await asyncio.wait_for(
+            outcomes = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
                 timeout=90.0  # 增加超时时间到 90 秒，应对复杂案例
             )
+            for outcome in outcomes:
+                if isinstance(outcome, APIError):
+                    raise outcome
         except asyncio.TimeoutError:
             timeout_occurred = True
             logger.warning("Swarm execution timeout (90s)")
@@ -436,9 +443,14 @@ class SwarmCoordinator:
                 tasks.append(task)
 
             # 等待所有任务完成
-            await asyncio.gather(*tasks, return_exceptions=True)
+            outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+            for outcome in outcomes:
+                if isinstance(outcome, APIError):
+                    raise outcome
 
         except Exception as e:
+            if isinstance(e, APIError):
+                raise
             logger.error(f"{worker.agent_id}: Error processing subtask: {e}")
 
     async def _execute_single_subtask(self, worker, subtask, shared_context):
@@ -448,6 +460,8 @@ class SwarmCoordinator:
             shared_context.complete_subtask(subtask.id, worker.agent_id, result)
             logger.info(f"{worker.agent_id}: Completed {subtask.type}")
         except Exception as e:
+            if isinstance(e, APIError):
+                raise
             logger.error(f"{worker.agent_id}: Error in {subtask.type}: {e}")
 
     def _extract_suggestions(self, final_answer: str) -> List[str]:
