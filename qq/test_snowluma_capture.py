@@ -44,6 +44,15 @@ class CaptureTests(unittest.TestCase):
         result,calls=self.capture(False)
         self.assertIsNone(result)
         self.assertEqual(calls,[])
+    def test_hook_connection_timeout_is_not_reported_as_unfinished_scan(self):
+        host=SnowLumaHost(install='unused')
+        with patch.object(host,'_ensure_qq_process'), \
+             patch.object(host,'_processes',return_value=[{'pid':1,'status':'connecting','injected':True,'connected':False}]), \
+             patch.object(host,'capture',return_value=None), \
+             patch('qq.snowluma.time.monotonic',side_effect=[0,1,2,151]), \
+             patch('qq.snowluma.time.sleep'):
+            with self.assertRaisesRegex(RuntimeError,'SnowLuma.*QQ'):
+                host._wait_until_online(lambda:False,lambda image:None)
     def test_separate_node_path_is_used_without_changing_global_path(self):
         with TemporaryDirectory() as d:
             host=SnowLumaHost(install=Path(d)/'install',runtime=Path(d)/'runtime')

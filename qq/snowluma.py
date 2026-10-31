@@ -225,6 +225,8 @@ class SnowLumaHost:
                     on_qr(image)
                 last_capture = now
             time.sleep(1)
+        if any(item.get("injected") and not item.get("connected") for item in processes):
+            raise RuntimeError("SnowLuma 已加载，但尚未与电脑版 QQ 建立连接。请在 SnowLuma 进程页检查连接状态。")
         raise RuntimeError("还没有完成 QQ 扫码。请重新打开登录后再试。")
 
     def _ensure_qq_process(self, cancelled):

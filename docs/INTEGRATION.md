@@ -142,3 +142,4 @@ Python3.10适配测试上下文清理、asyncio超时类型；断连测试兼容
 
 SnowLuma 可通过 `MEDIX_SNOWLUMA_NODE` 指定单独的 Node 可执行文件（默认仍为 PATH 中的 node）；安装包要求的 Node 版本以其 package.json 为准。`MEDIX_SNOWLUMA_HOME` 或本地 data/snowluma_home.txt 指向包含 index.mjs 的目录，非默认路径的QQ使用 MEDIX_QQ_EXE。以上本机路径、安装包、账号会话不提交Git。
 QQ 登录图片只从QQ进程的非最小化登录窗口读取（Pillow窗口截图），不再截图桌面区域；较大的QQ主聊天窗口不会作为登录图片返回。SnowLuma服务就绪不代表QQ已连接，仍需其进程状态及OneBot接口就绪。
+SnowLuma的 injected=true 只表示加载调用已返回，不能据此标记QQ已连接。连接阶段显示“正在连接”，取得登录图片才显示“等待扫码”；Hook未连接的超时与未扫码分别提示。真实验收仍需账号识别和OneBot连通。

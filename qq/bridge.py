@@ -122,8 +122,8 @@ class QQBridge:
                 if self._prepare and self._prepare.is_alive():
                     return self._view_locked(browser_id, 0)
                 self._phase = "login"
-                self._status = "waiting"
-                self._detail = "正在打开 QQ 登录…"
+                self._status = "connecting"
+                self._detail = "正在连接本机 QQ，二维码就绪后会显示在这里。"
                 self._qr_image = ""
                 self._prepare = threading.Thread(target=self._prepare_login, name="medix-qq-login", daemon=True)
                 self._prepare.start()
