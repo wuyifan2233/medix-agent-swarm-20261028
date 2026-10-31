@@ -43,7 +43,7 @@ class ReplyPreferencesTests(unittest.TestCase):
         captured=self.capture_analysis(self.a.id,None,remember=True)
         self.assertIn('测试称呼',captured['prompt']);self.assertIn('温和、有耐心',captured['prompt'])
         self.assertIn('1000字',captured['prompt']);self.assertNotIn('600字',captured['prompt'])
-        self.assertIn('低优先级偏好数据',captured['prompt']);self.assertIn('不能替代本人健康档案授权',captured['prompt'])
+        self.assertIn('低优先级偏好数据',captured['prompt']);self.assertIn('不能改变注册基本信息的适用对象',captured['prompt'])
         self.assertNotIn('私有日程标记',captured['query'])
         self.assertFalse(captured['result']['profile_used']);self.assertTrue(captured['result']['reply_preferences_used'])
         self.assertFalse(captured['options']['enable_long_term_memory'])

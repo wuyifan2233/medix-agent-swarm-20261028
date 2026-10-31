@@ -532,8 +532,6 @@ async def analyze(job, payload, session_id, memory_user_id):
     previous = contexts.get(session_id, {})
     if previous.get("preference_scope") != preference_scope:
         previous = {}
-    if previous.get("profile_scope") != profile_scope(snapshot):
-        previous = {}  # Opt-out/change must not reuse profile-derived answers or report facts.
     route = {'kind':'medical', 'subject':'general'}
     if evidence_mode and configured:
         from web.request_routing import classify_request
@@ -567,6 +565,13 @@ async def analyze(job, payload, session_id, memory_user_id):
             'patient':'self','subject':'self','label':'本人','corrects_previous':False,'confirms_previous':False,
             'needs_confirmation':False,'should_store':False,'memory_reason':'No account context'}
     patient = patient_resolution["patient"]
+    # Registration basics belong only to a confirmed self consultation.
+    if patient_resolution["subject"] != "self":
+        snapshot = None
+    if previous.get("profile_scope") != profile_scope(snapshot):
+        previous = {}  # Do not reuse answers or reports derived from another profile scope.
+        if not payload["images"]:
+            observed = ""
     # Do not carry another person's image/report or answers into a new subject.
     if previous.get("patient") != patient or patient == "other":
         if not payload["images"]: observed = ""
@@ -576,8 +581,6 @@ async def analyze(job, payload, session_id, memory_user_id):
     if document_text: observed=document_text
     document_context=({'text':new_observed,'subject':patient_resolution['subject']} if payload['images'] else previous.get('document_context'))
 
-    if snapshot and patient != 'self':
-        raise ValueError('本轮询问对象不是本人，请关闭本人档案授权后重新提交。')
     if clinical:
         stage(job, "knowledge", "正在检索本地医学资料")
     kb = get_knowledge_base() if clinical else None
@@ -662,11 +665,11 @@ async def analyze(job, payload, session_id, memory_user_id):
             enriched += "\n只能根据本轮、授权资料与当前账号的记忆说明已知信息；不知道真实姓名或身份时明确说不知道，不把昵称说成实名，不编造病史。"
     enriched += profile_context(snapshot)
     if not snapshot:
-        enriched += ("\n\n【本轮未授权健康档案】不得读取或声称已读取保存的健康档案。"
-                     "仅能根据本轮及允许的用户历史消息、附件中明确提供的事实总结个人情况。"
-                     "公共医学资料、相似案例和助手先前的猜测都不是这个用户的病史。"
-                     "没有足够的个人资料时，明确说明无法总结，并请用户提供症状或勾选页面的档案开关后重新发送。"
-                     "聊天里口头说同意不等于开启档案开关，不得承诺凭口头授权读取档案；不得编造年龄、性别、疾病、过敏或用药。")
+        enriched += ("\n\n【本轮不使用注册基本信息】不得声称已读取本人注册信息或保存的健康档案。"
+                     "仅根据本轮及允许的用户历史消息、附件中的明确事实回答，不将公共资料或助手推测当作个人病史。"
+                     "缺少的注册字段视为未知，不要求开启档案开关、重新授权或返回注册页补填。"
+                     "不得将当前账号的基本信息套用给他人，不编造姓名、年龄、性别、疾病、过敏或用药。"
+                     "可以针对本次临床问题、人物归属和报告矛盾作必要核实，但不要求确认或更新注册档案。")
     if clinical and observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
         if document_followup:

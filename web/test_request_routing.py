@@ -64,13 +64,13 @@ class RoutingPipelineTests(unittest.TestCase):
         self.scope=account_clients();self.fixture=self.scope.__enter__()
     def tearDown(self): self.scope.__exit__(None,None,None)
 
-    def analyze(self,question,kind,subject='self',index=0,remember=False):
+    def analyze(self,question,kind,subject='self',index=0,remember=False,snapshot=None,chat_id=None,case_questions=None):
         import web.app as web
         from config import LLM_CONFIG
         owner=self.fixture.users[index].id
         job={'started':time.monotonic(),'steps':[],'owner_user_id':owner}
         payload={'message':question,'images':[],'remember':remember,'owner':owner,
-                 'chat_id':str(uuid.uuid4()),'request_id':str(uuid.uuid4())}
+                 'chat_id':chat_id or str(uuid.uuid4()),'request_id':str(uuid.uuid4()),'profile_snapshot':snapshot}
         coordinator=Mock(worker_pool=[])
         coordinator.llm_client=NS(client=NS(close=AsyncMock()))
         coordinator.process=AsyncMock(return_value={'answer':'当前请求已处理','agent_id':'consultation_agent'})
@@ -79,7 +79,7 @@ class RoutingPipelineTests(unittest.TestCase):
         with patch.dict(os.environ,{'MEDIX_KB_MODE':'evidence'}),patch.dict(LLM_CONFIG,{'api_key':'mock'}), \
              patch('web.request_routing.classify_request',AsyncMock(return_value={'kind':kind,'subject':subject})), \
              patch('knowledge.get_knowledge_base',return_value=kb) as getkb, \
-             patch('web.app.prepare_context',AsyncMock(return_value={'case_id':'','facts':[],'context':'','sources':[],'index_ready':True,'outcome':{'changes':[],'questions':[],'switched':False},'warnings':[]})) as cases, \
+             patch('web.app.prepare_context',AsyncMock(return_value={'case_id':'','facts':[],'context':'','sources':[],'index_ready':True,'outcome':{'changes':[],'questions':case_questions or [],'switched':False},'warnings':[]})) as cases, \
              patch('swarm.SwarmCoordinator',return_value=coordinator), \
              patch('web.app.get_web_memory',return_value=memory):
             asyncio.run(web.analyze(job,payload,'web-'+owner+'-'+payload['chat_id'],owner))
@@ -116,3 +116,56 @@ class RoutingPipelineTests(unittest.TestCase):
             job,coordinator,_,kb,*_=self.analyze('核对刚才报告上的数值','report')
         kb.retrieve.assert_called_once();coordinator.process.assert_awaited_once()
         self.assertEqual(job['result']['answer'],'当前请求已处理')
+
+    def registered_baseline(self):
+        from personalization.models import RegistrationProfile
+        from personalization.registration_profile import BaselineStore
+        owner=self.fixture.users[0].id
+        with self.fixture.sessions() as db:
+            db.add(RegistrationProfile(user_id=owner,data={'name':'本人专属标记','birth_month':'1995-06','sex':'female'},recorded_at=time.time()))
+            db.commit()
+        return BaselineStore(self.fixture.sessions).snapshot(owner,1)
+
+    def test_registered_profile_only_used_for_confirmed_self(self):
+        from memory.patient_resolver import resolution
+        snapshot=self.registered_baseline()
+        for subject in ('self','father','mother','other','unknown','multiple','general'):
+            with self.subTest(subject=subject), patch('web.app.resolve_patient',AsyncMock(return_value=resolution(subject,1))):
+                job,coordinator,*_=self.analyze('核对报告','report',snapshot=snapshot)
+                self.assertEqual(job['result']['profile_used'],subject=='self')
+                prompt=coordinator.process.call_args.args[0]
+                self.assertEqual('本人专属标记' in prompt,subject=='self')
+                self.assertNotIn('关闭本人档案授权',job['result']['answer'])
+                if subject in ('unknown','multiple'):self.assertIn('？',job['result']['answer'])
+        for kind in ('conversation','action','personal'):
+            job,coordinator,*_=self.analyze('一般问题',kind,subject='general',snapshot=snapshot)
+            self.assertFalse(job['result']['profile_used'])
+            self.assertNotIn('本人专属标记',coordinator.process.call_args.args[0])
+
+    def test_switching_subject_drops_profile_derived_history_and_keeps_followups(self):
+        from memory.patient_resolver import resolution
+        from web.app import contexts
+        snapshot=self.registered_baseline();chat_id=str(uuid.uuid4())
+        key='web-'+self.fixture.users[0].id+'-'+chat_id
+        with patch('web.app.resolve_patient',AsyncMock(return_value=resolution('self',1))):
+            self.analyze('本人报告','report',snapshot=snapshot,chat_id=chat_id)
+        contexts[key]['history']=[{'role':'assistant','content':'本人档案衍生秘密','patient':'self'}]
+        contexts[key]['image_observations']='本人图片秘密'
+        with patch('web.app.resolve_patient',AsyncMock(return_value=resolution('father',1))):
+            job,coordinator,*_=self.analyze('父亲的报告','report',snapshot=snapshot,chat_id=chat_id,case_questions=['请核实报告日期'])
+        prompt=coordinator.process.call_args.args[0]
+        self.assertNotIn('本人',str(coordinator.process.call_args.kwargs['context']))
+        self.assertNotIn('本人图片秘密',prompt)
+        self.assertIn('需要自然追问的关键疑点：请核实报告日期',prompt)
+        self.assertFalse(job['result']['profile_used'])
+        with patch('web.app.resolve_patient',AsyncMock(return_value=resolution('father',1))):
+            _,coordinator,*_=self.analyze('再解释一下','report',snapshot=snapshot,chat_id=chat_id)
+        self.assertIn('父亲的报告',str(coordinator.process.call_args.kwargs['context']))
+
+    def test_missing_baseline_does_not_request_obsolete_authorization(self):
+        job,coordinator,*_=self.analyze('我是谁','personal')
+        prompt=coordinator.process.call_args.args[0]
+        self.assertIn('缺少的注册字段视为未知',prompt)
+        self.assertNotIn('勾选页面的档案开关',prompt)
+        self.assertNotIn('口头授权',prompt)
+        self.assertFalse(job['result']['profile_used'])
