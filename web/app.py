@@ -230,7 +230,8 @@ def account_page():
 def status():
     from config import LLM_CONFIG, MEM0_CONFIG, SPEECH_CONFIG
     from web.speech import tts_status
-    return {**health, **tts_status(SPEECH_CONFIG), "model": LLM_CONFIG["model_name"],
+    from research.web_search import search_status
+    return {**health, **tts_status(SPEECH_CONFIG), **search_status(), "model": LLM_CONFIG["model_name"],
             "model_configured": LLM_CONFIG.get("api_key") not in {None, "", "not-configured"},
             "memory_configured": bool(MEM0_CONFIG.get("api_key")),
             "speech_api_configured": SPEECH_CONFIG["remote_enabled"]}

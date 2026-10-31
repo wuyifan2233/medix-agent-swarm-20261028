@@ -1381,7 +1381,7 @@ function walletElement(tag,className,text){
 }
 function walletAgentName(agent){
   return ({'stage:patient':'人物判断','stage:case':'病例整理','stage:agents':'任务路由','stage:vision':'图片读取','stage:presentation':'回答整理','stage:answer':'原文阅读','stage:memory':'记忆核对','stage:patient_resolve':'人物判断','stage:case_prepare':'病例整理','stage:route':'任务路由',
-    'stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
+    'stage:search':'DeepSeek 网页搜索','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
     'consultation_agent':'健康咨询助手','diagnostic_agent':'诊断分析助手','research_agent':'医学研究助手','lead_synthesis':'协作汇总助手','evidence_reader':'原文阅读助手','health_consultant':'健康咨询助手','general_practitioner':'健康咨询助手'})[agent] || (agent?.startsWith('stage:')?'流程处理':agent || '助手');
 }
 function participatingAssistants(calls,fallback=[]){
@@ -1396,7 +1396,7 @@ function walletRecord(entry){
   const date=new Date(entry.created*1000).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
   const channel=({qq:'QQ',wechat:'微信',web:'网页'})[entry.channel] || '网页';
   const assistants=participatingAssistants(entry.calls);
-  const meta=entry.deleted ? `${date} · ${channel} · 对话已删除` : `${date} · ${channel} · ${assistants.join('、') || '流程处理'} · ${entry.requests} 次模型请求`;
+  const meta=entry.deleted ? `${date} · ${channel} · 对话已删除` : `${date} · ${channel} · ${assistants.join('、') || '流程处理'} · ${entry.requests} 次模型请求${entry.search_requests?' · '+entry.search_requests+' 次搜索':''}`;
   info.append(walletElement('span','',meta));summary.append(info);
   const amount=walletElement('div','wallet-record-amount');amount.append(walletElement('strong','',`−${formatPoints(entry.points)}`));
   amount.append(walletElement('span','',entry.held_points>0?'有额度待结算':'关怀点'));summary.append(amount,walletElement('span','wallet-record-chevron','⌄'));record.append(summary);
@@ -1407,17 +1407,17 @@ function walletRecord(entry){
     const metric=walletElement('div','');metric.append(walletElement('span','',label),walletElement('strong','',formatPoints(value)));metrics.append(metric);
   }
   content.append(metrics);
-  const assistantLine=`${assistants.length?'参与助手：'+assistants.join('、'):'本轮仅有流程处理'} · 助手调用 ${entry.assistant_requests} 次 · 模型请求 ${entry.requests} 次`;
+  const assistantLine=`${assistants.length?'参与助手：'+assistants.join('、'):'本轮仅有流程处理'} · 助手调用 ${entry.assistant_requests} 次 · 模型请求 ${entry.requests} 次${entry.search_requests?' · 网页搜索 '+entry.search_requests+' 次':''}`;
   content.append(walletElement('p','wallet-call-caption',assistantLine));
   const groups=new Map();
   for(const call of entry.calls){
     const key=call.agent || 'unknown';let group=groups.get(key);
-    if(!group){group={agent:key,calls:0,input:0,output:0,points:0,unknown:false};groups.set(key,group);}
+    if(!group){group={agent:key,kind:call.usage_kind || 'model',calls:0,input:0,output:0,points:0,unknown:false};groups.set(key,group);}
     group.calls++;group.input+=call.input_tokens || 0;group.output+=call.output_tokens || 0;group.points+=call.points;group.unknown ||= !call.usage_known;
   }
   const list=walletElement('div','wallet-call-list');
   for(const group of groups.values()){
-    const row=walletElement('div','wallet-call-row');const identity=walletElement('div','');identity.append(walletElement('strong','',walletAgentName(group.agent)),walletElement('span','',`${group.calls} 次调用 · ${formatPoints(group.input)} 输入 / ${formatPoints(group.output)} 输出${group.unknown?' · 用量待核对':''}`));
+    const row=walletElement('div','wallet-call-row');const identity=walletElement('div','');identity.append(walletElement('strong','',walletAgentName(group.agent)),walletElement('span','',group.kind==='search'?`${group.calls} 次搜索${group.unknown?' · 费用待核对':''}`:`${group.calls} 次调用 · ${formatPoints(group.input)} 输入 / ${formatPoints(group.output)} 输出${group.unknown?' · 用量待核对':''}`));
     row.append(identity,walletElement('span','wallet-call-points',`${formatPoints(group.points)} 点`));list.append(row);
   }
   content.append(list);

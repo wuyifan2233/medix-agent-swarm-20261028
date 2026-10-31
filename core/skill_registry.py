@@ -99,6 +99,9 @@ class SkillRegistry:
             return result
 
         except Exception as e:
+            from openai import APIError
+            if isinstance(e, APIError):
+                raise
             error_msg = f"Skill execution failed: {name} - {str(e)}"
             logger.error(error_msg)
             return {

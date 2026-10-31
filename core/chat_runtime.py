@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from contextvars import ContextVar
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from types import SimpleNamespace as NS
 
@@ -52,14 +53,15 @@ def usage_summary(turn_id):
     known=[r for r in rows if r['usage_known']]
     currencies={json.loads(r['price']).get('currency') for r in known if r['cost'] is not None}
     cost=str(sum((Decimal(r['cost']) for r in known if r['cost'] is not None),Decimal(0))) if len(currencies)==1 else None
-    return {'charge':care_wallet.turn_charge(turn_id),'requests':len(rows),'agents':sorted({r['agent'] for r in rows}),
+    searches = [r for r in rows if json.loads(r['price']).get('service') == 'search']
+    return {'charge':care_wallet.turn_charge(turn_id),'requests':len(rows)-len(searches),'search_requests':len(searches),'agents':sorted({r['agent'] for r in rows}),
             'input_tokens':sum(r['input_tokens'] for r in known),'output_tokens':sum(r['output_tokens'] for r in known),
             'cache_hit_tokens':sum(r['cache_hit_tokens'] for r in known),
             'unknown_requests':len(rows)-len(known),'estimated_cost':cost,
             'agent_count':len({r['agent'] for r in rows if not r['agent'].startswith('stage:')}),
             'currency':next(iter(currencies)) if len(currencies)==1 else None,
             'unpriced_requests':sum(r['cost'] is None for r in known),
-            'calls':[{k:r[k] for k in ('id','agent','model','status','input_tokens','output_tokens','cache_hit_tokens','usage_known','cost','created','updated')} | {'price':json.loads(r['price'])} for r in rows]}
+            'calls':[{k:r[k] for k in ('id','agent','model','status','input_tokens','output_tokens','cache_hit_tokens','usage_known','cost','created','updated')} | {'price':json.loads(r['price']), 'usage_kind':'search' if r in searches else 'model'} for r in rows]}
 
 
 def aggregate_usage(owner, chat_id=None):
@@ -68,7 +70,7 @@ def aggregate_usage(owner, chat_id=None):
         if chat_id is not None: query+=' AND chat_id=?';args.append(chat_id)
         ids=[r[0] for r in db.execute(query,args)]
     summaries=[usage_summary(tid) for tid in ids]
-    result={key:sum(row[key] for row in summaries) for key in ('requests','input_tokens','output_tokens','cache_hit_tokens','unknown_requests','unpriced_requests')}
+    result={key:sum(row[key] for row in summaries) for key in ('requests','search_requests','input_tokens','output_tokens','cache_hit_tokens','unknown_requests','unpriced_requests')}
     currencies={r['currency'] for r in summaries if r['estimated_cost'] is not None}
     result.update(agents=sorted({agent for row in summaries for agent in row['agents']}),
                   agent_count=len({agent for row in summaries for agent in row['agents'] if not agent.startswith('stage:')}),
@@ -80,6 +82,40 @@ def aggregate_usage(owner, chat_id=None):
 class ChatRuntime:
     def __init__(self, turn_id): self.turn_id=turn_id; self.stage='initial'; self.pending_contexts={}
     def emit(self, kind, **data): store.event(self.turn_id, {'type':kind,**data})
+
+
+@asynccontextmanager
+async def service_usage(model, price):
+    """Record fixed-price calls with the same owner, reservation and cancellation rules."""
+    receipt = NS(cost=None, price=price)
+    active = runtime.get()
+    if active is None:
+        yield receipt
+        return
+    call_id = uuid.uuid4().hex
+    care_wallet.reserve(call_id, active.turn_id, {}, price)
+    try:
+        with connect() as db:
+            db.execute('INSERT INTO model_usage(id,turn_id,agent,model,status,price,created,updated) VALUES(?,?,?,?,?,?,?,?)',
+                       (call_id, active.turn_id, 'stage:search', model, 'running', dumps(price), time.time(), time.time()))
+    except Exception:
+        care_wallet.settle(call_id, '0')
+        raise
+    state = 'failed'
+    try:
+        yield receipt
+        state = 'completed'
+    except asyncio.CancelledError:
+        state = 'cancelled'
+        raise
+    finally:
+        known = receipt.cost is not None
+        care_wallet.settle(call_id, receipt.cost, unknown=not known)
+        with connect() as db:
+            db.execute('UPDATE model_usage SET status=?,input_tokens=?,output_tokens=?,cache_hit_tokens=?,usage_known=?,cost=?,updated=? WHERE id=?',
+                       (state, 0 if known else None, 0 if known else None, 0 if known else None,
+                        int(known), receipt.cost, time.time(), call_id))
+        active.emit('usage', usage=usage_summary(active.turn_id))
 
 
 async def completion(client, params, *, visible=False, agent='system', transform=None):

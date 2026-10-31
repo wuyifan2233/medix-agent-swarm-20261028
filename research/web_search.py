@@ -1,283 +1,206 @@
-"""
-网络搜索模块
-
-提供医学领域的网络搜索能力，基于 DuckDuckGo Search API (DDGS)
-"""
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
-from loguru import logger
+"""Async DeepSeek Search adapter. DDGS is available only by explicit selection."""
 import asyncio
-from bs4 import BeautifulSoup
-import httpx
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any
+from urllib.parse import urlsplit
 
-# 尝试导入 ddgs (新包名) 或 duckduckgo_search (旧包名)
+import httpx
+from bs4 import BeautifulSoup
+from loguru import logger
+from openai import APIError
+from runtime_settings import load_setting
+
 try:
-    try:
-        from ddgs import DDGS
-    except ImportError:
-        from duckduckgo_search import DDGS
+    from ddgs import DDGS
     DDGS_AVAILABLE = True
 except ImportError:
     DDGS_AVAILABLE = False
-    logger.error("DDGS not available. Install with: pip install ddgs")
+    DDGS = None
+
+
+class SearchError(APIError):
+    """Safe provider errors, propagated instead of being presented as research."""
+    def __init__(self, message):
+        super().__init__(message, request=httpx.Request('POST', 'https://api.deepseek.com/v1/tools/search'), body=None)
+
+
+def source_key(url):
+    """Canonical key for duplicate source URLs; preserve meaningful query strings."""
+    parts = urlsplit(url)
+    return (parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip('/'), parts.query)
+
+
+def unique_sources(rows):
+    seen = set()
+    for row in rows:
+        key = source_key(row.url)
+        if key not in seen:
+            seen.add(key)
+            yield row
 
 
 @dataclass
 class SearchResult:
-    """搜索结果数据结构"""
     title: str
     url: str
-    snippet: str  # 摘要
-    source: str = "web"  # 来源标识
+    snippet: str
+    source: str = 'web'
+    summary: str = ''
+    content: str = ''
+    site_name: Optional[str] = None
+    date: Optional[str] = None
+    authority: Optional[int] = None
+    rerank_score: Optional[float] = None
 
 
 class WebSearchTool:
-    """
-    网络搜索工具
-
-    功能：
-    - 使用 DuckDuckGo 进行网络搜索
-    - 专注于医学领域网站
-    - 结果去重和质量过滤
-    """
-
-    def __init__(self, timeout: int = 30):
-        """
-        初始化搜索工具
-
-        Args:
-            timeout: HTTP 请求超时时间（秒）
-        """
+    def __init__(self, timeout=30, provider=None, api_key=None, transport=None):
         self.timeout = timeout
+        self.provider = provider or load_setting('MEDIX_SEARCH_PROVIDER', 'deepseek')
+        if self.provider not in {'deepseek', 'ddgs'}:
+            raise ValueError('MEDIX_SEARCH_PROVIDER 必须是 deepseek 或 ddgs。')
+        self.api_key = api_key
+        self.transport = transport
+        self.medical_domains = ['pubmed.ncbi.nlm.nih.gov', 'mayoclinic.org', 'webmd.com', 'who.int',
+                                'cdc.gov', 'nih.gov', 'uptodate.com', 'medscape.com', 'healthline.com',
+                                'medicalnewstoday.com']
 
-        # 医学领域权威网站白名单
-        self.medical_domains = [
-            "pubmed.ncbi.nlm.nih.gov",
-            "mayoclinic.org",
-            "webmd.com",
-            "who.int",
-            "cdc.gov",
-            "nih.gov",
-            "uptodate.com",
-            "medscape.com",
-            "healthline.com",
-            "medicalnewstoday.com"
-        ]
-
-    async def search(
-        self,
-        query: str,
-        max_results: int = 10,
-        region: str = "cn-zh",  # 中国区域，更适合中文搜索
-        safesearch: str = "on",  # 严格安全搜索
-        timelimit: Optional[str] = None,  # 时间限制：'d'(天), 'w'(周), 'm'(月), 'y'(年)
-        retry_count: int = 2  # 重试次数
-    ) -> List[SearchResult]:
-        """
-        执行搜索（参考 shanglv 项目的实现）
-
-        Args:
-            query: 搜索查询
-            max_results: 最大结果数
-            region: 地区设置（cn-zh = 中国区域）
-            safesearch: 安全搜索级别（on = 严格）
-            timelimit: 时间限制
-            retry_count: 重试次数
-
-        Returns:
-            搜索结果列表
-        """
-        if not DDGS_AVAILABLE:
-            logger.error("DDGS not available, cannot perform web search")
-            return []
-
-        for attempt in range(retry_count + 1):
+    async def search(self, query, max_results=10, region='cn-zh', safesearch='on',
+                     timelimit=None, retry_count=0, need_content=False, ori_question=None):
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError('搜索词不能为空。')
+        if type(max_results) is not int or not 1 <= max_results <= 50:
+            raise ValueError('搜索条数必须为 1–50。')
+        if timelimit not in {None, 'd', 'w', 'm', 'y'}:
+            raise ValueError('不支持的搜索时间范围。')
+        if self.provider == 'ddgs':
+            return await self._search_ddgs(query, max_results, region, safesearch, timelimit, retry_count)
+        if timelimit:
+            days = {'d': 1, 'w': 7, 'm': 30, 'y': 365}[timelimit]
+            after = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+            query = f'{query} after:{after}'
+        if len(query) > 128:
+            raise ValueError('DeepSeek 搜索词最多128个字符，请缩短后重试。')
+        if type(need_content) is not bool:
+            raise ValueError('need_content 必须是布尔值。')
+        if ori_question is not None and (not isinstance(ori_question, str) or not ori_question.strip() or len(ori_question) > 128):
+            raise ValueError('原始搜索问题必须为1–128个字符。')
+        key = self.api_key if self.api_key is not None else load_setting('DEEPSEEK_SEARCH_API_KEY', load_setting('DEEPSEEK_API_KEY'))
+        if not key or key.lower() in {'xxx', 'not-configured'}:
+            raise SearchError('尚未配置 DeepSeek 网页搜索密钥。')
+        payload = {'query': query, 'count': max_results, 'need_content': need_content}
+        if ori_question is not None:
+            payload['ori_question'] = ori_question
+        from core.chat_runtime import service_usage
+        from core.token_pricing import search_price
+        async with service_usage('deepseek-search', search_price()) as receipt:
             try:
-                logger.info(f"Web searching (attempt {attempt + 1}): {query} (max_results={max_results})")
+                async with httpx.AsyncClient(timeout=self.timeout, transport=self.transport, follow_redirects=False) as client:
+                    response = await client.post('https://api.deepseek.com/v1/tools/search',
+                                                 headers={'Authorization': 'Bearer ' + key}, json=payload)
+            except httpx.HTTPError:
+                raise SearchError('DeepSeek 网页搜索连接失败或超时，请稍后重试。') from None
+            if response.status_code != 200:
+                receipt.cost = '0'  # Published tariff: unsuccessful requests are not billed.
+                messages = {400: '网页搜索参数未通过校验。', 401: 'DeepSeek 网页搜索鉴权失败，请检查密钥。',
+                            402: 'DeepSeek 搜索服务余额不足。', 403: 'DeepSeek 网页搜索请求被拒绝。',
+                            429: 'DeepSeek 网页搜索请求过于频繁，请稍后重试。'}
+                raise SearchError(messages.get(response.status_code, 'DeepSeek 网页搜索暂时不可用，请稍后重试。'))
+            try:
+                data = response.json()
+                raw = data['results']
+                if not isinstance(raw, list):
+                    raise ValueError()
+            except (ValueError, KeyError, TypeError):
+                raise SearchError('DeepSeek 网页搜索响应格式异常，费用待核对。') from None
+            # Charge the upstream result, even when later validation/filtering removes items.
+            receipt.cost = receipt.price['request'] if raw else '0'
+            rows = []
+            for item in raw:
+                if not isinstance(item, dict) or not isinstance(item.get('url'), str):
+                    continue
+                try:
+                    parsed = urlsplit(item['url'])
+                    valid = parsed.scheme in {'https', 'http'} and bool(parsed.hostname) and not parsed.username and not parsed.password
+                except ValueError:
+                    valid = False
+                if not valid:
+                    continue
+                rows.append(SearchResult(str(item.get('title') or ''), item['url'], str(item.get('snippet') or ''),
+                            summary=str(item.get('summary') or ''), content=str(item.get('content') or '') if need_content else '',
+                            site_name=item.get('site_name'), date=item.get('date'), authority=item.get('authority'),
+                            rerank_score=item.get('rerank_score')))
+            return list(unique_sources(rows))[:max_results]
 
-                # 在查询中添加医学相关关键词，提高结果相关性
-                enhanced_query = f"{query} 医学" if "医学" not in query else query
-
-                # 使用 DDGS 搜索（参考 shanglv：多后端尝试，不使用上下文管理器）
-                results = []
-                search_results = []
-
-                # 尝试多个后端：bing → duckduckgo → auto
-                for backend in ("bing", "duckduckgo", "auto"):
-                    try:
-                        ddgs = DDGS()
-                        raw = ddgs.text(
-                            enhanced_query,
-                            max_results=max_results * 2,  # 获取更多结果用于过滤
-                            safesearch=safesearch,
-                            region=region,
-                            backend=backend  # 关键：指定后端
-                        )
-                        search_results = list(raw)
-                        if search_results:
-                            logger.debug(f"DDGS backend {backend} succeeded with {len(search_results)} results")
-                            break
-                    except Exception as e:
-                        logger.debug(f"DDGS backend {backend} failed: {e}")
-                        continue
-
-                # 处理搜索结果
-                for result in search_results:
-                    search_result = SearchResult(
-                        title=result.get("title", ""),
-                        url=result.get("href", ""),
-                        snippet=result.get("body", ""),
-                        source="web"
-                    )
-                    results.append(search_result)
-
-                    if len(results) >= max_results:
-                        break
-
-                if results:
-                    logger.info(f"Found {len(results)} results for: {query}")
-                    return results
-                else:
-                    logger.warning(f"No results found for: {query}")
-
-            except Exception as e:
-                logger.warning(f"Web search error (attempt {attempt + 1}): {e}")
-
-                if attempt < retry_count:
-                    # 等待后重试
-                    await asyncio.sleep(2 ** attempt)  # 指数退避
-                else:
-                    logger.error(f"Web search failed after {retry_count + 1} attempts")
-                    return []
-
+    async def _search_ddgs(self, query, count, region, safesearch, timelimit, retries):
+        if not DDGS_AVAILABLE:
+            return []
+        for attempt in range(retries + 1):
+            for backend in ('bing', 'duckduckgo', 'auto'):
+                def run():
+                    return list(DDGS(timeout=self.timeout).text(query, max_results=count * 2,
+                                safesearch=safesearch, region=region, backend=backend, timelimit=timelimit))
+                try:
+                    raw = await asyncio.wait_for(asyncio.to_thread(run), self.timeout + 1)
+                    rows = [SearchResult(item.get('title', ''), item.get('href', ''), item.get('body', '')) for item in raw]
+                    if rows:
+                        return list(unique_sources(rows))[:count]
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    continue
+            if attempt < retries:
+                await asyncio.sleep(min(2 ** attempt, 4))
         return []
 
-    def filter_by_domain(
-        self,
-        results: List[SearchResult],
-        allowed_domains: Optional[List[str]] = None
-    ) -> List[SearchResult]:
-        """
-        按域名过滤结果
-
-        Args:
-            results: 搜索结果
-            allowed_domains: 允许的域名列表（默认使用医学域名白名单）
-
-        Returns:
-            过滤后的结果
-        """
-        if allowed_domains is None:
-            allowed_domains = self.medical_domains
-
-        filtered = []
+    def filter_by_domain(self, results, allowed_domains=None):
+        allowed = self.medical_domains if allowed_domains is None else allowed_domains
+        allowed = [domain.lower().rstrip('.') for domain in allowed]
+        rows = []
         for result in results:
-            # 检查 URL 是否包含白名单域名
-            if any(domain in result.url for domain in allowed_domains):
-                filtered.append(result)
+            try:
+                parts = urlsplit(result.url)
+                host = (parts.hostname or '').lower().rstrip('.')
+                if parts.scheme in {'http', 'https'} and any(host == domain or host.endswith('.' + domain) for domain in allowed):
+                    rows.append(result)
+            except ValueError:
+                continue
+        return rows
 
-        logger.info(f"Filtered {len(filtered)}/{len(results)} results by domain")
-        return filtered
-
-    async def fetch_content(
-        self,
-        url: str,
-        max_length: int = 2000
-    ) -> Optional[str]:
-        """
-        抓取网页内容
-
-        Args:
-            url: 网页 URL
-            max_length: 最大内容长度
-
-        Returns:
-            网页文本内容（提取正文）
-        """
+    async def fetch_content(self, url, max_length=2000):
+        """Optional legacy page retrieval, not a DeepSeek Fetch API request."""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(url)
                 response.raise_for_status()
-
-                # 使用 BeautifulSoup 提取正文
-                soup = BeautifulSoup(response.text, 'html.parser')
-
-                # 移除 script 和 style 标签
-                for script in soup(["script", "style"]):
-                    script.decompose()
-
-                # 提取文本
-                text = soup.get_text()
-
-                # 清理空白字符
-                lines = (line.strip() for line in text.splitlines())
-                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                text = ' '.join(chunk for chunk in chunks if chunk)
-
-                # 限制长度
-                if len(text) > max_length:
-                    text = text[:max_length] + "..."
-
-                return text
-
-        except Exception as e:
-            logger.error(f"Failed to fetch content from {url}: {e}")
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for element in soup(['script', 'style']):
+                element.decompose()
+            text = ' '.join(soup.stripped_strings)
+            return text[:max_length] + ('...' if len(text) > max_length else '')
+        except httpx.HTTPError:
             return None
 
-    async def search_with_content(
-        self,
-        query: str,
-        max_results: int = 5,
-        fetch_full_content: bool = False
-    ) -> List[Dict[str, Any]]:
-        """
-        搜索并获取内容
-
-        Args:
-            query: 搜索查询
-            max_results: 最大结果数
-            fetch_full_content: 是否抓取完整内容
-
-        Returns:
-            包含内容的搜索结果
-        """
-        # 执行搜索
-        results = await self.search(query, max_results=max_results)
-
-        # 如果需要，抓取完整内容
-        enriched_results = []
-        for result in results:
-            enriched = {
-                "title": result.title,
-                "url": result.url,
-                "snippet": result.snippet,
-                "source": result.source,
-                "full_content": None
-            }
-
-            if fetch_full_content:
-                content = await self.fetch_content(result.url)
-                enriched["full_content"] = content
-
-            enriched_results.append(enriched)
-
-        return enriched_results
+    async def search_with_content(self, query, max_results=5, fetch_full_content=False):
+        # Official search can return content itself; never silently add a paid Fetch call.
+        rows = await self.search(query, max_results=max_results, **({'need_content': True} if fetch_full_content and self.provider == 'deepseek' else {}))
+        output = []
+        for row in rows:
+            full = row.content or None
+            if fetch_full_content and self.provider == 'ddgs':
+                full = await self.fetch_content(row.url)
+            output.append({'title': row.title, 'url': row.url, 'snippet': row.snippet, 'summary': row.summary,
+                           'source': row.source, 'full_content': full})
+        return output
 
 
-# 便捷函数
-async def search_medical_web(
-    query: str,
-    max_results: int = 10
-) -> List[SearchResult]:
-    """
-    快速搜索医学网络信息
+async def search_medical_web(query, max_results=10):
+    return await WebSearchTool().search(query, max_results=max_results)
 
-    Args:
-        query: 搜索查询
-        max_results: 最大结果数
 
-    Returns:
-        搜索结果列表
-    """
-    tool = WebSearchTool()
-    return await tool.search(query, max_results=max_results)
+def search_status():
+    provider = load_setting('MEDIX_SEARCH_PROVIDER', 'deepseek')
+    key = load_setting('DEEPSEEK_SEARCH_API_KEY', load_setting('DEEPSEEK_API_KEY'))
+    configured = bool(key and key.lower() not in {'xxx', 'not-configured'}) if provider == 'deepseek' else DDGS_AVAILABLE if provider == 'ddgs' else False
+    return {'search_provider': provider, 'search_configured': configured}

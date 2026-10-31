@@ -42,6 +42,10 @@ def reserve(call_id,turn_id,params,price=None):
         input_rate=max(Decimal('2'),Decimal(str((price or {}).get('input',2))),Decimal(str((price or {}).get('cached_input',0))))
         output_rate=max(Decimal('8'),Decimal(str((price or {}).get('output',8))))
         maximum=(Decimal(incoming)*input_rate+Decimal(outgoing)*output_rate)/1000000
+        if price and price.get('unit') == 'request':
+            maximum = Decimal(str(price['request']))
+            if not maximum.is_finite() or maximum < 0:
+                raise ValueError('服务价格必须是非负有限数。')
         amount=int((maximum*row['units_per_cny']).to_integral_value(rounding=ROUND_CEILING))
         if row['balance']-held<amount: raise CarePointsError()
         db.execute('INSERT INTO care_ledger(id,owner,turn_id,kind,amount,reserved,created,channel) VALUES(?,?,?,?,?,?,?,?)',
@@ -78,18 +82,20 @@ def history(owner,offset=0,limit=20):
             turn=db.execute('''SELECT t.status,s.title FROM chat_turns t JOIN chat_sessions s
                 ON s.owner=t.owner AND s.id=t.chat_id WHERE t.id=? AND t.owner=?''',(tid,owner)).fetchone()
             rows=db.execute('''SELECT l.id,l.kind,l.amount,l.reserved,l.created,l.channel,
-                u.agent,u.model,u.status,u.input_tokens,u.output_tokens,u.cache_hit_tokens,u.usage_known
+                u.agent,u.model,u.status,u.input_tokens,u.output_tokens,u.cache_hit_tokens,u.usage_known,u.price
                 FROM care_ledger l LEFT JOIN model_usage u ON u.id=l.id AND u.turn_id=l.turn_id
                 WHERE l.owner=? AND l.turn_id=? ORDER BY l.created,l.id''',(owner,tid)).fetchall()
             calls=[dict(row) for row in rows]
             for call in calls:
+                call['usage_kind'] = 'search' if json.loads(call.pop('price') or '{}').get('service') == 'search' else 'model'
                 call['points']=call.pop('amount')/1000
                 call['held_points']=call.pop('reserved')/1000
             assistants={r['agent'] for r in rows if r['agent'] and not r['agent'].startswith('stage:')}
             entries.append({'id':tid,'title':turn['title'] if turn else '已删除的对话',
                 'deleted':turn is None,'status':turn['status'] if turn else 'deleted',
                 'created':rows[0]['created'],'channel':rows[0]['channel'],'points':sum(c['points'] for c in calls),
-                'held_points':sum(c['held_points'] for c in calls),'requests':len(calls),
+                'held_points':sum(c['held_points'] for c in calls),'requests':sum(c['usage_kind']=='model' for c in calls),
+                'search_requests':sum(c['usage_kind']=='search' for c in calls),
                 'agent_count':len(assistants),
                 'assistant_requests':sum(bool(r['agent'] in assistants) for r in rows),
                 'input_tokens':sum(r['input_tokens'] or 0 for r in rows),

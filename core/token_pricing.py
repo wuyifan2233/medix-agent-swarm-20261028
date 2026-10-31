@@ -5,6 +5,20 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+
+def search_price():
+    """DeepSeek Search: CNY 5 / 1000 successful, nonempty requests.
+
+    https://api-docs.deepseek.com/zh-cn/guides/search/#计费
+    """
+    from runtime_settings import load_setting
+    amount = Decimal(load_setting('MEDIX_SEARCH_PRICE_CNY', '0.005'))
+    if not amount.is_finite() or amount < 0:
+        raise ValueError('搜索单价必须是非负有限数。')
+    return {'currency': 'CNY', 'unit': 'request', 'service': 'search', 'request': str(amount),
+            'version': load_setting('MEDIX_SEARCH_PRICE_VERSION', '2026-10-31-deepseek-search'),
+            'started_at': datetime.now(timezone.utc).isoformat()}
+
 # State Council 2026 holiday notice, including the announced holiday breaks.
 # https://www.gov.cn/zhengce/content/202511/content_7047090.htm
 HOLIDAYS_2026={(month,day) for month,start,end in [(1,1,3),(2,15,23),(4,4,6),(5,1,5),(6,19,21),(9,25,27),(10,1,7)] for day in range(start,end+1)}

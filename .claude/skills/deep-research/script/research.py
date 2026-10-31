@@ -5,6 +5,7 @@ Deep Research Skill
 """
 from typing import Dict, Any
 from loguru import logger
+from openai import APIError
 
 
 async def deep_research(query: str, max_iterations: int = 2) -> Dict[str, Any]:
@@ -34,9 +35,10 @@ async def deep_research(query: str, max_iterations: int = 2) -> Dict[str, Any]:
 
     from research.deep_research_workflow import DeepResearchWorkflow
 
-    workflow = DeepResearchWorkflow()
-
     try:
+        if type(max_iterations) is not int or not 1 <= max_iterations <= 3:
+            raise ValueError('研究检索预算必须为1–3。')
+        workflow = DeepResearchWorkflow()
         # 执行研究
         # 注意：DeepResearchWorkflow.run() 返回的是 ResearchReport 对象，不是 dict
         report = await workflow.run(
@@ -53,23 +55,32 @@ async def deep_research(query: str, max_iterations: int = 2) -> Dict[str, Any]:
         # - summary: str
         # - recommendations: List[str]
 
+        status = getattr(report, 'status', 'completed')
+        if not report.sources:
+            status = 'empty' if status == 'completed' else status
         return {
             "answer": format_research_report(query, report),
             "findings": report.key_findings,
             "confidence": "high" if report.confidence > 0.7 else "medium" if report.confidence > 0.4 else "low",
             "sources": len(report.sources),
+            "source_details": report.sources,
             "evidence_level": report.evidence_level,
-            "status": "completed",
-            "data_sources": "Web Search + Milvus RAG + Evidence Synthesis"
+            "status": status,
+            "success": status == 'completed',
+            "data_sources": "Web Search + Local Knowledge + Evidence Synthesis"
         }
 
     except Exception as e:
-        logger.error(f"Deep research failed: {e}")
+        if isinstance(e, APIError):
+            raise
+        logger.error("Deep research failed ({})", type(e).__name__)
         return {
-            "answer": f"深度研究失败：{str(e)}",
+            "answer": "深度研究未完成，请检查检索服务配置后重试。",
             "findings": [],
             "confidence": "low",
             "sources": 0,
+            "source_details": [],
+            "success": False,
             "status": "error"
         }
 
@@ -120,8 +131,10 @@ def format_research_report(query: str, report) -> str:
     # 来源数量
     if report.sources:
         output.append(f"\n参考来源数量：{len(report.sources)}")
+        for index, source in enumerate(report.sources, 1):
+            output.append(f"[{index}] {source.get('title', '来源')} {source.get('url', '')}")
 
-    output.append("\n💡 数据来源：网络搜索 + 医学知识库（Milvus RAG）+ 证据综合")
+    output.append("\n数据来源以本次返回的来源列表为准；检索摘要不等于医学结论已经核验。")
 
     return "\n".join(output)
 

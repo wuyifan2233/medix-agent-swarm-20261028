@@ -322,8 +322,17 @@ class StreamTimingTests(unittest.IsolatedAsyncioTestCase):
         from starlette.requests import ClientDisconnect
         with patch("edge_tts.Communicate", Speaker):
             response = await speech.speech_response(ConnectedRequest(), {}, "test")
-            with self.assertRaises(ClientDisconnect):
+            try:
                 await response({"type": "http", "asgi": {"spec_version": "2.4"}}, receive, send)
+            except Exception as exc:
+                # Starlette 0.41/AnyIO wrap OSError; newer Starlette maps it to
+                # ClientDisconnect for ASGI 2.4. Validate leaves, not the wrapper.
+                def disconnect_only(error):
+                    nested = getattr(error, 'exceptions', ())
+                    return all(disconnect_only(child) for child in nested) if nested else isinstance(error, (OSError, ClientDisconnect))
+                self.assertTrue(disconnect_only(exc), type(exc).__name__)
+            else:
+                self.fail('Disconnected transport must raise')
         self.assertTrue(closed.is_set())
 
     async def test_transport_disconnect_releases_open_provider(self):

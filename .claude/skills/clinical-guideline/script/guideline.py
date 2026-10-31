@@ -11,8 +11,8 @@ _kb_instance = None
 def get_knowledge_base():
     global _kb_instance
     if _kb_instance is None:
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        _kb_instance = MedicalKnowledgeBase()
+        from knowledge import get_knowledge_base
+        _kb_instance = get_knowledge_base()
     return _kb_instance
 
 
@@ -52,7 +52,7 @@ async def clinical_guideline(query: str, max_results: int = 1) -> Dict[str, Any]
             "guideline_title": f"{metadata.get('disease', query)}相关临床指南",
             "organization": metadata.get("organization", "N/A"),
             "year": metadata.get("year", "N/A"),
-            "source": "向量数据库"
+            "source": "本地文本检索" if getattr(kb, 'backend', '') == 'mini' else "向量数据库"
         }
     else:
         # 未找到相关内容

@@ -6,10 +6,11 @@
 from typing import List, Dict, Any, Optional
 from loguru import logger
 import asyncio
+from openai import APIError
 
 from core import LLMClient
-from research.web_search import WebSearchTool, SearchResult
-from knowledge.milvus_kb import MedicalKnowledgeBase
+from research.web_search import WebSearchTool, SearchResult, unique_sources
+from knowledge import get_knowledge_base as resolve_knowledge_base
 from research.evidence_synthesizer import EvidenceSynthesizer, ResearchReport
 
 # 全局知识库实例（单例）
@@ -19,7 +20,7 @@ def get_knowledge_base():
     """获取知识库单例"""
     global _kb_instance
     if _kb_instance is None:
-        _kb_instance = MedicalKnowledgeBase()
+        _kb_instance = resolve_knowledge_base()
     return _kb_instance
 
 
@@ -78,6 +79,8 @@ class DeepResearchWorkflow:
         logger.info(f"Starting DeepResearch for: {question}")
 
         # Step 1: 查询规划
+        if type(max_web_results) is not int or type(max_kb_results) is not int or not 0 <= max_web_results <= 50 or not 0 <= max_kb_results <= 50:
+            raise ValueError('检索结果预算必须为0–50。')
         sub_queries = await self._plan_queries(question)
         logger.info(f"Planned {len(sub_queries)} sub-queries")
 
@@ -87,18 +90,20 @@ class DeepResearchWorkflow:
 
         search_tasks = []
 
-        if self.use_web_search and self.web_search:
+        if self.use_web_search and self.web_search and max_web_results:
             # 网络搜索
-            for query in sub_queries[:3]:  # 限制子查询数量
+            queries = sub_queries[:min(3, max_web_results)]
+            for index, query in enumerate(queries):
                 search_tasks.append(
-                    self.web_search.search(query, max_results=max_web_results // len(sub_queries))
+                    self.web_search.search(query, max_results=max_web_results // len(queries) + int(index < max_web_results % len(queries)))
                 )
 
-        if self.use_knowledge_base and self.knowledge_base:
+        if self.use_knowledge_base and self.knowledge_base and max_kb_results:
             # 从 Milvus 知识库检索
-            for query in sub_queries[:3]:
+            queries = sub_queries[:min(3, max_kb_results)]
+            for index, query in enumerate(queries):
                 search_tasks.append(
-                    self._search_milvus(query, top_k=max_kb_results // len(sub_queries))
+                    self._search_milvus(query, top_k=max_kb_results // len(queries) + int(index < max_kb_results % len(queries)))
                 )
 
         # 并行执行
@@ -107,8 +112,10 @@ class DeepResearchWorkflow:
 
             # 分离结果
             for result in results:
+                if isinstance(result, APIError):
+                    raise result
                 if isinstance(result, Exception):
-                    logger.warning(f"Search task failed: {result}")
+                    logger.warning("Search task failed ({})", type(result).__name__)
                     continue
 
                 if isinstance(result, list):
@@ -119,7 +126,12 @@ class DeepResearchWorkflow:
                             # Milvus 返回的是字典列表
                             kb_results.extend(result)
 
+        web_results = list(unique_sources(web_results))[:max_web_results]
+        seen_local = set()
+        kb_results = [row for row in kb_results if not ((key := row.get('id') or row.get('content')) in seen_local or seen_local.add(key))][:max_kb_results]
         logger.info(f"Collected {len(web_results)} web results, {len(kb_results)} KB results")
+        if not web_results and not kb_results:
+            return ResearchReport(query=question, status='empty', summary='本次没有检索到可用来源，无法生成有依据的研究报告。')
 
         # Step 3: 证据综合
         report = await self.synthesizer.synthesize(
@@ -148,7 +160,7 @@ class DeepResearchWorkflow:
             文档列表（字典格式）
         """
         try:
-            results = self.knowledge_base.search(query=query, top_k=top_k, filter_type=None)
+            results = await asyncio.to_thread(self.knowledge_base.search, query=query, top_k=top_k, filter_type=None)
             logger.debug(f"Milvus search returned {len(results)} results for: {query[:50]}...")
             return results
         except Exception as e:
@@ -197,12 +209,12 @@ class DeepResearchWorkflow:
                 line = line.strip()
                 # 移除可能的编号
                 line = line.lstrip('0123456789.-:：）) ')
-                if line and len(line) > 5:  # 过滤太短的行
+                if 5 < len(line) <= 128:
                     sub_queries.append(line)
 
             # 至少包含原始问题
             if not sub_queries:
-                sub_queries = [question]
+                sub_queries = [question[:128]]
 
             # 限制数量
             sub_queries = sub_queries[:3]
@@ -210,9 +222,11 @@ class DeepResearchWorkflow:
             return sub_queries
 
         except Exception as e:
+            if isinstance(e, APIError):
+                raise
             logger.error(f"Query planning error: {e}")
             # 降级：返回原始问题
-            return [question]
+            return [question[:128]]
 
     async def research_with_refinement(
         self,

@@ -7,9 +7,10 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from loguru import logger
+from openai import APIError
 
 from core import LLMClient
-from research.web_search import SearchResult
+from research.web_search import SearchResult, unique_sources
 
 
 @dataclass
@@ -24,6 +25,7 @@ class ResearchReport:
     summary: str = ""  # 综合总结
     recommendations: List[str] = field(default_factory=list)  # 建议
     created_at: datetime = field(default_factory=datetime.now)
+    status: str = "completed"
 
 
 class EvidenceSynthesizer:
@@ -68,6 +70,9 @@ class EvidenceSynthesizer:
             web_results = []
         if kb_results is None:
             kb_results = []
+        web_results = list(unique_sources(web_results))
+        if not web_results and not kb_results:
+            return ResearchReport(query=query, status='empty', summary='没有可用来源，未进行证据综合。')
 
         # 构建综合提示
         prompt = self._build_synthesis_prompt(query, web_results, kb_results)
@@ -77,6 +82,8 @@ class EvidenceSynthesizer:
             response = await self.llm_client.chat([
                 {"role": "user", "content": prompt}
             ])
+            if not response or not response.strip():
+                raise ValueError('empty synthesis')
 
             # 解析响应生成报告
             report = self._parse_response(query, response, web_results, kb_results)
@@ -85,11 +92,13 @@ class EvidenceSynthesizer:
             return report
 
         except Exception as e:
-            logger.error(f"Evidence synthesis error: {e}")
+            if isinstance(e, APIError):
+                raise
+            logger.error("Evidence synthesis failed ({})", type(e).__name__)
             # 返回空报告
             return ResearchReport(
                 query=query,
-                summary=f"综合失败：{str(e)}"
+                summary='证据综合未完成，请稍后重试。', status='failed'
             )
 
     def _build_synthesis_prompt(
@@ -112,7 +121,12 @@ class EvidenceSynthesizer:
             for i, result in enumerate(web_results[:5], 1):
                 prompt += f"{i}. {result.title}\n"
                 prompt += f"   来源: {result.url}\n"
-                prompt += f"   摘要: {result.snippet}\n\n"
+                prompt += f"   摘要: {result.summary or result.snippet}\n"
+                if result.date:
+                    prompt += f"   发布日期: {result.date}\n"
+                if result.content:
+                    prompt += f"   正文摘录: {result.content[:4000]}\n"
+                prompt += '\n'
 
         # 添加知识库检索结果（Milvus 返回的字典）
         if kb_results:
@@ -240,11 +254,13 @@ class EvidenceSynthesizer:
             ]
 
         # 收集来源
-        for result in web_results[:5]:
+        for result in list(unique_sources(web_results))[:5]:
             report.sources.append({
                 "type": "web",
                 "title": result.title,
-                "url": result.url
+                "url": result.url,
+                **({'date': result.date} if result.date else {}),
+                **({'site_name': result.site_name} if result.site_name else {})
             })
 
         for doc in kb_results[:5]:

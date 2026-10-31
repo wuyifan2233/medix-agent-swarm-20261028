@@ -84,6 +84,9 @@ class ResearchAgent(BaseAgent, SkillRegistryMixin):
 9. search_similar_cases: 搜索相似历史案例（长期记忆）
 
 **Skills 使用策略**：
+- 明确要求联网、最新信息或网页来源时，调用 `deep_research`，不要将本地检索描述成联网搜索。
+- `clinical_guideline` 只检索已配置的本地知识库；本地没有来源时可调用 `deep_research`。
+- 引用本次工具返回的实际来源链接，不编造链接；工具失败或无来源时如实说明。
 - 优先使用 `clinical_guideline`（快速获取权威指南）
 - 需要最新信息或复杂问题时使用 `deep_research`
 - 可以结合其他 Skills（如 `search_knowledge`）补充信息

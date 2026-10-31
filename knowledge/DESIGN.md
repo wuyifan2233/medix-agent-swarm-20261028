@@ -1,5 +1,16 @@
 # MediX 本地医学证据库完整设计
 
+## 2026-10-31：DeepSeek 官方网页搜索接入
+
+联网深研默认使用 DeepSeek Search `POST https://api.deepseek.com/v1/tools/search`。Search 不传聊天模型名；独立异步 HTTP 调用，保留标题、原始 URL、长摘要、日期及可选正文。`MEDIX_SEARCH_PROVIDER=ddgs` 才显式使用旧后端，官方失败不自动回退。短期时间筛选转换为 `after:` 查询语法；参数长度和条数按官方约束校验。DeepSeek 返回的 authority/rerank_score 是供应商排序提示，不是医学证据等级或临床核验。
+
+ResearchAgent 的深研按配置复用本地知识库选择器（包括标明的 mini 文本后备），网络来源去重后参与综合；Skill 同时返回 `source_details` 和可读链接。没有来源时不发起证据综合、不标记完成；模型综合失败如实返回失败。临床指南 Skill 仍是本地检索，不能把它称作联网查询。本次改动不改变主证据语料、分块、索引或嵌入版本。
+
+官方 Search 当前为每次成功且结果非空收费 0.005 元，价格由 `MEDIX_SEARCH_PRICE_CNY` 与版本配置保存快照。网页和渠道托管任务按次预留/结算关怀点，搜索次数与模型请求/Token分开；HTTP失败或空结果结算为0；客户端中断、网络错误或响应无法确认时保留本次固定费用待核对。付费响应经本地过滤后为空仍按供应商成功调用结算。没有启用自动付费重试，也没有新增付费 Fetch 请求。
+
+参考：<https://api-docs.deepseek.com/zh-cn/api/search/>、<https://api-docs.deepseek.com/zh-cn/guides/search/>。验证入口：`python scripts/verify_research.py`；整套回归含 Search HTTP、账号隔离、固定价格、空结果、错误与取消用例。历史验证报告保留，不将此前 DDGS 实测当作官方 Search 验收。
+
+
 ## 2026-10-31 流式生成补充
 
 本功能分支对 `generate_answer` 使用真实上游流。原始 JSON 不展示：增量解析完整 sentence 对象后，复用 `parse_answer` 检查引用编号与逐字 quote，再发布已完成句子；最后仍对完整 JSON 校验，以最终结果替换草稿。quote 仍只证明原文存在。格式异常不把未完成 JSON 当作最终答案。Agent 路径在生成期标识草稿，结束后保留原有引用核验和输出修复。模型推理内容仅用于内存中的工具续传，不写入事件或聊天记录。单次生成不额外发起“流式美化”请求；底层禁用隐藏 SDK 重试，每个显式重试单独记用量。检索、语料与索引版本未改变。
