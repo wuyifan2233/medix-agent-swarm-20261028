@@ -31,7 +31,7 @@ flowchart TD
 - `web/app.py`：默认读取当前账号基本信息，停止挂载旧档案写入路由。
 - `personalization/answer_policy.py`、`reply_render.py`：统一直接回答约束，偏好整理不得重新添加追问。
 - `web/static/login.js`：仅在注册模式显示出生年月与性别，出生年月使用month输入控件。
-- `web/static/registration-profile.js`：三项只读展示；`web/static/app.js`：回答中显示引用信息，不提供档案更新入口。
+- `web/static/registration-profile.js`：三项只读展示；`web/static/app.js`：不再展示基本信息与回答偏好使用说明，保留后端实际应用逻辑，不提供档案更新入口。
 
 ## 边界与兼容
 
