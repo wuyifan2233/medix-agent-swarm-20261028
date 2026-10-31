@@ -37,7 +37,7 @@ class RegistrationProfileTests(unittest.TestCase):
         selected=select_fields(snapshot,['age'])
         self.assertEqual(selected['data'],{'age':30})
         self.assertNotIn('height_cm',profile_context(selected))
-        self.assertIn('注册时',profile_context(selected));self.assertIn('不写回档案',profile_context(selected))
+        self.assertIn('默认用于相关回答',profile_context(selected));self.assertIn('不得询问是否授权使用',profile_context(selected));self.assertIn('注册时',profile_context(selected));self.assertIn('不写回档案',profile_context(selected))
         self.assertNotIn('30',retrieval_query('问题','',None))
         self.assertEqual(store.load(user_id),snapshot)
     def test_chat_uses_baseline_and_rejects_clinical_fields(self):

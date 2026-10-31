@@ -201,7 +201,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         current = ProfileStore(app.state.auth_service.sessions).snapshot(job["owner_user_id"], snapshot["revision"])
         current = select_fields(current, snapshot.get('selected_fields',PROFILE_FIELDS))
         if profile_scope(current) != profile_scope(snapshot):
-            raise ValueError("档案确认状态已变化，请重新提交问题。")
+            raise ValueError("注册基本信息状态已变化，请重新提交问题。")
         snapshot = current
     preferences = load_preferences(app.state.auth_service.sessions,job["owner_user_id"])
     preferences_used = preferences["data"]["enabled"]
@@ -245,11 +245,11 @@ async def analyze(job, payload, session_id, memory_user_id):
     enriched = question
     enriched += profile_context(snapshot)
     if not snapshot:
-        enriched += ("\n\n【本轮未授权健康档案】不得读取或声称已读取保存的健康档案。"
-                     "仅能根据本轮及允许的用户历史消息、附件中明确提供的事实总结个人情况。"
-                     "公共医学资料、相似案例和助手先前的猜测都不是这个用户的病史。"
-                     "没有足够的个人资料时，明确说明无法总结，并请用户提供症状或勾选页面的档案开关后重新发送。"
-                     "聊天里口头说同意不等于开启档案开关，不得承诺凭口头授权读取档案；不得编造年龄、性别、疾病、过敏或用药。")
+        enriched += ("\n\n【本轮没有可用的注册基本信息】不得声称已读取保存的档案。"
+                     "根据用户本轮及允许的历史消息、附件回答；公共资料或助手推测不能当作用户病史。"
+                     "注册基本信息默认参考，无须询问是否允许使用、是否开启档案或要求重复确认。"
+                     "缺少的基本信息视为未知，不要求用户返回注册页补填；仅在确实影响当前问题时询问必要信息。"
+                     "不得编造年龄、性别、身高、体重、疾病、过敏或用药。")
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
     if hits:
@@ -368,7 +368,7 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
             raise ValueError("用户身份与档案必须由服务端读取。")
         revision = payload.get("profile_revision", 1)
         if use_profile and (type(revision) is not int or revision < 1):
-            raise ValueError("请先确认档案并提交对应版本。")
+            raise ValueError("注册基本信息版本格式不正确。")
         fields=payload.get('profile_fields',list(PROFILE_FIELDS))
         if use_profile and (not isinstance(fields,list) or not fields or any(type(field) is not str or field not in PROFILE_FIELDS for field in fields) or len(fields)!=len(set(fields))):
             raise ValueError('请选择有效且不重复的档案字段。')
