@@ -30,7 +30,7 @@ class StubSpeaker:
 class SpeechTests(unittest.TestCase):
     def setUp(self):
         self.config_patch = patch("config.SPEECH_CONFIG", {
-            "remote_enabled": False, "tts_provider": "edge", "tts_voice": "zh-CN-XiaoxiaoNeural",
+            "remote_enabled": False, "tts_provider": "edge", "tts_voice": "zh-CN-YunxiaNeural",
             "tts_rate": "-5%", "tts_pitch": "+0Hz", "tts_volume": "+0%",
             "api_key": "text-key-must-never-be-sent", "base_url": "https://api.deepseek.com",
         })
@@ -62,7 +62,7 @@ class SpeechTests(unittest.TestCase):
         self.assertEqual(response.headers["cache-control"], "no-store")
         text, options = StubSpeaker.calls[0]
         self.assertEqual(text, "你好 今天，照顾自己。")
-        self.assertEqual(options, {"voice": "zh-CN-XiaoxiaoNeural", "rate": "-5%",
+        self.assertEqual(options, {"voice": "zh-CN-YunxiaNeural", "rate": "-5%",
                                   "pitch": "+0Hz", "volume": "+0%", "connect_timeout": 10,
                                   "receive_timeout": 30})
 
@@ -183,7 +183,7 @@ class SpeechTests(unittest.TestCase):
     def test_manual_voice_and_disabled_switch_respect_account_boundaries(self):
         saved = self.save_preferences(enabled=True, tone="direct", voice_profile="gentle")
         self.assertEqual(saved["data"]["voice_profile"], "gentle")
-        self.save_preferences(self.other_client, enabled=True, tone="direct")
+        self.save_preferences(self.other_client, enabled=True, tone="direct", voice_profile="auto")
         own = self.client.post("/api/voice/speech/prepare", json={"text":"自己的回答"}).json()
         other = self.other_client.post("/api/voice/speech/prepare", json={"text":"另一账号的回答"}).json()
         self.assertEqual((own["voice"]["id"], other["voice"]["id"]), ("gentle", "clear"))
@@ -197,8 +197,21 @@ class SpeechTests(unittest.TestCase):
         self.assertEqual(StubSpeaker.calls[-1][1]["rate"], "-5%")
         self.assertEqual(self.client.get("/api/voice/voices").json()["effective"]["id"], "default")
 
+    def test_child_voice_profile_is_available_and_uses_default_voice(self):
+        saved = self.save_preferences(enabled=True, voice_profile="child")
+        self.assertEqual(saved["data"]["voice_profile"], "child")
+        catalog = self.client.get("/api/voice/voices").json()
+        child = next(profile for profile in catalog["profiles"] if profile["id"] == "child")
+        self.assertEqual(child["label"], "默认（小麦童声）")
+        prepared = self.client.post("/api/voice/speech/prepare", json={"text": "默认童声"})
+        self.assertEqual(prepared.status_code, 200, prepared.text)
+        self.assertEqual(prepared.json()["voice"]["id"], "child")
+        self.client.get(prepared.json()["url"])
+        self.assertEqual((StubSpeaker.calls[-1][1]["voice"], StubSpeaker.calls[-1][1]["rate"]),
+                         ("zh-CN-YunxiaNeural", "-5%"))
+
     def test_prepared_voice_is_a_snapshot_and_new_playback_uses_new_preference(self):
-        self.save_preferences(enabled=True, tone="supportive")
+        self.save_preferences(enabled=True, tone="supportive", voice_profile="auto")
         first = self.client.post("/api/voice/speech/prepare", json={"text":"旧音色"}).json()
         self.save_preferences(tone="direct")
         second = self.client.post("/api/voice/speech/prepare", json={"text":"新音色"}).json()
@@ -231,7 +244,7 @@ class SpeechTests(unittest.TestCase):
             self.assertEqual(self.client.post("/api/voice/speech/preview", json=payload).status_code, 422)
         self.assertEqual(StubSpeaker.calls, [])
         catalog = self.client.get("/api/voice/voices").json()
-        self.assertEqual(len(catalog["profiles"]), 3)
+        self.assertEqual(len(catalog["profiles"]), 4)
         self.assertNotIn("api_key", str(catalog))
         self.assertNotIn("base_url", str(catalog))
 
@@ -240,7 +253,7 @@ class SpeechTests(unittest.TestCase):
         with patch.dict(os.environ, {"MEDIX_CONFIG_PATH": str(root / "missing-test-config.py")}, clear=True):
             config = runpy.run_path(str(root / "config.py"))["SPEECH_CONFIG"]
         self.assertEqual(config["tts_provider"], "edge")
-        self.assertEqual(config["tts_voice"], "zh-CN-XiaoxiaoNeural")
+        self.assertEqual(config["tts_voice"], "zh-CN-YunxiaNeural")
         self.assertFalse(config["remote_enabled"])
 
 

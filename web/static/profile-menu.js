@@ -78,6 +78,7 @@
   });
   document.getElementById('careWallet').addEventListener('click', close);
   document.getElementById('hpOpen').addEventListener('click', close);
+  document.getElementById('rpOpen').addEventListener('click', close);
   document.getElementById('profileSettings').addEventListener('click', () => { close(); window.dispatchEvent(new Event('medix-settings-request')); });
   document.getElementById('logoutButton').addEventListener('click', async event => {
     const button = event.currentTarget;
