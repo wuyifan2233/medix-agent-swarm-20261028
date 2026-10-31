@@ -1,0 +1,33 @@
+const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
+const source=fs.readFileSync('web/static/app.js','utf8');
+const elements=new Map();
+function $(id){if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',src:'',setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},scrollIntoView(){}});return elements.get(id);}
+const requests=[];
+const state={channel:'wechat',cursors:{wechat:0,qq:0},linkQr:''};
+const context={state,$,MedixAuth:{ready:Promise.resolve(),user:{id:'account-a'},fetch:url=>new Promise(resolve=>requests.push({url,resolve}))},toast:()=>{}};
+vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('const linkLabels ='),source.indexOf("$('pickWechat').onclick")),context);
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const respond=(request,data)=>request.resolve({ok:true,json:async()=>data});
+(async()=>{
+ const initial=context.refreshLink();await tick();respond(requests.shift(),{status:'waiting',qr:'wechat-qr',cursor:1});await initial;
+ assert.equal($('wechatQr').src,'wechat-qr');
+ const old=context.refreshLink();await tick();const oldRequest=requests.shift();
+ const switching=context.chooseChannel('qq');await tick();const switchRequest=requests.shift();
+ assert.equal($('wechatQr').hidden,true,'Old QR must disappear before the switch request returns');
+ assert.equal($('wechatQr').src,undefined);
+ assert.equal($('wechatLogin').disabled,true,'Cannot scan the old channel while switching');
+ respond(oldRequest,{status:'waiting',qr:'late-wechat-qr',cursor:999});await old;
+ assert.equal($('wechatQr').hidden,true);
+ assert.equal(state.cursors.wechat,1,'Stale response must not advance another channel cursor');
+ respond(switchRequest,{channel:'qq'});await tick();const qqRequest=requests.shift();assert.match(qqRequest.url,/^\/api\/qq\?/);
+ respond(qqRequest,{status:'waiting',qr:'',hint:'QQ preparing',cursor:2});await switching;
+ assert.equal(state.channel,'qq');assert.equal($('wechatQr').hidden,true);
+ assert.equal($('wechatLogin').textContent,'刷新二维码');assert.equal($('wechatLogin').disabled,false);
+ const qqPoll=context.refreshLink();await tick();respond(requests.shift(),{status:'waiting',qr:'qq-qr',cursor:3});await qqPoll;
+ assert.equal($('wechatQr').src,'qq-qr');assert.equal($('wechatQr').alt,'用手机 QQ 扫描登录');
+ const pending=context.refreshLink();await tick();context.MedixAuth.user={id:'account-b'};
+ respond(requests.shift(),{status:'waiting',qr:'private-old-user-qr'});await pending;
+ assert.equal($('wechatQr').src,'qq-qr','Old account response must be ignored');
+ console.log('Channel QR: immediate clearing, delayed response isolation, correct API, empty QR and account isolation passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

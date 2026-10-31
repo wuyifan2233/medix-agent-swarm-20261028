@@ -1055,7 +1055,14 @@ async function refreshReminders() {
 refreshReminders();
 setInterval(refreshReminders, 15000);
 const linkLabels = {idle: '未连接', waiting: '等待扫码', scanned: '请在手机确认', need_code: '需要配对码', connected: '已连接', expired: '二维码过期', error: '连接失败', taken: '其他页面已连接', connecting: '正在连接'};
-function linkApi() { return state.channel === 'qq' ? '/api/qq' : '/api/wechat'; }
+let channelRevision = 0;
+let channelSwitchPending = false;
+function linkApi(channel = state.channel) { return channel === 'qq' ? '/api/qq' : '/api/wechat'; }
+function clearLinkQr() {
+  state.linkQr = '';
+  $('wechatQr').hidden = true;
+  $('wechatQr').removeAttribute('src');
+}
 function showPhoneMessage(event) {
   document.body.classList.add('chatting');
   $('welcome').hidden = true;
@@ -1093,13 +1100,14 @@ function paintChannel() {
 }
 async function refreshLink() {
   await MedixAuth.ready.catch(()=>{});
-  if (!MedixAuth.user) return;
+  if (!MedixAuth.user || channelSwitchPending) return;
   const owner=MedixAuth.user.id;
+  const channel=state.channel, revision=channelRevision;
   try {
-    const response = await MedixAuth.fetch(linkApi() + '?after=' + (state.cursors[state.channel] || 0));
+    const response = await MedixAuth.fetch(linkApi(channel) + '?after=' + (state.cursors[channel] || 0));
     if (!response.ok) return;
     const data = await response.json();
-    if (typeof owner!=="undefined" && MedixAuth.user?.id!==owner) return;
+    if (MedixAuth.user?.id!==owner || revision!==channelRevision || channel!==state.channel) return;
     $('wechatState').textContent = linkLabels[data.status] || '未连接';
     $('wechatHint').textContent = data.hint || '';
     const qr = $('wechatQr');
@@ -1122,15 +1130,26 @@ async function refreshLink() {
   } catch { /* 下一轮再同步手机连接 */ }
 }
 async function chooseChannel(channel) {
-  if (state.channel === channel) return;
+  if (state.channel === channel || channelSwitchPending) return;
+  const owner=MedixAuth.user?.id;
+  const revision=++channelRevision;
+  channelSwitchPending = true;
+  clearLinkQr();
+  $('wechatState').textContent = '正在切换';
+  $('wechatHint').textContent = '';
+  ['pickWechat','pickQq','wechatLogin','wechatLogout'].forEach(id=>$(id).disabled=true);
   try {
     const response = await MedixAuth.fetch('/api/channel', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({channel})});
+    if (MedixAuth.user?.id!==owner || revision!==channelRevision) return;
     if (!response.ok) { toast('没有切换到这个聊天。'); return; }
     state.channel = channel;
-    state.linkQr = '';
+  } catch { toast('没有切换到这个聊天。'); }
+  finally {
+    channelSwitchPending = false;
+    ['pickWechat','pickQq','wechatLogin','wechatLogout'].forEach(id=>$(id).disabled=false);
     paintChannel();
     await refreshLink();
-  } catch { toast('没有切换到这个聊天。'); }
+  }
 }
 $('pickWechat').onclick = () => chooseChannel('wechat');
 $('pickQq').onclick = () => chooseChannel('qq');
@@ -1172,11 +1191,13 @@ $('wechatCodeForm').onsubmit = async event => {
 $('wechatLogout').onclick = async () => {
   try { await MedixAuth.fetch(linkApi() + '/logout', {method: 'POST', headers: {'Content-Type':'application/json'}, body:'{}'}); } catch { /* 仍刷新本地状态 */ }
   state.cursors[state.channel] = 0;
-  state.linkQr = '';
+  clearLinkQr();
   refreshLink();
 };
 paintChannel();
+const initialChannelRevision=channelRevision;
 Promise.resolve(MedixAuth.ready).then(()=>MedixAuth.user ? MedixAuth.fetch('/api/channel') : null).then(response => response?.ok ? response.json() : null).then(data => {
+  if (initialChannelRevision!==channelRevision) return;
   if (data && (data.channel === 'wechat' || data.channel === 'qq')) state.channel = data.channel;
   paintChannel();
   refreshLink();
@@ -1184,7 +1205,7 @@ Promise.resolve(MedixAuth.ready).then(()=>MedixAuth.user ? MedixAuth.fetch('/api
 setInterval(refreshLink, 2000);
 
 window.addEventListener('medix-auth-change',()=>{refreshReminders();refreshLink();});
-window.addEventListener('medix-signout',()=>{state.seenReminders.clear();state.cursors={wechat:0,qq:0};state.linkQr='';state.channel='wechat';$('wechatQr').hidden=true;$('wechatQr').removeAttribute('src');$('wechatState').textContent='未连接';$('wechatHint').textContent='请登录后连接微信或 QQ。';renderUpcoming([]);});
+window.addEventListener('medix-signout',()=>{channelRevision++;state.seenReminders.clear();state.cursors={wechat:0,qq:0};state.linkQr='';state.channel='wechat';$('wechatQr').hidden=true;$('wechatQr').removeAttribute('src');$('wechatState').textContent='未连接';$('wechatHint').textContent='请登录后连接微信或 QQ。';renderUpcoming([]);});
 
 // Durable conversations and resumable, server-originated model chunks.
 function rememberActiveChat() {
