@@ -33,6 +33,11 @@ class SkillRegistryMixin:
             metadata = skill_info["metadata"]
             func = skill_info["function"]
 
+            # Browser/runtime integrations are not medical reasoning tools.
+            if metadata.get("runtime") == "ui" or metadata.get("expose_to_agent") is False:
+                logger.info(f"Skipping runtime-only skill: {function_name}")
+                continue
+
             # 从 metadata 获取描述
             description = metadata.get("description", f"Skill: {skill_info['name']}")
 

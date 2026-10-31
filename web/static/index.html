@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=2"><script src="/assets/app.js?v=2" defer></script>
+<link rel="icon" href="/assets/companion.svg"><link rel="stylesheet" href="/assets/style.css?v=3"><script src="/assets/app.js?v=5" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
@@ -22,6 +22,10 @@
 <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
 <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6L12 2Z"/><path d="m8 12 3 3 5-6"/></symbol>
 <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3"/></symbol>
+<symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5"/></symbol>
 </defs></svg>
 <div class="app-shell">
 <button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="关闭侧栏" hidden></button>
@@ -42,11 +46,12 @@
 <div class="service-line"><span class="status-dot" id="modelDot"></span><span>图文理解</span><small id="modelState">检测中</small></div>
 <div class="service-line"><span class="status-dot" id="kbDot"></span><span>医学资料</span><small id="kbState">准备中</small></div>
 <div class="memory-option"><label for="remember"><span><svg><use href="#i-spark"/></svg>记住我们的对话</span><input type="checkbox" id="remember" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p id="memoryHelp">开启后，对话和图片解读摘要将发送至 Mem0，用于后续会话检索。</p></div>
+<div class="memory-option audio-option"><label for="autoSpeak"><span><svg><use href="#i-volume"/></svg>回答自动朗读</span><input type="checkbox" id="autoSpeak" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p>晓晓 · 云端合成女声。默认开启，可随时关闭或停止。</p></div>
 <div class="profile"><span class="profile-icon">你</span><div>我的本地空间<small>从关心自己开始</small></div><button class="icon-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg></button></div>
 </div>
 </aside>
 <main>
-<header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar"><svg><use href="#i-menu"/></svg></button><span class="workspace-title">健康咨询</span><span class="version">AI 助手</span></div><div class="topbar-right"><span class="top-status"><span></span>文字、图片都可以问</span><button class="guide-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg><span>使用指南</span></button></div></header>
+<header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar"><svg><use href="#i-menu"/></svg></button><span class="workspace-title">健康咨询</span><span class="version">AI 助手</span></div><div class="topbar-right"><span class="top-status"><span></span>文字、图片、语音都可以问</span><button class="guide-button" data-action="guide" aria-label="使用指南"><svg><use href="#i-help"/></svg><span>使用指南</span></button></div></header>
 <div class="conversation" id="conversation">
 <section class="welcome" id="welcome">
 <div class="hero"><div class="hero-copy"><div class="eyebrow"><span></span>让关心，随时在身边</div><h1>你好，我是 <span>MediX</span><br>今天有什么想问的？</h1><p class="welcome-description">身体的小疑问，报告里的看不懂。<br>说给我听，我们一起找到更清楚的答案。</p></div><div class="hero-art" aria-hidden="true"><span class="art-orbit orbit-one"></span><span class="art-orbit orbit-two"></span><span class="art-spark spark-one">✦</span><span class="art-spark spark-two">＋</span><img src="/assets/companion.svg" alt="" class="companion"><span class="hello-bubble">Hi，今天也要照顾好自己</span></div></div>
@@ -64,8 +69,14 @@
 <div class="messages" id="messages" aria-live="polite"></div>
 </div>
 <div class="composer-region"><div class="drop-hint" id="dropHint"><svg><use href="#i-image"/></svg>松开即可添加图片</div>
-<form class="composer" id="chatForm"><div class="attachments" id="attachments"></div><label class="sr-only" for="message">输入健康问题</label><textarea id="message" placeholder="有健康问题，尽管问我…" rows="2" maxlength="8000"></textarea>
-<div class="composer-bottom"><div class="compose-left"><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">报告、药盒、健康记录</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+<form class="composer" id="chatForm"><div class="attachments" id="attachments"></div>
+<div class="voice-panel" id="voicePanel" hidden>
+  <div class="voice-panel-head"><span class="voice-orb"><svg><use href="#i-mic"/></svg></span><div><strong id="voiceTitle">正在听你说</strong><small id="voiceStatus" aria-live="polite">说完后点击结束录音</small></div><button type="button" class="icon-button" id="cancelVoice" aria-label="取消语音输入"><svg><use href="#i-close"/></svg></button></div>
+  <div class="voice-wave" id="voiceWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="voice-record-actions" id="voiceRecordActions"><span class="voice-live-dot"></span><span id="voiceElapsed">00:00</span><button type="button" class="voice-stop" id="stopVoice"><svg><use href="#i-stop"/></svg>结束录音</button></div>
+</div>
+<label class="sr-only" for="message">输入健康问题</label><textarea id="message" placeholder="有健康问题，尽管问我…" rows="2" maxlength="8000"></textarea>
+<div class="composer-bottom"><div class="compose-left"><button type="button" class="voice-btn" id="voiceButton" aria-label="语音输入" title="语音输入，识别后可编辑"><svg><use href="#i-mic"/></svg><span>语音输入</span></button><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">说一说，或上传报告</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
 <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></form>
 <p class="disclaimer"><svg><use href="#i-shield"/></svg>AI 回答仅供参考，不能替代医生诊断。紧急不适请及时就医。</p>
 </div>

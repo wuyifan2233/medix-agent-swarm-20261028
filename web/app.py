@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -22,6 +22,7 @@ from loguru import logger
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).parent / "static"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_AUDIO_BYTES = 16 * 1024 * 1024
 MAX_BODY = 34 * 1024 * 1024
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="medix-chat")
 jobs = {}
@@ -104,10 +105,135 @@ def index():
 
 @app.get("/api/health")
 def status():
-    from config import LLM_CONFIG, MEM0_CONFIG
-    return {**health, "model": LLM_CONFIG["model_name"],
+    from config import LLM_CONFIG, MEM0_CONFIG, SPEECH_CONFIG
+    from web.speech import tts_status
+    return {**health, **tts_status(SPEECH_CONFIG), "model": LLM_CONFIG["model_name"],
             "model_configured": LLM_CONFIG.get("api_key") not in {None, "", "not-configured"},
-            "memory_configured": bool(MEM0_CONFIG.get("api_key"))}
+            "memory_configured": bool(MEM0_CONFIG.get("api_key")),
+            "speech_api_configured": SPEECH_CONFIG["remote_enabled"]}
+
+
+@app.post("/api/voice/transcribe")
+async def transcribe_voice(request: Request):
+    """Transcribe a short in-memory recording through the configured audio API."""
+    from config import SPEECH_CONFIG
+    import httpx
+
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    extensions = {"audio/webm": "webm", "audio/mp4": "mp4", "audio/mpeg": "mp3",
+                  "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav",
+                  "audio/ogg": "ogg", "audio/flac": "flac", "audio/x-m4a": "m4a"}
+    if content_type not in extensions:
+        raise HTTPException(415, "录音格式不受支持，请使用 WebM、MP4、MP3 或 WAV。")
+    if not SPEECH_CONFIG["remote_enabled"]:
+        raise HTTPException(503, "尚未配置兼容的语音识别服务；请使用支持 Web Speech 的浏览器，或配置 MEDIX_AUDIO_*。")
+    chunks, size = [], 0
+    max_audio_bytes = min(int(SPEECH_CONFIG.get("max_audio_bytes", MAX_AUDIO_BYTES)), MAX_AUDIO_BYTES)
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > max_audio_bytes:
+            raise HTTPException(413, "录音不能超过 16 MB，请缩短后重试。")
+        chunks.append(chunk)
+    audio = b"".join(chunks)
+    if not audio:
+        raise HTTPException(400, "没有收到录音内容，请重新录制。")
+
+    import io
+    url = SPEECH_CONFIG["base_url"].rstrip("/") + "/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {SPEECH_CONFIG['api_key']}"}
+    files = {"file": (f"recording.{extensions[content_type]}", io.BytesIO(audio), content_type)}
+    transcription_model = SPEECH_CONFIG["transcription_model"]
+    data = {"model": transcription_model}
+    if SPEECH_CONFIG.get("transcription_language"):
+        language = SPEECH_CONFIG["transcription_language"]
+        # GPT-Transcribe accepts language hints as an array; other
+        # audio/transcriptions-compatible providers commonly use `language`.
+        if transcription_model == "gpt-transcribe":
+            data["languages"] = [language]
+        else:
+            data["language"] = language
+    try:
+        async with httpx.AsyncClient(timeout=90) as client:
+            response = await client.post(url, headers=headers, data=data, files=files)
+        if response.status_code >= 400:
+            logger.warning("Speech transcription endpoint returned status {}", response.status_code)
+            raise HTTPException(502, "语音识别暂时不可用，请检查音频服务配置或改用文字输入。")
+        text = response.json().get("text", "").strip()
+        if not text:
+            raise HTTPException(422, "没有识别出清晰语音，请重新录制或直接输入文字。")
+        return {"text": text}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Speech transcription failed ({})", type(exc).__name__)
+        raise HTTPException(502, "语音识别暂时不可用，请检查音频服务配置或改用文字输入。") from exc
+
+
+# Short-lived, browser-owned tickets let native Audio fetch a progressive MP3
+# without putting the answer text in a URL or buffering a complete Blob.
+speech_tickets = {}
+SPEECH_TICKET_TTL = 120
+MAX_SPEECH_TICKETS = 64
+
+
+async def speech_text(request):
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "播报内容格式不正确。") from exc
+    text = payload.get("text", "") if isinstance(payload, dict) else ""
+    if not isinstance(text, str):
+        raise HTTPException(400, "播报内容格式不正确。")
+    # Speech only needs the answer body, not its Markdown decoration or references.
+    text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*|[*`_>#]", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        raise HTTPException(400, "没有可播报的内容。")
+    if len(text) > 4000:
+        raise HTTPException(413, "这段回答较长，请分段朗读。")
+    return text
+
+
+@app.post("/api/voice/speech")
+async def synthesize_speech(request: Request):
+    """Stream MP3 chunks immediately; kept for API clients and regression tests."""
+    from config import SPEECH_CONFIG
+    from web.speech import speech_response
+    return await speech_response(request, SPEECH_CONFIG, await speech_text(request))
+
+
+@app.post("/api/voice/speech/prepare")
+async def prepare_speech(request: Request):
+    from config import SPEECH_CONFIG
+    from web.speech import load_provider
+    text = await speech_text(request)
+    load_provider(SPEECH_CONFIG)
+    now = time.monotonic()
+    for key, ticket in list(speech_tickets.items()):
+        if now - ticket["created"] >= SPEECH_TICKET_TTL:
+            speech_tickets.pop(key, None)
+    if len(speech_tickets) >= MAX_SPEECH_TICKETS:
+        raise HTTPException(429, "语音请求较多，请稍后重试。")
+    token = uuid.uuid4().hex
+    speech_tickets[token] = {"text": text, "owner": request.state.browser_id, "created": now}
+    return {"url": f"/api/voice/speech/stream/{token}"}
+
+
+@app.get("/api/voice/speech/stream/{token}")
+async def play_speech_stream(token: str, request: Request):
+    from config import SPEECH_CONFIG
+    from web.speech import speech_response
+    ticket = speech_tickets.get(token)
+    if not ticket or ticket["owner"] != request.state.browser_id:
+        raise HTTPException(404, "语音播放已失效，请重新朗读。")
+    speech_tickets.pop(token, None)
+    if time.monotonic() - ticket["created"] >= SPEECH_TICKET_TTL:
+        raise HTTPException(404, "语音播放已失效，请重新朗读。")
+    # Consume the empty GET body before monitoring transport disconnects.
+    await request.body()
+    return await speech_response(request, SPEECH_CONFIG, ticket["text"])
 
 
 def stage(job, name, label):
