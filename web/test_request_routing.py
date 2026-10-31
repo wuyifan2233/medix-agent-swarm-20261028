@@ -46,7 +46,7 @@ class RoutingPipelineTests(unittest.TestCase):
         coordinator.llm_client=NS(client=NS(close=AsyncMock()))
         coordinator.process=AsyncMock(return_value={'answer':'当前请求已处理','agent_id':'consultation_agent'})
         memory=Mock();memory.related.return_value=[]
-        kb=Mock();kb.retrieve.return_value={'status':'no_results','hits':[],'trace':{},'message':'医学资料不足'}
+        kb=Mock();kb.retrieve.return_value={'status':'needs_information','hits':[],'trace':{},'message':'医学资料不足'}
         with patch.dict(os.environ,{'MEDIX_KB_MODE':'evidence'}),patch.dict(LLM_CONFIG,{'api_key':'mock'}), \
              patch('web.request_routing.classify_request',AsyncMock(return_value={'kind':kind,'subject':subject})), \
              patch('knowledge.get_knowledge_base',return_value=kb) as getkb, \

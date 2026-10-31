@@ -1,4 +1,5 @@
 import unittest
+import os
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from fastapi import HTTPException
@@ -6,6 +7,10 @@ from auth.sms_provider import AliyunSms
 
 
 class SmsProviderTests(unittest.TestCase):
+    def test_placeholder_keys_do_not_enable_sms(self):
+        with patch.dict(os.environ,{'MEDIX_SMS_ACCESS_KEY_ID':'xxx','MEDIX_SMS_ACCESS_KEY_SECRET':'xxx','MEDIX_SMS_SIGN_NAME':'xxx'}):
+            self.assertFalse(AliyunSms().configured())
+
     def test_only_pass_is_accepted_not_just_ok(self):
         provider = AliyunSms()
         client = Mock()

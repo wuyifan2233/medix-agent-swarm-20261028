@@ -73,4 +73,8 @@ SPEECH_CONFIG = {
     "max_audio_bytes": max(1, min(int(os.environ.get("MEDIX_MAX_AUDIO_BYTES", str(16 * 1024 * 1024))), 16 * 1024 * 1024)),
 }
 MEM0_CONFIG = dict(settings.get("MEM0_CONFIG", {}))
-MEM0_CONFIG["api_key"] = os.environ.get("MEM0_API_KEY") or MEM0_CONFIG.get("api_key", "")
+MEM0_CONFIG["api_key"] = load_setting("MEM0_API_KEY") or MEM0_CONFIG.get("api_key", "")
+
+# Optional placeholder credentials must not enable cloud memory.
+if str(MEM0_CONFIG.get('api_key', '')).strip().lower() == 'xxx':
+    MEM0_CONFIG['api_key'] = ''

@@ -11,7 +11,7 @@
 - 先读 `docs/KNOWLEDGE_DELIVERY.md`。本分支基于同事 `feature/rag`，保留默认集合的空库自动初始化。
 - 新克隆安装 `requirements.kb.txt` 后可直接用 `run_kb_demo.py` 启动（8766），缺失语料自动逐篇缓存获取，至少3000篇才发布；首次仍需联网获取正文和固定BGE模型。`--prepare-only`可提前构建。默认数据库在项目内`knowledge/data/evidence/`，普通 `run_web.py` 保持旧库兼容。
 - `MEDIX_KB_MODE=evidence` 为显式开关；`MEDIX_EVIDENCE_ROOT` 与原 `MEDIX_DB_PATH` 分离。不要对证据库运行旧版迁移或样例导入。
-- 来源全文、快照和构建状态位于忽略提交的 `knowledge/.local/`。未知再分发许可的正文不能加入交付包或 Git。
+- 来源全文、快照和构建状态位于忽略提交的 `knowledge/.local/`。未知再分发许可的正文不能加入公开交付包或 Git。用户已授权本次私有开发机迁移，产物仅存knowledge/.local/migration并排除密钥，不推送Git；步骤见DESIGN第16节。
 - 新验证：`python -m unittest knowledge.test_embeddings knowledge.test_reranking knowledge.test_bootstrap knowledge.test_evidence knowledge.test_query_policy web.test_web -v`；关闭占用同一证据版本的服务后运行 `python knowledge/scripts/evaluate_evidence.py`。真实生成未配置 Key 时不得宣称验证通过。
 
 ## 项目定位

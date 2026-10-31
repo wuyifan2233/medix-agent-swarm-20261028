@@ -62,22 +62,11 @@ class MedicalKnowledgeBase:
         # 确保数据目录存在
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # 初始化 Embedding 模型（支持本地路径）
-        # 优先检查本地缓存路径
-        local_model_path = Path.home() / ".cache" / "huggingface" / "hub" / "models--BAAI--bge-small-zh-v1.5" / "snapshots"
-
-        if embedding_model == DEFAULT_EMBEDDING and local_model_path.exists():
-            # 找到最新的 snapshot
-            snapshots = sorted(local_model_path.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
-            if snapshots:
-                model_path = str(snapshots[0])
-                logger.info(f"Loading embedding model from local cache: {model_path}")
-                self.embedding_model = SentenceTransformer(model_path, device='cpu')
-            else:
-                logger.info(f"Loading embedding model: {embedding_model}")
-                self.embedding_model = SentenceTransformer(embedding_model, device='cpu')
+        # Resolve the pinned project/HF_HOME snapshot before attempting the Hub.
+        if embedding_model == DEFAULT_EMBEDDING:
+            from knowledge.embeddings import LocalBGEEmbedding
+            self.embedding_model = LocalBGEEmbedding().model_instance
         else:
-            logger.info(f"Loading embedding model: {embedding_model}")
             self.embedding_model = SentenceTransformer(embedding_model, device='cpu')
 
         self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
@@ -85,7 +74,7 @@ class MedicalKnowledgeBase:
 
         # 初始化 Milvus Lite
         logger.info(f"Connecting to Milvus Lite: {db_path}")
-        self.milvus_client = MilvusClient(db_path)
+        self.milvus_client = MilvusClient(db_path,grpc_options={"grpc.keepalive_time_ms":60000,"grpc.keepalive_timeout_ms":20000,"grpc.keepalive_permit_without_calls":False})
 
         try:
             result = ensure_knowledge_collection(

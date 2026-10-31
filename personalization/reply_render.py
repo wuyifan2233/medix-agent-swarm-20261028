@@ -28,6 +28,7 @@ async def render_reply(draft, question, preferences):
             '不能增加诊断、剂量、相互作用、检查结果或个人健康事实，不能把历史记录或助手建议变成当前事实。'
             '移除固定“回答/核心建议/免责声明”模板的重复内容，用用户选择的呈现方式；不要为了详细而编造，'
             '简短时不要机械截断句子或删掉必要风险。纯转录或翻译应保留原任务内容，不加健康分析。'
+            '保留每条结论原有的[1]等来源编号及其对应关系，不能删除、增加或重编号引用。'
             '本轮用户明确的字数、格式和称呼要求优先。只返回JSON {"answer":"完整最终回答"}。'
             +limits[data['detail']]+preference_context(preferences))
     client=AsyncOpenAI(api_key=LLM_CONFIG['api_key'],base_url=LLM_CONFIG['base_url'],timeout=35,max_retries=0)
@@ -41,6 +42,8 @@ async def render_reply(draft, question, preferences):
         if choice.finish_reason!='stop':raise ValueError('Incomplete presentation')
         answer=json.loads(choice.message.content or '').get('answer')
         if not isinstance(answer,str) or not answer.strip():raise ValueError('Empty presentation')
+        if set(re.findall(r'\[\d+\]',answer)) != set(re.findall(r'\[\d+\]',draft)):
+            raise ValueError('Presentation changed evidence citations')
         return address(answer.strip(),data['nickname'],question),'applied'
     except Exception as exc:
         # Keep the complete original advice; callers expose failure instead of claiming success.

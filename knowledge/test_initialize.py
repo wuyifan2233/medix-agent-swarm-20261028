@@ -77,6 +77,13 @@ class InitializationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):initialize.ensure_sources()
                 fetch.assert_not_called()
 
+    def test_legacy_default_uses_same_cached_bge_without_hub_loading(self):
+        from knowledge.milvus_kb import MedicalKnowledgeBase
+        model=Mock();model.get_sentence_embedding_dimension.return_value=512
+        with tempfile.TemporaryDirectory() as directory,patch.object(MedicalKnowledgeBase,'_instance',None),patch.dict(os.environ,{'MEDIX_KB_MODE':'legacy'}),patch('knowledge.embeddings.LocalBGEEmbedding',return_value=SimpleNamespace(model_instance=model)) as local,patch('knowledge.milvus_kb.SentenceTransformer',side_effect=AssertionError('Unexpected Hub loading')),patch('knowledge.milvus_kb.MilvusClient'),patch('knowledge.milvus_kb.ensure_knowledge_collection',return_value={'rows':180,'status':'existing'}):
+            kb=MedicalKnowledgeBase(db_path=str(Path(directory)/'legacy'))
+            self.assertIs(kb.embedding_model,model);local.assert_called_once()
+
     def test_fresh_and_cached_bge_have_same_pinned_identity(self):
         from knowledge.embeddings import LocalBGEEmbedding,BGE_REVISION
         model=SimpleNamespace(tokenizer=object(),get_sentence_embedding_dimension=lambda:512)
