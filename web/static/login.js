@@ -2,6 +2,9 @@
 (() => {
   const el = id => document.getElementById(id);
   const dialog = el('authDialog');
+  const basics=document.createElement('fieldset');basics.id='registerBasics';basics.hidden=true;
+  basics.innerHTML='<legend>身体基本信息（仅注册时填写）</legend><p>不询问疾病或用药。可留空或选择不愿提供，注册后不再修改。</p><div class="register-basics-grid"><label>注册时年龄（岁）<input id="regAge" type="number" min="0" max="130" step="1" placeholder="不愿提供可留空"></label><label>性别<select id="regSex"><option value="undisclosed">不愿提供</option><option value="female">女</option><option value="male">男</option></select></label><label>注册时身高（cm）<input id="regHeight" type="number" min="30" max="250" step="0.1" placeholder="不愿提供可留空"></label><label>注册时体重（kg）<input id="regWeight" type="number" min="1" max="400" step="0.1" placeholder="不愿提供可留空"></label></div><label class="register-basic-ack"><input id="regBasicAck" type="checkbox">我已核对所填基本信息，理解注册后只读；问答时需单独授权使用。</label>';
+  el('authForm').insertBefore(basics,el('feedback'));
   let registering = false, busy = false, generation = 0, requestController = null;
   const updatePasswordHints = MedixPasswordPolicy.attachHints(el('password'), () => registering);
   function fitViewport() {
@@ -12,7 +15,7 @@
   window.addEventListener('resize', fitViewport);
   fitViewport();
   function mode(value) {
-    registering = value;
+    registering = value;basics.hidden=!value;basics.querySelectorAll('input,select').forEach(node=>{node.disabled=!value;});el('regBasicAck').required=value;
     el('loginTab').setAttribute('aria-selected', String(!value));
     el('registerTab').setAttribute('aria-selected', String(value));
     el('confirmField').hidden = !value;
@@ -45,7 +48,7 @@
   el('closeAuth').onclick = () => dialog.close();
   dialog.addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;
-    const controls = [...dialog.querySelectorAll('button, input, [href], [tabindex]')]
+    const controls = [...dialog.querySelectorAll('button, input, select, [href], [tabindex]')]
       .filter(node => !node.disabled && node.tabIndex >= 0 && node.getClientRects().length);
     const first = controls[0], last = controls[controls.length - 1];
     if (event.shiftKey && document.activeElement === first) {
@@ -94,6 +97,7 @@
     el('submitButton').textContent = isRegister ? '创建中…' : '登录中…'; el('feedback').textContent = '';
     try {
       const payload = {username:el('username').value, password};
+      if(isRegister){const number=id=>el(id).value===''?null:Number(el(id).value);payload.basic_profile={age:number('regAge'),sex:el('regSex').value,height_cm:number('regHeight'),weight_kg:number('regWeight'),acknowledged:el('regBasicAck').checked};}
       const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/login', {
         method:'POST', body:JSON.stringify(payload), signal:requestController.signal
       });

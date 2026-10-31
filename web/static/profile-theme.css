@@ -136,3 +136,7 @@
 @media(max-width:600px){.answer-profile-actions{padding:14px;margin-top:16px}.answer-profile-action-row{align-items:stretch;flex-direction:column;gap:12px}.answer-profile-save{width:100%;padding:11px}.answer-profile-action-row strong{font-size:13px}}
 
 .profile-apply-note{font-size:12px;line-height:1.7;color:#5d7b73;margin:10px 0 4px}
+
+#registerBasics{margin:18px 0;padding:14px;border:1px solid #dce6e3;border-radius:12px}#registerBasics legend{font-size:14px;font-weight:600}#registerBasics p{font-size:12px;color:#6c7d83;line-height:1.7}.register-basics-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}#registerBasics select{width:100%;padding:10px;border:1px solid #dce2ed;border-radius:8px;background:white;font:inherit}#registerBasics .register-basic-ack{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.7;margin-top:14px}#registerBasics input[type=checkbox]{width:16px;height:16px;flex-shrink:0;margin-top:3px}#baselineValues{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;background:#f5f9f7;border-radius:12px}#baselineValues dt{color:#6b7f7c}#baselineValues dd{margin:0;font-weight:600}@media(max-width:420px){.register-basics-grid{grid-template-columns:1fr}}
+
+#authDialog:has(#registerBasics:not([hidden])){width:600px}#registerBasics .register-basics-grid label{margin:0}#registerBasics .register-basics-grid input{margin:0}#registerBasics .register-basics-grid{gap:14px}

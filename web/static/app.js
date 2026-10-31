@@ -113,8 +113,8 @@ function resultMessage(row, result, userText, jobId) {
   const main = row.querySelector('.message-main'); main.replaceChildren();
   const profileNote = document.createElement('p'); profileNote.className = 'profile-reference';
   profileNote.textContent = result.profile_used
-    ? `本轮参考本人档案 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状",followups:"建议与待核实事项"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。仅作历史背景，现状仍需核对；本轮暂停云端记忆。`
-    : '本轮未使用健康档案。';
+    ? `本轮参考注册基本信息 v${result.profile_revision} · 字段：${(result.profile_fields || []).map(field=>({age:"年龄",sex:"性别",conditions:"病史",allergies:"过敏",medications:"用药",symptoms:"症状",followups:"建议与待核实事项",height_cm:"身高",weight_kg:"体重"}[field])).join("、")}（确认于 ${new Date(result.profile_confirmed_at * 1000).toLocaleString()}）。注册时基本信息，仅作历史背景，后续不更新；本轮暂停云端记忆。`
+    : '本轮未使用注册基本信息。';
   if(result.reply_preferences_used){const detail={brief:'简短重点',standard:'适中解释',detailed:'详细说明'}[result.reply_preferences_detail] || '';profileNote.textContent+=result.reply_preferences_status==='applied'?` 已应用回答偏好 v${result.reply_preferences_revision} · ${detail}；本轮暂停云端记忆。`:' 回答偏好整理未完成，已保留原始完整回答；可重新发送。本轮暂停云端记忆。';}
 
   const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
@@ -143,18 +143,8 @@ function resultMessage(row, result, userText, jobId) {
     const chips = document.createElement('div'); chips.className = 'pending-steps';
     [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
   }
-  const actions=document.createElement('section');actions.className='answer-profile-actions';actions.setAttribute('aria-label','本轮回答后续操作');
-  const actionRow=document.createElement('div');actionRow.className='answer-profile-action-row';
-  const copy=document.createElement('div'),title=document.createElement('strong'),hint=document.createElement('p');
-  title.textContent='把有用的信息留在健康档案';hint.textContent='整理本轮内容，逐项选择；保存前由你确认。';copy.append(title,hint);
-  const pickerSlot=document.createElement('div');pickerSlot.className='answer-profile-picker-slot';
-  const update=document.createElement('button');update.type='button';update.className='answer-profile-save';update.textContent='选择加入健康档案';
-  update.onclick=()=>{let picker=pickerSlot.querySelector('.conversation-profile-picker');if(!picker)picker=window.MedixInlineProfilePicker?.(pickerSlot,userText,jobId);picker?.scrollIntoView({behavior:'smooth',block:'nearest'});};
-  actionRow.append(copy,update);actions.append(actionRow,pickerSlot);
   const reference=document.createElement('details');reference.className='answer-profile-reference';
-  const referenceTitle=document.createElement('summary');referenceTitle.textContent=[result.profile_used?'本轮已参考健康档案':'本轮未使用健康档案',result.reply_preferences_used?(result.reply_preferences_status==='applied'?'回答偏好已应用':'回答偏好整理未完成'):''].filter(Boolean).join(' · ')+' · 查看说明';
-  reference.open=Boolean(result.reply_preferences_used && result.reply_preferences_status!=='applied');
-  reference.append(referenceTitle,profileNote);actions.append(reference);main.append(actions);
+  const referenceTitle=document.createElement('summary');referenceTitle.textContent='查看本轮基本信息与回答偏好使用说明';reference.append(referenceTitle,profileNote);main.append(reference);
   scrollDown();
 }
 async function submit(message, images, retryRow) {

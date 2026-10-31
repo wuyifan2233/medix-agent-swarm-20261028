@@ -39,3 +39,10 @@ class ReplyPreferences(Base):
     data: Mapped[dict] = mapped_column(JSON,nullable=False)
     revision: Mapped[int] = mapped_column(Integer,nullable=False)
     updated_at: Mapped[float] = mapped_column(Float,nullable=False)
+
+
+class RegistrationProfile(Base):
+    __tablename__='registration_profiles'
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON,nullable=False)
+    recorded_at: Mapped[float] = mapped_column(Float,nullable=False)

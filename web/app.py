@@ -30,13 +30,13 @@ from auth.middleware import AuthBodyLimit
 from storage.database import make_database
 from storage.migrate import upgrade_database
 from personalization.router import router as profile_router
-from personalization.store import ProfileStore
+from personalization.registration_profile import BaselineStore as ProfileStore
 from personalization.middleware import ProfileBodyLimit
 from personalization.memory_tools import memory_tool_result
 from personalization.report_imports import router as report_import_router
 from personalization.conversation_updates import router as conversation_profile_router
-from personalization.context import profile_context, retrieval_query, scope as profile_scope
-from personalization.context import select_fields, PROFILE_FIELDS
+from personalization.registration_profile import profile_context, retrieval_query, scope as profile_scope
+from personalization.registration_profile import select_fields, FIELDS as PROFILE_FIELDS
 from personalization.preferences import router as preferences_router, load_preferences, preference_context
 from personalization.reply_render import render_reply
 
@@ -114,9 +114,10 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
     {urlsplit(origin).hostname for origin in auth_settings.origins}
     | ({"testserver"} if not auth_settings.production else set())))
 app.include_router(auth_router)
-app.include_router(profile_router)
-app.include_router(report_import_router)
-app.include_router(conversation_profile_router)
+from personalization.registration_profile import router as baseline_router
+app.include_router(baseline_router)
+
+
 app.include_router(preferences_router)
 
 
