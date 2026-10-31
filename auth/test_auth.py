@@ -1,0 +1,608 @@
+import tempfile
+import time
+import unittest
+import uuid
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+from sqlalchemy import select, update, inspect
+
+from auth.models import AuthSession, User
+from auth.schemas import Registration
+from auth.security import digest
+from auth.service import AuthService
+from auth.settings import AuthSettings
+from storage.database import make_database
+from storage.migrate import upgrade_database
+from web.app import app, contexts, jobs
+
+PASSWORD = "Test-Password2026!"
+NEW_PASSWORD = "New-Password2026!"
+
+
+class AuthTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        cls.url = "sqlite:///" + (Path(cls.temp.name) / "test.db").as_posix()
+        upgrade_database(cls.url)
+        upgrade_database(cls.url)  # idempotent upgrade
+        cls.engine, cls.sessions = make_database(cls.url)
+        cls.original_service = app.state.auth_service
+        cls.settings = AuthSettings(cls.url, False, frozenset({"http://testserver"}), True, namespace="test", password_registration_enabled=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        app.state.auth_service = cls.original_service
+        cls.engine.dispose()
+        cls.temp.cleanup()
+
+    def setUp(self):
+        self.warmup_patch = patch("web.app.warmup")
+        self.warmup_patch.start()
+        with self.sessions() as db:
+            from auth.models import AuthAttempt, SmsChallenge
+            for model in [SmsChallenge, AuthAttempt, AuthSession, User]:
+                db.query(model).delete()
+            db.commit()
+        app.state.auth_service = AuthService(self.sessions, self.settings)
+        self.auth = app.state.auth_service
+        jobs.clear(); contexts.clear()
+        self.client = self.client_for()
+
+    def tearDown(self):
+        self.warmup_patch.stop()
+        self.client.close()
+        jobs.clear(); contexts.clear()
+
+    def client_for(self):
+        return TestClient(app, headers={"Origin": "http://testserver", "X-Medix-Request": "1"})
+
+    def register(self, username="alice", role="user"):
+        return self.auth.register(Registration(username=username, password=PASSWORD, display_name=username), role)
+
+    def login(self, client=None, username="alice", password=PASSWORD):
+        client = client or self.client
+        response = client.post("/api/auth/login", json={"username": username, "password": password})
+        self.assertEqual(response.status_code, 200, response.text)
+        client.headers["X-CSRF-Token"] = response.json()["csrf_token"]
+        return response
+
+    def test_migration_and_foreign_keys(self):
+        self.assertIn("auth_attempts", inspect(self.engine).get_table_names())
+        with self.engine.connect() as conn:
+            self.assertEqual(conn.exec_driver_sql("PRAGMA foreign_keys").scalar(), 1)
+
+    def test_registration_normalizes_username_and_never_accepts_role(self):
+        payload = {"username":"Alice", "password":PASSWORD, "display_name":"爱丽丝"}
+        response = self.client.post("/api/auth/register", json=payload)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["username"], "alice")
+        self.assertNotIn("password_hash", response.json())
+        self.assertEqual(self.client.post("/api/auth/register", json=payload).status_code, 409)
+        payload.update(username="mallory", role="admin")
+        self.assertEqual(self.client.post("/api/auth/register", json=payload).status_code, 422)
+
+    def test_validation_does_not_echo_passwords(self):
+        response = self.client.post("/api/auth/register", json={"username":"alice", "password":"short12", "display_name":"A"})
+        self.assertEqual(response.status_code, 422)
+        self.assertNotIn("short12", response.text)
+
+    def test_registration_defaults_display_name_to_username(self):
+        response = self.client.post("/api/auth/register", json={"username":"Alice", "password":PASSWORD})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["display_name"], "alice")
+        self.login()
+        self.assertEqual(self.client.get("/api/auth/me").json()["display_name"], "alice")
+
+    def test_new_password_length_and_composition(self):
+        invalid = ["Aa1!aaa", "Aa1!" + "a" * 17, "abcdefgh", "ABCDEFGH", "12345678", "!!!!@@@@",
+                   "abcd1234", "ABCD1234", "Abcdefgh", "abcd!!!!", "ABCD!!!!", "1234!!!!", "abcd123 "]
+        for password in invalid:
+            response = self.client.post("/api/auth/register", json={"username":"policy", "password":password})
+            self.assertEqual(response.status_code, 422)
+            self.assertIn("8–20", response.json()["detail"])
+            self.assertNotIn(password, response.text)
+        for index, password in enumerate(["Aa1!aaaa", "Aa1!" + "a" * 16,
+                                          "Abcd1234", "abcd123!", "ABCD123!", "Abcdefg!"]):
+            response = self.client.post("/api/auth/register", json={"username":f"valid_{index}", "password":password})
+            self.assertEqual(response.status_code, 201, response.text)
+        self.register(); self.login()
+        for password in invalid:
+            response = self.client.post("/api/auth/change-password", json={"current_password":PASSWORD, "new_password":password})
+            self.assertEqual(response.status_code, 422)
+        response = self.client.post("/api/auth/change-password", json={"current_password":PASSWORD, "new_password":"Aa1!aaaa"})
+        self.assertEqual(response.status_code, 204)
+        self.login(password="Aa1!aaaa")
+
+    def test_existing_long_password_can_still_log_in(self):
+        from auth.security import passwords
+        user = self.register()
+        legacy = "a previously permitted long passphrase"
+        with self.sessions() as db:
+            db.get(User, user.id).password_hash = passwords.hash(legacy)
+            db.commit()
+        self.login(password=legacy)
+
+    def test_registration_can_be_closed(self):
+        from dataclasses import replace
+        app.state.auth_service = AuthService(self.sessions, replace(self.settings, registration_enabled=False))
+        self.assertEqual(self.client.post("/api/auth/register", json={"username":"alice", "password":PASSWORD, "display_name":"A"}).status_code, 403)
+
+    def test_login_cookie_hash_and_current_user(self):
+        user = self.register()
+        response = self.login()
+        cookie = response.headers["set-cookie"]
+        self.assertIn("HttpOnly", cookie); self.assertIn("SameSite=lax", cookie)
+        self.assertEqual(self.client.get("/api/auth/me").json()["id"], user.id)
+        token = self.client.cookies.get(self.settings.cookie_name)
+        with self.sessions() as db:
+            record = db.scalar(select(AuthSession))
+            self.assertEqual(record.token_hash, digest(token))
+            self.assertNotEqual(record.token_hash, token)
+            self.assertTrue(db.get(User, user.id).password_hash.startswith("$argon2id$"))
+
+    def test_wrong_password_and_unknown_user_have_same_error(self):
+        self.register()
+        one = self.client.post("/api/auth/login", json={"username":"alice", "password":"wrong"})
+        two = self.client.post("/api/auth/login", json={"username":"unknown", "password":"wrong"})
+        self.assertEqual(one.status_code, 401); self.assertEqual(one.json(), two.json())
+
+    def test_unauthenticated_and_forged_browser_cookie_rejected(self):
+        self.client.cookies.set("medix_browser", "a" * 32)
+        self.client.cookies.set(self.settings.cookie_name, "x" * 43)
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+        self.assertEqual(self.client.post("/api/chat", json={}).status_code, 401)
+        self.assertEqual(self.client.get("/api/jobs/anything").status_code, 401)
+        self.assertEqual(self.client.get("/", follow_redirects=False).status_code, 200)
+        response = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/?login=1")
+
+    def test_csrf_all_writes_and_multitab_stability(self):
+        self.register(); self.login()
+        token = self.client.headers.pop("X-CSRF-Token")
+        self.assertEqual(self.client.post("/api/auth/logout", json={}).status_code, 403)
+        self.client.headers["X-CSRF-Token"] = "x" * 64
+        self.assertEqual(self.client.post("/api/chat", json={}).status_code, 403)
+        self.assertEqual(self.client.get("/api/auth/csrf").json()["csrf_token"], token)
+        self.assertEqual(self.client.get("/api/auth/csrf").json()["csrf_token"], token)
+        self.client.headers["X-CSRF-Token"] = token
+        self.assertEqual(self.client.post("/api/auth/logout", json={}).status_code, 204)
+
+    def test_origin_custom_header_and_content_type_required(self):
+        payload = {"username":"alice", "password":PASSWORD}
+        for headers in [{"Origin":"https://evil.example"}, {"Origin":""}, {"X-Medix-Request":""}, {"Content-Type":"text/plain"}]:
+            self.assertEqual(self.client.post("/api/auth/login", json=payload, headers=headers).status_code, 403)
+
+    def test_logout_revokes_old_cookie(self):
+        self.register(); self.login()
+        stolen = self.client.cookies.get(self.settings.cookie_name)
+        self.assertEqual(self.client.post("/api/auth/logout", json={}).status_code, 204)
+        self.client.cookies.set(self.settings.cookie_name, stolen)
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+
+    def test_sms_binding_and_login_keep_identity_and_reject_replay(self):
+        phone = "13800000001"
+        alice = self.register(); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = True
+            sms.verify.return_value = True
+            sent = self.client.post("/api/auth/phone/send", json={"phone_number":phone})
+            self.assertEqual(sent.status_code, 200, sent.text)
+            challenge = sent.json()["challenge_id"]
+            bound = self.client.post("/api/auth/phone/bind", json={"challenge_id":challenge,
+                "code":"123456"})
+            self.assertEqual(bound.status_code, 200, bound.text)
+            self.assertEqual(self.client.get("/api/auth/me").json()["phone_masked"], "138****0001")
+            self.client.post("/api/auth/logout", json={})
+            # Expire only the send cooldown in this isolated test.
+            from auth.models import AuthAttempt
+            with self.sessions() as db:
+                db.query(AuthAttempt).delete(); db.commit()
+            sent = self.client.post("/api/auth/sms/send", json={"phone_number":phone})
+            challenge = sent.json()["challenge_id"]
+            result = self.client.post("/api/auth/sms/login", json={"challenge_id":challenge,"code":"123456"})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()["user"]["id"], alice.id)
+            self.assertEqual(self.client.get("/api/auth/me").json()["id"], alice.id)
+            self.assertEqual(self.client.post("/api/auth/sms/login", json={"challenge_id":challenge,"code":"123456"}).status_code, 400)
+
+    def test_sms_auto_register_and_unbind_keep_identity(self):
+        from auth.models import AuthAttempt
+        self.register()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True; sms.verify.return_value=True
+            phone="13800000009"
+            c=self.client.post("/api/auth/phone/register/send",json={"phone_number":phone}).json()["challenge_id"]
+            result=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            self.assertEqual(result.status_code,200,result.text)
+            user=result.json()["user"]
+            self.assertRegex(user["avatar_url"],r"^/assets/avatars/robot-[1-8]\.svg$")
+            self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"],user["avatar_url"])
+            self.client.headers["X-CSRF-Token"] = result.json()["csrf_token"]
+            with self.sessions() as db:
+                self.assertEqual(db.query(User).count(),2)
+                db.query(AuthAttempt).delete();db.commit()
+            c=self.client.post("/api/auth/phone/unbind/send",json={}).json()["challenge_id"]
+            result=self.client.post("/api/auth/phone/unbind",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            self.assertEqual(result.status_code,200,result.text)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            self.login(username=user["username"])
+            current=self.client.get("/api/auth/me").json()
+            self.assertEqual(current["id"],user["id"])
+            self.assertIsNone(current["phone_masked"])
+
+    def test_sms_first_password_requires_sms_and_enables_password_login(self):
+        from auth.models import AuthAttempt
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True;sms.verify.return_value=True
+            c=self.client.post("/api/auth/phone/register/send",json={"phone_number":"13800000008"}).json()["challenge_id"]
+            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            self.client.headers["X-CSRF-Token"]=r.json()["csrf_token"]
+            u=r.json()["user"]
+            with self.sessions() as db:
+                db.get(User,u["id"]).has_password=False;db.commit()
+            self.assertFalse(self.client.get("/api/auth/me").json()["has_password"])
+            with self.sessions() as db:
+                db.query(AuthAttempt).delete();db.commit()
+            c=self.client.post("/api/auth/password/send",json={}).json()["challenge_id"]
+            payload={"challenge_id":c,"code":"123456","new_password":PASSWORD}
+            sms.verify.return_value=False
+            self.assertEqual(self.client.post("/api/auth/password/set",json=payload).status_code,400)
+            sms.verify.return_value=True
+            self.assertEqual(self.client.post("/api/auth/password/set",json=payload).status_code,200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            self.login(username=u["username"])
+            self.assertTrue(self.client.get("/api/auth/me").json()["has_password"])
+            self.assertEqual(self.client.post("/api/auth/password/send",json={}).status_code,409)
+
+    def test_public_password_registration_closed_by_default(self):
+        from dataclasses import replace
+        app.state.auth_service=AuthService(self.sessions,replace(self.settings,password_registration_enabled=False))
+        result=self.client.post("/api/auth/register",json={"username":"newuser","password":PASSWORD})
+        self.assertEqual(result.status_code,403)
+
+    def test_sms_reset_keeps_user_and_revokes_session(self):
+        user=self.register();self.login()
+        with self.sessions() as db:
+            db.get(User,user.id).phone_number="13800000007";db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True;sms.verify.return_value=True
+            c=self.client.post("/api/auth/password/reset/send",json={"phone_number":"13800000007"}).json()["challenge_id"]
+            payload={"challenge_id":c,"code":"123456","new_password":NEW_PASSWORD}
+            self.assertEqual(self.client.post("/api/auth/password/reset",json=payload).status_code,200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            self.assertEqual(self.client.post("/api/auth/password/reset",json=payload).status_code,400)
+            self.login(password=NEW_PASSWORD)
+            self.assertEqual(self.client.get("/api/auth/me").json()["id"],user.id)
+
+    def test_phone_password_login_uses_same_account(self):
+        user=self.register()
+        with self.sessions() as db:
+            db.get(User,user.id).phone_number="13800000006";db.commit()
+        r=self.client.post("/api/auth/phone/login",json={"phone_number":"13800000006","password":PASSWORD})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(r.json()["user"]["id"],user.id)
+        self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000006","password":"wrong"}).status_code,401)
+        with self.sessions() as db:
+            db.get(User,user.id).has_password=False;db.commit()
+        self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000006","password":PASSWORD}).status_code,401)
+
+    def test_phone_password_login_never_sends_or_verifies_sms(self):
+        user = self.register()
+        with self.sessions() as db:
+            db.get(User, user.id).phone_number = "13800000009"
+            db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = False
+            response = self.client.post("/api/auth/phone/login", json={
+                "phone_number":"13800000009", "password":PASSWORD})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["user"]["id"], user.id)
+            rejected = self.client.post("/api/auth/phone/login", json={
+                "phone_number":"13800000009", "password":"incorrect"})
+            self.assertEqual(rejected.status_code, 401)
+            sms.send.assert_not_called()
+            sms.verify.assert_not_called()
+
+    def test_account_deletion_requires_sms_and_releases_phone(self):
+        user=self.register();other=self.register("bob");self.login()
+        phone="13800000005"
+        with self.sessions() as db:
+            db.get(User,user.id).phone_number=phone;db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True;sms.verify.return_value=True
+            c=self.client.post("/api/auth/account/delete/send",json={}).json()["challenge_id"]
+            payload={"challenge_id":c,"code":"123456","confirmation":"注销账号"}
+            self.assertEqual(self.client.delete("/api/auth/account").status_code,403)
+            sms.verify.return_value=False
+            self.assertEqual(self.client.request("DELETE","/api/auth/account",json=payload).status_code,400)
+            sms.verify.return_value=True
+            self.assertEqual(self.client.request("DELETE","/api/auth/account",json=payload).status_code,200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            with self.sessions() as db:
+                self.assertIsNone(db.get(User,user.id))
+                self.assertIsNotNone(db.get(User,other.id))
+                self.assertEqual(db.query(AuthSession).filter_by(user_id=user.id).count(),0)
+                from auth.models import AuthAttempt
+                db.query(AuthAttempt).delete();db.commit()
+            c=self.client.post("/api/auth/phone/register/send",json={"phone_number":phone}).json()["challenge_id"]
+            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            self.assertEqual(r.status_code,200,r.text)
+            self.assertNotEqual(r.json()["user"]["id"],user.id)
+
+    def test_phone_change_verifies_both_and_preserves_identity(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        with self.sessions() as db:
+            row=db.get(User,alice.id);row.phone_number="13800000001";row.avatar_data="saved-avatar"
+            db.get(User,bob.id).phone_number="13800000003";db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True;sms.verify.return_value=True
+            old=self.client.post("/api/auth/phone/change/old/send",json={}).json()["challenge_id"]
+            proof=self.client.post("/api/auth/phone/change/old/verify",json={"challenge_id":old,"code":"123456"}).json()["proof"]
+            self.assertEqual(self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000003","proof":proof}).status_code,409)
+            self.assertEqual(self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000002","proof":"x"*43}).status_code,400)
+            new=self.client.post("/api/auth/phone/change/new/send",json={"phone_number":"13800000002","proof":proof}).json()["challenge_id"]
+            payload={"challenge_id":new,"code":"123456","proof":proof}
+            sms.verify.return_value=False
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,400)
+            sms.verify.return_value=True
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code,401)
+            with self.sessions() as db:
+                row=db.get(User,alice.id)
+                self.assertEqual(row.phone_number,"13800000002")
+                self.assertEqual(row.avatar_data,"saved-avatar")
+                self.assertEqual(db.query(User).count(),2)
+            r=self.client.post("/api/auth/phone/login",json={"phone_number":"13800000002","password":PASSWORD})
+            self.assertEqual(r.status_code,200,r.text)
+            self.assertEqual(r.json()["user"]["id"],alice.id)
+            self.client.headers["X-CSRF-Token"]=r.json()["csrf_token"]
+            self.assertEqual(self.client.post("/api/auth/phone/change",json=payload).status_code,400)
+            self.assertEqual(self.client.post("/api/auth/phone/login",json={"phone_number":"13800000001","password":PASSWORD}).status_code,401)
+
+    def test_admin_overview_search_and_page_guard(self):
+        self.register();self.register("leader","admin");self.login()
+        self.assertEqual(self.client.get("/admin").status_code,403)
+        self.assertEqual(self.client.get("/api/admin/overview").status_code,403)
+        self.login(username="leader")
+        result=self.client.get("/api/admin/overview")
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json(),{"total":2,"active":2,"disabled":0,"admins":1})
+        self.assertEqual(self.client.get("/admin").status_code,200)
+        result=self.client.get("/api/admin/users",params={"q":"alice"})
+        self.assertEqual(result.json()["total"],1)
+        self.assertEqual(result.json()["items"][0]["display_name"],"alice")
+        self.assertEqual(self.client.get("/api/admin/users",params={"q":"%"}).json()["total"],0)
+
+    def test_nickname_changes_only_current_users_display_name(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        result=self.client.patch("/api/auth/nickname",json={"nickname":"  小明  "})
+        self.assertEqual(result.status_code,200,result.text)
+        current=self.client.get("/api/auth/me").json()
+        self.assertEqual(current["display_name"],"小明")
+        self.assertEqual(current["id"],alice.id)
+        with self.sessions() as db:
+            self.assertEqual(db.get(User,bob.id).display_name,"bob")
+            self.assertEqual(db.get(User,alice.id).username,"alice")
+        for nickname in ["   ","x"*21,"bad\nname"]:
+            self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":nickname}).status_code,422)
+        self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":"名字","user_id":bob.id}).status_code,422)
+        self.assertEqual(self.client.patch("/api/auth/nickname",json={"nickname":"名字"},headers={"X-CSRF-Token":""}).status_code,403)
+
+    def test_avatar_presets_are_validated_and_user_scoped(self):
+        alice=self.register();bob=self.register("bob");self.login()
+        self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":3}).status_code,200)
+        self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"],"/assets/avatars/robot-3.svg")
+        with self.sessions() as db:
+            self.assertIsNone(db.get(User,bob.id).avatar_data)
+            self.assertEqual(db.get(User,alice.id).avatar_data,"/assets/avatars/robot-3.svg")
+        for value in [0,9,"../file",True]:
+            self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":value}).status_code,422)
+        self.assertEqual(self.client.put("/api/auth/avatar/preset",json={"preset":1},headers={"X-CSRF-Token":""}).status_code,403)
+
+    def test_sms_limits_wrong_codes_purpose_and_expiry(self):
+        from auth.models import SmsChallenge
+        self.register(); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value = True
+            sms.verify.return_value = False
+            data = {"phone_number":"13800000002"}
+            sent = self.client.post("/api/auth/sms/send", json=data)
+            self.assertEqual(sent.status_code, 200)
+            self.assertEqual(self.client.post("/api/auth/sms/send", json=data).status_code, 429)
+            challenge = sent.json()["challenge_id"]
+            payload = {"challenge_id":challenge,"code":"123456"}
+            self.assertEqual(self.client.post("/api/auth/phone/bind", json={**payload}).status_code,400)
+            sms.verify.assert_not_called()
+            for _ in range(5):
+                self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+            self.assertEqual(sms.verify.call_count,5)
+            self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+            self.assertEqual(sms.verify.call_count,5)
+            with self.sessions() as db:
+                record=db.get(SmsChallenge,digest(challenge));record.attempts=0;record.expires_at=time.time()-1;db.commit()
+            self.assertEqual(self.client.post("/api/auth/sms/login",json=payload).status_code,400)
+
+    def test_sms_binding_cannot_take_another_users_number(self):
+        self.register(); bob = self.register("bob"); self.login()
+        with self.sessions() as db:
+            row=db.get(User,bob.id);row.phone_number="13800000003";db.commit()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True; sms.verify.return_value=True
+            challenge=self.client.post("/api/auth/phone/send",json={"phone_number":"13800000003"}).json()["challenge_id"]
+            payload={"challenge_id":challenge,"code":"123456"}
+            self.assertEqual(self.client.post("/api/auth/phone/bind",json=payload).status_code,409)
+            self.assertIsNone(self.client.get("/api/auth/me").json()["phone_masked"])
+
+    def test_sms_unconfigured_fails_closed_and_send_requires_origin(self):
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=False
+            self.assertEqual(self.client.post("/api/auth/sms/send",json={"phone_number":"13800000001"}).status_code,503)
+            sms.send.assert_not_called()
+        self.assertEqual(self.client.post("/api/auth/sms/send",json={"phone_number":"13800000001"},headers={"Origin":"https://evil.example"}).status_code,403)
+
+    def test_phone_binding_needs_csrf_and_cannot_use_another_users_challenge(self):
+        self.register(); self.register("bob"); self.login()
+        with patch("auth.sms_router.provider") as sms:
+            sms.configured.return_value=True; sms.verify.return_value=True
+            token=self.client.headers.pop("X-CSRF-Token")
+            self.assertEqual(self.client.post("/api/auth/phone/send",json={"phone_number":"13800000004"}).status_code,403)
+            sms.send.assert_not_called()
+            self.client.headers["X-CSRF-Token"]=token
+            challenge=self.client.post("/api/auth/phone/send",json={"phone_number":"13800000004"}).json()["challenge_id"]
+            with self.client_for() as other:
+                self.login(other,"bob")
+                self.assertEqual(other.post("/api/auth/phone/bind",json={"challenge_id":challenge,"code":"123456"}).status_code,400)
+                sms.verify.assert_not_called()
+
+    def test_avatar_persistence_normalization_and_account_isolation(self):
+        import base64
+        import io
+        from PIL import Image
+        self.register(); self.login()
+        output = io.BytesIO()
+        Image.new("RGB", (400, 200), "red").save(output, format="PNG")
+        data = "data:image/png;base64," + base64.b64encode(output.getvalue()).decode()
+        response = self.client.put("/api/auth/avatar", json={"data": data})
+        self.assertEqual(response.status_code, 200, response.text)
+        avatar = response.json()["avatar_url"]
+        with Image.open(io.BytesIO(base64.b64decode(avatar.split(",")[1]))) as image:
+            self.assertEqual(image.size, (256, 256))
+            self.assertEqual(image.format, "WEBP")
+        self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"], avatar)
+        self.register("bob")
+        with self.client_for() as other:
+            self.login(other, "bob")
+            self.assertIsNone(other.get("/api/auth/me").json()["avatar_url"])
+            self.assertEqual(other.put("/api/auth/avatar", json={"data":"data:image/png;base64,bad"}).status_code, 400)
+        csrf = self.client.headers.pop("X-CSRF-Token")
+        self.assertEqual(self.client.request("DELETE", "/api/auth/avatar", json={}).status_code, 403)
+        self.client.headers["X-CSRF-Token"] = csrf
+        self.assertEqual(self.client.request("DELETE", "/api/auth/avatar", json={}).status_code, 204)
+        self.assertIsNone(self.client.get("/api/auth/me").json()["avatar_url"])
+
+    def test_login_replaces_previous_browser_session(self):
+        self.register(); self.login()
+        previous = self.client.cookies.get(self.settings.cookie_name)
+        self.login()
+        with self.client_for() as other:
+            other.cookies.set(self.settings.cookie_name, previous)
+            self.assertEqual(other.get("/api/auth/me").status_code, 401)
+
+    def test_expired_idle_and_revoked_sessions(self):
+        self.register()
+        for changes in [{"expires_at":time.time()-1}, {"last_seen_at":time.time()-1801}, {"revoked_at":time.time()}]:
+            self.login()
+            with self.sessions() as db:
+                db.execute(update(AuthSession).values(**changes)); db.commit()
+            self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+
+    def test_logout_all_and_password_change_revoke_other_devices(self):
+        self.register(); self.login()
+        with self.client_for() as other:
+            self.login(other)
+            self.assertEqual(self.client.post("/api/auth/logout-all", json={}).status_code, 204)
+            self.assertEqual(other.get("/api/auth/me").status_code, 401)
+            self.login(); self.login(other)
+            bad = self.client.post("/api/auth/change-password", json={"current_password":"wrong", "new_password":NEW_PASSWORD})
+            self.assertEqual(bad.status_code, 400)
+            self.assertEqual(other.get("/api/auth/me").status_code, 200)
+            response = self.client.post("/api/auth/change-password", json={"current_password":PASSWORD, "new_password":NEW_PASSWORD})
+            self.assertEqual(response.status_code, 204)
+            self.assertEqual(other.get("/api/auth/me").status_code, 401)
+            self.login(password=NEW_PASSWORD)
+
+    def test_admin_disable_reenable_and_no_admin_management(self):
+        alice = self.register(); self.register("leader", "admin"); self.login()
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 403)
+        with self.client_for() as admin:
+            leader = self.login(admin, "leader").json()["user"]
+            self.assertEqual(admin.get("/api/admin/users").json()["total"], 2)
+            url = f"/api/admin/users/{alice.id}/status"
+            self.assertEqual(admin.patch(url, json={"is_active":False}).status_code, 200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+            self.assertEqual(admin.patch(url, json={"is_active":True}).status_code, 200)
+            self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+            self.assertEqual(admin.patch(f"/api/admin/users/{leader['id']}/status", json={"is_active":False}).status_code, 403)
+        self.login()
+
+    def test_login_rate_limit_and_expiry(self):
+        payload = {"username":"unknown", "password":"wrong"}
+        # Avoid repeated expensive password hashes; exercise the actual database limiter.
+        for _ in range(10):
+            self.auth.limit("login", "testclient", "unknown")
+        self.assertEqual(self.client.post("/api/auth/login", json=payload).status_code, 429)
+        with patch("auth.service.time.time", return_value=time.time()+901):
+            self.auth.limit("login", "testclient", "unknown")
+
+    def test_cross_user_jobs_and_context_namespace(self):
+        alice = self.register(); self.register("bob"); self.login()
+        chat_id = str(uuid.uuid4())
+        with patch("web.app.executor.submit") as submit:
+            response = self.client.post("/api/chat", json={"chat_id":chat_id, "message":"hello"})
+            self.assertEqual(response.status_code, 202, response.text)
+            job_id = response.json()["job_id"]
+            self.assertEqual(submit.call_args.args[-2], f"web-{alice.id}-{chat_id}")
+            self.assertEqual(submit.call_args.args[-1], f"medix:test:user:{alice.id}")
+        self.assertEqual(self.client.get(f"/api/jobs/{job_id}").status_code, 200)
+        self.assertNotIn("owner_user_id", self.client.get(f"/api/jobs/{job_id}").json())
+        with self.client_for() as other:
+            self.login(other, "bob")
+            self.assertEqual(other.get(f"/api/jobs/{job_id}").status_code, 404)
+            with patch("web.app.executor.submit") as submit:
+                other.post("/api/chat", json={"chat_id":chat_id, "message":"hello"})
+                self.assertNotEqual(submit.call_args.args[-2], f"web-{alice.id}-{chat_id}")
+
+    def test_production_cookie_and_security_headers(self):
+        from dataclasses import replace
+        app.state.auth_service = AuthService(self.sessions, replace(self.settings, production=True,
+            origins=frozenset({"https://testserver"})))
+        self.register()
+        client = TestClient(app, base_url="https://testserver", headers={"Origin":"https://testserver", "X-Medix-Request":"1"})
+        try:
+            response = self.login(client)
+            cookie = response.headers["set-cookie"]
+            self.assertTrue(cookie.startswith("__Host-medix_session="))
+            self.assertIn("Secure", cookie); self.assertNotIn("Domain=", cookie)
+            self.assertEqual(response.headers["strict-transport-security"], "max-age=31536000")
+            self.assertIn("frame-ancestors 'none'", response.headers["content-security-policy"])
+        finally:
+            client.close()
+
+    def test_auth_body_limit(self):
+        response = self.client.post("/api/auth/login", content=b"x" * 17000, headers={"Content-Type":"application/json"})
+        self.assertEqual(response.status_code, 413)
+        response = self.client.post("/api/auth/login", content=iter([b"x" * 9000, b"y" * 9000]),
+                                    headers={"Content-Type":"application/json"})
+        self.assertEqual(response.status_code, 413)
+
+    def test_production_configuration_fails_closed(self):
+        with patch.dict("os.environ", {"MEDIX_ENV":"production"}, clear=True):
+            with self.assertRaises(ValueError):
+                AuthSettings.from_env()
+        with patch.dict("os.environ", {"MEDIX_ENV":"prod"}, clear=True):
+            with self.assertRaises(ValueError):
+                AuthSettings.from_env()
+
+    def test_disabled_owner_does_not_start_queued_analysis(self):
+        from web.app import run_job
+        user = self.register()
+        with self.sessions() as db:
+            db.execute(update(User).where(User.id == user.id).values(is_active=False)); db.commit()
+        job = {"owner_user_id":user.id}
+        with patch("web.app.analyze") as analyze:
+            run_job(job, {}, "session", "memory-user")
+            analyze.assert_not_called()
+        self.assertEqual(job["status"], "failed")
+
+    def test_session_storage_survives_service_restart(self):
+        user = self.register(); self.login()
+        app.state.auth_service = AuthService(self.sessions, self.settings)
+        self.assertEqual(self.client.get("/api/auth/me").json()["id"], user.id)
+
+
+if __name__ == "__main__":
+    unittest.main()

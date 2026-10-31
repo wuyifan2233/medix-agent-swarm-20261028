@@ -1,0 +1,58 @@
+{
+  "retrieval": {
+    "version": "91baa7e1f7938727",
+    "documents": 16,
+    "chunks": 186,
+    "chunk_budget_and_offsets_verified": true,
+    "in_domain_hit_at_3": 1.0,
+    "out_of_domain_passed": 5,
+    "needs_information_passed": 6,
+    "retrieval_p95_ms": 3357.4,
+    "generation_evaluated": false,
+    "embedding": {
+      "provider": "siliconflow",
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "model": "Qwen/Qwen3-Embedding-8B",
+      "dimension": 4096,
+      "normalization": "l2",
+      "query_instruction": "Given a medical question, retrieve relevant passages that answer the question",
+      "document_instruction": "",
+      "tokenizer": "Qwen/Qwen3-Embedding-8B",
+      "tokenizer_revision": "unversioned"
+    },
+    "reranker": {
+      "provider": "none"
+    },
+    "cases_total": 43,
+    "cases_passed": 43,
+    "in_domain_total": 30,
+    "functional_gate_passed": true,
+    "latency_target_ms": 2000,
+    "latency_gate_passed": false
+  },
+  "live": {
+    "submitted": 2,
+    "question_explorer_verified": true,
+    "mobile_no_horizontal_overflow": true,
+    "cases": [
+      {
+        "question": "糖尿病患者选择主食和水果时，应注意哪些基本原则？",
+        "status": "completed",
+        "llm_requests": 1,
+        "elapsed": 2.3,
+        "quotes_located": 3,
+        "highlight_clicked": true
+      },
+      {
+        "question": "高血压患者日常如何限制食盐？",
+        "status": "completed",
+        "llm_requests": 1,
+        "elapsed": 1.6,
+        "quotes_located": 4,
+        "highlight_clicked": false
+      }
+    ]
+  },
+  "offline_tests_passed": 59,
+  "note": "Original source text and full live responses stay in ignored local artifacts. Quote existence is not clinical entailment validation."
+}

@@ -1,6 +1,2 @@
--r requirements.verified.txt
-fastapi==0.162.0
-uvicorn==0.54.0
-pillow==13.0.0
-
-edge-tts==7.3.1
+# Unified main_copy installation entry.
+-r requirements.integration.txt

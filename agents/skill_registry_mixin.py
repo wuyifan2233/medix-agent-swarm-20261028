@@ -9,6 +9,24 @@ from loguru import logger
 import inspect
 
 
+def parameters_from_frontmatter(metadata):
+    """Use the explicit parameter table when SKILL.md provides one."""
+    raw = metadata.get("parameters") if isinstance(metadata, dict) else None
+    if not isinstance(raw, list) or not raw:
+        return []
+    parameters = []
+    for item in raw:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        parameters.append(SkillParameter(
+            name=item["name"],
+            type=item.get("type") or "string",
+            description=item.get("description") or item["name"],
+            required=bool(item.get("required", False)),
+            enum=item.get("enum")))
+    return parameters
+
+
 class SkillRegistryMixin:
     """
     统一注册所有 Skills（自动发现模式）
@@ -65,6 +83,10 @@ class SkillRegistryMixin:
         Returns:
             [SkillParameter(...), ...]
         """
+        explicit = parameters_from_frontmatter(skill_info.get("metadata") or {})
+        if explicit:
+            return explicit
+
         func = skill_info["function"]
 
         # 获取函数签名

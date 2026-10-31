@@ -1,0 +1,57 @@
+{
+  "independent_originals": 3298,
+  "unique_urls": 3298,
+  "languages": {
+    "zh": 3298
+  },
+  "publishers": {
+    "中华医学会科学普及部": 1030,
+    "中华医学会心血管病学分会": 1,
+    "新疆大学药学院（转载科普中国）": 1,
+    "中国医药信息查询平台": 2262,
+    "药品安全合作联盟": 3,
+    "湖南省药学会": 1
+  },
+  "evidence_kinds": {
+    "popular_science": 1034,
+    "clinical_guideline": 1,
+    "medical_encyclopedia": 1091,
+    "drug_reference": 1172
+  },
+  "qa_urls": 0,
+  "embedding_provider": "local",
+  "chat_llm_calls": 0,
+  "unique_normalized_bodies": 3298,
+  "duplicate_bodies": 0,
+  "offline_tests_passed": 62,
+  "disease_inventory": 94,
+  "drug_inventory": 159,
+  "title_coverage_gaps": 0,
+  "chunks": 22376,
+  "originals_with_chunks": 3298,
+  "unique_chunk_ids": 22376,
+  "index_version": "b753b43fda077d23",
+  "database": "E:\\workspace\\medix-agent-swarm-20261028\\knowledge\\data\\evidence\\b753b43fda077d23\\milvus.db",
+  "embedding": {
+    "provider": "local",
+    "model": "BAAI/bge-small-zh-v1.5",
+    "dimension": 512,
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "normalization": "l2"
+  },
+  "persisted_rows": 22376,
+  "representative_cases_passed": 14,
+  "representative_cases_total": 14,
+  "final_fixed_regression": {
+    "version": "b753b43fda077d23",
+    "documents": 3298,
+    "chunks": 22376,
+    "cases_passed": 42,
+    "cases_total": 46,
+    "in_domain_passed": 30,
+    "in_domain_total": 33,
+    "retrieval_p95_ms": 244.1,
+    "chat_llm_calls": 0,
+    "functional_gate_passed": false
+  }
+}

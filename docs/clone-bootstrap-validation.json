@@ -1,0 +1,25 @@
+{
+  "fixture": "Fresh tracked Git tree; registry reduced to 3 real public Chinese sources for smoke validation",
+  "env_local_present": false,
+  "source_cache_initially_present": false,
+  "index_initially_present": false,
+  "shared_existing_bge_model_cache": true,
+  "first_run_documents": 3,
+  "first_run_chunks": 16,
+  "database_root_in_clone": true,
+  "server_restart_same_index_version": true,
+  "model_configured": false,
+  "retrieval_status": "ok",
+  "embedding": {
+    "provider": "local",
+    "model": "BAAI/bge-small-zh-v1.5",
+    "dimension": 512,
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "normalization": "l2"
+  },
+  "chat_llm_calls": 0,
+  "scope_limit": "Not a fresh download/rebuild of all 3298 originals; full-corpus index was separately verified in bulk reports.",
+  "offline_tests_passed": 67,
+  "windows_rename_fallback_tested": true,
+  "full_originals_published": false
+}

@@ -30,6 +30,7 @@ class LLMResponse:
     content: Optional[str]
     tool_calls: List[ToolCall]
     finish_reason: str  # "stop", "tool_calls", "length", "content_filter"
+    reasoning_content: Optional[str] = None
 
     def has_tool_calls(self) -> bool:
         """是否包含 function calls"""
@@ -58,6 +59,7 @@ class LLMClient:
             self.model_name = self.config["model_name"]
             self.temperature = self.config.get("temperature", 0.7)
             self.max_tokens = self.config.get("max_tokens", 8192)
+            self.request_defaults = self.config.get('request_defaults', {})
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 
@@ -80,6 +82,7 @@ class LLMClient:
             模型返回的文本
         """
         try:
+            return_metadata = kwargs.pop("_return_metadata", False)
             temperature = temperature or self.temperature
             max_tokens = max_tokens or self.max_tokens
 
@@ -90,16 +93,28 @@ class LLMClient:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **self._request_options(kwargs)
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content or ''
+            if return_metadata:
+                return {"content":content, "finish_reason":response.choices[0].finish_reason}
             logger.debug(f"LLM response length: {len(content)} chars")
             return content
 
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             raise
+
+    def _request_options(self, overrides):
+        defaults = getattr(self, "request_defaults", {})
+        if not defaults and getattr(self, "config", {}).get("extra_body"):
+            defaults = {"extra_body":self.config["extra_body"]}
+        options = {**defaults, **overrides}
+        if 'extra_body' in defaults or 'extra_body' in overrides:
+            options['extra_body'] = {**defaults.get('extra_body', {}),
+                                     **(overrides.get('extra_body') or {})}
+        return options
 
     async def chat_with_retry(
         self,
@@ -173,7 +188,7 @@ class LLMClient:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                **kwargs
+                **self._request_options(kwargs)
             }
 
             # 添加工具参数（如果提供）
@@ -202,7 +217,8 @@ class LLMClient:
             return LLMResponse(
                 content=message.content,
                 tool_calls=tool_calls,
-                finish_reason=finish_reason
+                finish_reason=finish_reason,
+                reasoning_content=getattr(message, 'reasoning_content', None)
             )
 
         except Exception as e:

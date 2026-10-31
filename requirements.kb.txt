@@ -1,0 +1,2 @@
+# Unified main_copy installation entry.
+-r requirements.integration.txt

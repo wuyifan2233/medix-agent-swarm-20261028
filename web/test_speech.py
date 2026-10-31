@@ -41,7 +41,9 @@ class SpeechTests(unittest.TestCase):
         self.addCleanup(self.speaker_patch.stop)
         StubSpeaker.calls = []
         StubSpeaker.failure = None
-        self.client = TestClient(app)
+        from storage.test_support import account_clients
+        accounts = self.enterContext(account_clients())
+        self.client, self.other_client = accounts.clients
         speech_tickets.clear()
         self.addCleanup(speech_tickets.clear)
 
@@ -67,7 +69,7 @@ class SpeechTests(unittest.TestCase):
                                 ({"text": "字" * 4001}, 413)]:
             with self.subTest(payload_type=type(payload).__name__, status=status):
                 self.assertEqual(self.client.post("/api/voice/speech", json=payload).status_code, status)
-        self.assertEqual(self.client.post("/api/voice/speech", content=b"{bad").status_code, 400)
+        self.assertEqual(self.client.post("/api/voice/speech", content=b"{bad", headers={"Content-Type":"application/json"}).status_code, 400)
         self.assertEqual(StubSpeaker.calls, [])
 
     def test_provider_error_is_controlled_without_upstream_details(self):
@@ -109,7 +111,8 @@ class SpeechTests(unittest.TestCase):
         url = prepared.json()["url"]
         self.assertNotIn("固定样例", url)
         self.assertEqual(StubSpeaker.calls, [], "Preparing must not wait for synthesis")
-        self.assertEqual(TestClient(app).get(url).status_code, 404)
+        self.assertEqual(TestClient(app).get(url).status_code, 401)
+        self.assertEqual(self.other_client.get(url).status_code, 404)
         audio = self.client.get(url, headers={"Range": "bytes=0-"})
         self.assertEqual(audio.status_code, 200)
         self.assertEqual(audio.content, b"mp3-amp3-b")
@@ -117,6 +120,24 @@ class SpeechTests(unittest.TestCase):
         self.assertEqual(audio.headers["x-accel-buffering"], "no")
         self.assertEqual(audio.headers["accept-ranges"], "none")
         self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_voice_routes_require_login_and_csrf_before_provider(self):
+        anonymous = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
+        self.addCleanup(anonymous.close)
+        for endpoint in ("/api/voice/speech", "/api/voice/speech/prepare", "/api/voice/transcribe"):
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(anonymous.post(endpoint, json={"text":"你好"}).status_code, 401)
+                self.assertEqual(self.client.post(endpoint, json={"text":"你好"}, headers={"X-CSRF-Token":""}).status_code, 403)
+        self.assertEqual(StubSpeaker.calls, [])
+
+    def test_ticket_cannot_be_used_from_another_session_of_same_account(self):
+        url = self.client.post("/api/voice/speech/prepare", json={"text":"你好"}).json()["url"]
+        other = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
+        self.addCleanup(other.close)
+        login = other.post("/api/auth/login", json={"username":"alice", "password":"Test-Password2026!"})
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(other.get(url).status_code, 404)
+        self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_ticket_expiration_and_capacity(self):
         with patch("web.app.MAX_SPEECH_TICKETS", 1):

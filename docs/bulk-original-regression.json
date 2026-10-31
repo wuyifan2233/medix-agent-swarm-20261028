@@ -1,0 +1,867 @@
+{
+  "summary": {
+    "version": "b753b43fda077d23",
+    "documents": 3298,
+    "chunks": 22376,
+    "chunk_budget_and_offsets_verified": true,
+    "in_domain_hit_at_3": 0.8181818181818182,
+    "out_of_domain_passed": 5,
+    "needs_information_passed": 6,
+    "retrieval_p95_ms": 234.6,
+    "generation_evaluated": false,
+    "embedding": {
+      "provider": "local",
+      "model": "BAAI/bge-small-zh-v1.5",
+      "dimension": 512,
+      "revision": "7999e1d3359715c523056ef9478215996d62a620",
+      "normalization": "l2"
+    },
+    "reranker": {
+      "provider": "none"
+    },
+    "cases_total": 46,
+    "cases_passed": 39,
+    "in_domain_total": 33,
+    "functional_gate_passed": false,
+    "latency_target_ms": 2000,
+    "latency_gate_passed": true
+  },
+  "cases": [
+    {
+      "id": "d01",
+      "kind": "in_domain",
+      "query": "普通感冒引起的咳嗽需要抗生素吗",
+      "expected_docs": [
+        "cold"
+      ],
+      "evidence_terms": [
+        "抗生素"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "cold",
+        "dayi_disease_1161551",
+        "cma_57697"
+      ],
+      "elapsed_ms": 217.9,
+      "query_rewritten": false
+    },
+    {
+      "id": "d02",
+      "kind": "in_domain",
+      "query": "长期剧烈咳嗽有哪些严重后果",
+      "expected_docs": [
+        "cold"
+      ],
+      "evidence_terms": [
+        "咯血",
+        "晕厥"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "cold",
+        "cma_46055",
+        "dayi_disease_1031554"
+      ],
+      "elapsed_ms": 209.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "d03",
+      "kind": "in_domain",
+      "query": "流感和普通感冒有什么区别",
+      "expected_docs": [
+        "flu"
+      ],
+      "evidence_terms": [
+        "流感",
+        "感冒"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_disease_1019973",
+        "dayi_disease_1019973",
+        "flu"
+      ],
+      "elapsed_ms": 187.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "d04",
+      "kind": "in_domain",
+      "query": "流感哪些人容易发生严重并发症",
+      "expected_docs": [
+        "flu"
+      ],
+      "evidence_terms": [
+        "老年",
+        "婴幼儿"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "flu",
+        "flu",
+        "cma_46037"
+      ],
+      "elapsed_ms": 200.7,
+      "query_rewritten": false
+    },
+    {
+      "id": "d05",
+      "kind": "in_domain",
+      "query": "儿童过敏性鼻炎有什么表现",
+      "expected_docs": [
+        "rhinitis"
+      ],
+      "evidence_terms": [
+        "鼻塞",
+        "鼻痒"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "rhinitis",
+        "rhinitis",
+        "cma_55517"
+      ],
+      "elapsed_ms": 182.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "d06",
+      "kind": "in_domain",
+      "query": "急性胃肠炎腹泻时饮食应该注意什么",
+      "expected_docs": [
+        "diarrhea"
+      ],
+      "evidence_terms": [
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diarrhea",
+        "dayi_disease_1156497",
+        "dayi_disease_1156497"
+      ],
+      "elapsed_ms": 207.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "d07",
+      "kind": "in_domain",
+      "query": "高血压没有症状是不是就不用管",
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "症状"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "cma_47056",
+        "dayi_disease_1150927",
+        "dayi_disease_1150927"
+      ],
+      "elapsed_ms": 185.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "d08",
+      "kind": "in_domain",
+      "query": "高血压患者饮食生活方式怎样改善",
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "膳食",
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "cma_57495",
+        "hypertension_standard2019"
+      ],
+      "elapsed_ms": 189.8,
+      "query_rewritten": false
+    },
+    {
+      "id": "d09",
+      "kind": "in_domain",
+      "query": "糖尿病患者运动对血糖有什么益处",
+      "expected_docs": [
+        "diabetes"
+      ],
+      "evidence_terms": [
+        "胰岛素",
+        "血糖"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes",
+        "diabetes",
+        "dayi_disease_1145179"
+      ],
+      "elapsed_ms": 222.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "d10",
+      "kind": "in_domain",
+      "query": "糖尿病患者运动中怎样注意低血糖",
+      "expected_docs": [
+        "diabetes"
+      ],
+      "evidence_terms": [
+        "低血糖"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes",
+        "diabetes",
+        "dayi_disease_1145179"
+      ],
+      "elapsed_ms": 225.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "m01",
+      "kind": "in_domain",
+      "query": "对乙酰氨基酚为什么需要警惕重复用药",
+      "expected_docs": [
+        "paracetamol"
+      ],
+      "evidence_terms": [
+        "感冒药"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1152033",
+        "dayi_drug_1152033"
+      ],
+      "elapsed_ms": 203.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "m02",
+      "kind": "in_domain",
+      "query": "扑热息痛在复方感冒药中也有吗",
+      "expected_docs": [
+        "paracetamol"
+      ],
+      "evidence_terms": [
+        "感冒药"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1015883",
+        "dayi_drug_1015883",
+        "dayi_drug_1152033"
+      ],
+      "elapsed_ms": 251.0,
+      "query_rewritten": false
+    },
+    {
+      "id": "m03",
+      "kind": "in_domain",
+      "query": "布洛芬有哪些剂型和使用注意事项",
+      "expected_docs": [
+        "ibuprofen"
+      ],
+      "evidence_terms": [
+        "剂型",
+        "注意事项"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1151907",
+        "ibuprofen",
+        "dayi_drug_1151907"
+      ],
+      "elapsed_ms": 230.7,
+      "query_rewritten": false
+    },
+    {
+      "id": "m04",
+      "kind": "in_domain",
+      "query": "氯雷他定属于什么药物，在荨麻疹治疗中有什么作用",
+      "expected_docs": [
+        "loratadine"
+      ],
+      "evidence_terms": [
+        "抗组胺"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1151949",
+        "dayi_drug_1151949",
+        "dayi_disease_1125078"
+      ],
+      "elapsed_ms": 245.0,
+      "query_rewritten": false
+    },
+    {
+      "id": "m05",
+      "kind": "in_domain",
+      "query": "口服补液盐配制时有哪些常见错误",
+      "expected_docs": [
+        "ors"
+      ],
+      "evidence_terms": [
+        "调配",
+        "浓度"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1155528",
+        "dayi_drug_1155528",
+        "ors"
+      ],
+      "elapsed_ms": 166.0,
+      "query_rewritten": false
+    },
+    {
+      "id": "m06",
+      "kind": "in_domain",
+      "query": "口服补液盐可以直接加热吗",
+      "expected_docs": [
+        "ors"
+      ],
+      "evidence_terms": [
+        "加热"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1155528",
+        "dayi_drug_1155528",
+        "ors"
+      ],
+      "elapsed_ms": 150.2,
+      "query_rewritten": false
+    },
+    {
+      "id": "b01",
+      "kind": "in_domain",
+      "query": "家庭测量血压选择什么血压计",
+      "expected_docs": [
+        "literacy"
+      ],
+      "evidence_terms": [
+        "上臂"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "literacy"
+      ],
+      "elapsed_ms": 154.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "b02",
+      "kind": "in_domain",
+      "query": "家庭测血压记录哪些信息供医生参考",
+      "expected_docs": [
+        "literacy"
+      ],
+      "evidence_terms": [
+        "时间",
+        "读数"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "literacy"
+      ],
+      "elapsed_ms": 175.2,
+      "query_rewritten": false
+    },
+    {
+      "id": "b03",
+      "kind": "in_domain",
+      "query": "哮喘患者家里应注意哪些环境因素",
+      "expected_docs": [
+        "medication"
+      ],
+      "evidence_terms": [
+        "室内"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "medication",
+        "dayi_disease_1157213",
+        "cma_46635"
+      ],
+      "elapsed_ms": 196.8,
+      "query_rewritten": false
+    },
+    {
+      "id": "b04",
+      "kind": "in_domain",
+      "query": "哮喘患者就诊时为什么需要告知用药情况",
+      "expected_docs": [
+        "medication"
+      ],
+      "evidence_terms": [
+        "药物",
+        "病史"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_disease_1157213",
+        "medication",
+        "dayi_disease_1157213"
+      ],
+      "elapsed_ms": 176.7,
+      "query_rewritten": false
+    },
+    {
+      "id": "o01",
+      "kind": "out_of_domain",
+      "query": "量子计算机纠错算法怎么实现",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.7,
+      "query_rewritten": false
+    },
+    {
+      "id": "o02",
+      "kind": "out_of_domain",
+      "query": "怎样配置 Kubernetes 网络插件",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.9,
+      "query_rewritten": false
+    },
+    {
+      "id": "o03",
+      "kind": "out_of_domain",
+      "query": "唐代科举制度的历史演变",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "o04",
+      "kind": "out_of_domain",
+      "query": "红烧肉具体做法和烹饪步骤",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "o05",
+      "kind": "out_of_domain",
+      "query": "行星发动机的设计与制造",
+      "passed": true,
+      "status": "no_results",
+      "docs": [],
+      "elapsed_ms": 0.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "s01",
+      "kind": "needs_information",
+      "query": "三岁孩子发烧布洛芬吃多少毫升",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "s02",
+      "kind": "needs_information",
+      "query": "怀孕了氯雷他定能吃吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "s03",
+      "kind": "needs_information",
+      "query": "肾功能不好对乙酰氨基酚用多少",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "s04",
+      "kind": "needs_information",
+      "query": "布洛芬和对乙酰氨基酚可以一起吃吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "s05",
+      "kind": "needs_information",
+      "query": "血压正常了我能停药吗",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.2,
+      "query_rewritten": false
+    },
+    {
+      "id": "p01",
+      "kind": "in_domain",
+      "query": "高血压患者水果能不能吃",
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "水果",
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "hypertension_intro",
+        "hypertension"
+      ],
+      "elapsed_ms": 155.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "p02",
+      "kind": "in_domain",
+      "query": "血压高平时怎样管理",
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "膳食",
+        "运动"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "dayi_disease_1118536",
+        "hypertension_standard2019"
+      ],
+      "elapsed_ms": 118.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "p03",
+      "kind": "in_domain",
+      "query": "儿童过敏性鼻炎有哪些症状",
+      "expected_docs": [
+        "rhinitis"
+      ],
+      "evidence_terms": [
+        "鼻塞",
+        "喷嚏"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "rhinitis",
+        "rhinitis",
+        "cma_55517"
+      ],
+      "elapsed_ms": 146.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "p04",
+      "kind": "audience_mismatch",
+      "query": "成人口服补液盐的配制误区",
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1155528",
+        "dayi_drug_1155528"
+      ],
+      "elapsed_ms": 148.3,
+      "query_rewritten": false
+    },
+    {
+      "id": "p05",
+      "kind": "knowledge_gap",
+      "query": "氯雷他定有哪些禁忌",
+      "expected_gap": "missing_product_label",
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_drug_1151949",
+        "dayi_drug_1151949"
+      ],
+      "elapsed_ms": 131.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "p06",
+      "kind": "needs_information",
+      "query": "虚构：我吃了一片布洛芬，现在该怎么办",
+      "passed": true,
+      "status": "needs_information",
+      "docs": [],
+      "elapsed_ms": 0.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "p07",
+      "kind": "in_domain",
+      "query": "糖尿病患者水果能不能吃",
+      "expected_docs": [
+        "diabetes_myths",
+        "diabetes_diet"
+      ],
+      "evidence_terms": [
+        "水果"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "cma_55980",
+        "diabetes_myths",
+        "cma_50461"
+      ],
+      "elapsed_ms": 150.2,
+      "query_rewritten": false
+    },
+    {
+      "id": "p08",
+      "kind": "in_domain",
+      "query": "那饮食应该注意什么",
+      "history": [
+        {
+          "role": "user",
+          "content": "高血压如何管理"
+        }
+      ],
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "膳食",
+        "饮食"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "dayi_disease_1028127",
+        "cma_51318"
+      ],
+      "elapsed_ms": 177.6,
+      "query_rewritten": true
+    },
+    {
+      "id": "p09",
+      "kind": "in_domain",
+      "query": "糖尿病怎样运动",
+      "history": [
+        {
+          "role": "user",
+          "content": "高血压如何管理"
+        }
+      ],
+      "expected_docs": [
+        "diabetes"
+      ],
+      "evidence_terms": [
+        "运动"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes",
+        "diabetes",
+        "cma_45502"
+      ],
+      "elapsed_ms": 98.0,
+      "query_rewritten": false
+    },
+    {
+      "id": "n01",
+      "kind": "in_domain",
+      "query": "糖尿病低GI饮食如何选择主食",
+      "expected_docs": [
+        "diabetes_diet"
+      ],
+      "evidence_terms": [
+        "主食",
+        "全麦"
+      ],
+      "passed": false,
+      "status": "ok",
+      "docs": [
+        "diabetes_diet",
+        "diabetes_diet",
+        "dayi_disease_1027675"
+      ],
+      "elapsed_ms": 147.4,
+      "query_rewritten": false
+    },
+    {
+      "id": "n02",
+      "kind": "in_domain",
+      "query": "高血压每天食盐摄入应该注意什么",
+      "expected_docs": [
+        "hypertension",
+        "hypertension_intro",
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "5克",
+        "5 g",
+        "食盐"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "cma_47463",
+        "cma_60268"
+      ],
+      "elapsed_ms": 149.8,
+      "query_rewritten": false
+    },
+    {
+      "id": "n03",
+      "kind": "in_domain",
+      "query": "糖尿病患者能否完全不吃甜食和水果",
+      "expected_docs": [
+        "diabetes_myths",
+        "diabetes_diet"
+      ],
+      "evidence_terms": [
+        "水果"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "diabetes_myths",
+        "cma_51836",
+        "dayi_disease_1027675"
+      ],
+      "elapsed_ms": 184.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "n04",
+      "kind": "in_domain",
+      "query": "高血压运动前的医学检查有什么要求",
+      "expected_docs": [
+        "hypertension_standard2019"
+      ],
+      "evidence_terms": [
+        "运动",
+        "检查"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "hypertension_standard2019",
+        "hypertension_standard2019",
+        "dayi_disease_1150927"
+      ],
+      "elapsed_ms": 234.6,
+      "query_rewritten": false
+    },
+    {
+      "id": "n05",
+      "kind": "in_domain",
+      "query": "家庭监测高血压应该选择什么血压计",
+      "expected_docs": [
+        "bp_home"
+      ],
+      "evidence_terms": [
+        "上臂式"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "bp_home",
+        "hypertension_standard2019",
+        "bp_home"
+      ],
+      "elapsed_ms": 202.5,
+      "query_rewritten": false
+    },
+    {
+      "id": "n06",
+      "kind": "in_domain",
+      "query": "鼻炎患者有哪些鼻腔冲洗的方法",
+      "expected_docs": [
+        "nasal_rinse"
+      ],
+      "evidence_terms": [
+        "冲洗"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "dayi_disease_1119265",
+        "nasal_rinse",
+        "rhinitis_general"
+      ],
+      "elapsed_ms": 215.1,
+      "query_rewritten": false
+    },
+    {
+      "id": "n07",
+      "kind": "in_domain",
+      "query": "成人过敏性鼻炎有哪些治疗方法",
+      "expected_docs": [
+        "rhinitis_general"
+      ],
+      "evidence_terms": [
+        "鼻炎"
+      ],
+      "passed": true,
+      "status": "ok",
+      "docs": [
+        "rhinitis_general",
+        "rhinitis_general",
+        "dayi_disease_1158510"
+      ],
+      "elapsed_ms": 203.8,
+      "query_rewritten": false
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "documents": 3298,
+  "chunks": 22376,
+  "version": "b753b43fda077d23",
+  "database": "E:\\workspace\\medix-agent-swarm-20261028\\knowledge\\data\\evidence\\b753b43fda077d23\\milvus.db",
+  "embedding": {
+    "provider": "local",
+    "model": "BAAI/bge-small-zh-v1.5",
+    "dimension": 512,
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "normalization": "l2"
+  },
+  "persistent_reload_without_document_encoding": true,
+  "coverage_gaps": {
+    "diseases": [],
+    "drugs": []
+  },
+  "cases_passed": 14,
+  "cases_total": 14,
+  "cases": [
+    {
+      "query": "高血压的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "高血压",
+        "双胎妊娠的孕妇更容易得妊娠期高血压，怎么预防？",
+        "高血压"
+      ],
+      "elapsed_ms": 193.2
+    },
+    {
+      "query": "糖尿病的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "哪些女性容易得妊娠期糖尿病？孕期需要吃降糖药吗？",
+        "1型糖尿病",
+        "中医怎么治疗糖尿病肾病？常用中成药有哪些？"
+      ],
+      "elapsed_ms": 162.7
+    },
+    {
+      "query": "哮喘的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "“哮”傲江湖——儿童哮喘",
+        "一住新房就憋喘，小心有“鬼”！",
+        "哮喘"
+      ],
+      "elapsed_ms": 154.3
+    },
+    {
+      "query": "痛风的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "痛风",
+        "痛风",
+        "痛风"
+      ],
+      "elapsed_ms": 144.2
+    },
+    {
+      "query": "尿路感染的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "尿路感染",
+        "尿路感染"
+      ],
+      "elapsed_ms": 178.7
+    },
+    {
+      "query": "湿疹的常见症状有哪些",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "湿疹的三种典型症状，你都知道吗？",
+        "湿疹的三种典型症状，你都知道吗？",
+        "特应性皮炎怎么治？患者需要注意哪些事？"
+      ],
+      "elapsed_ms": 160.7
+    },
+    {
+      "query": "阿莫西林是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "阿莫西林",
+        "阿莫西林",
+        "阿莫西林克拉维酸钾"
+      ],
+      "elapsed_ms": 157.6
+    },
+    {
+      "query": "奥美拉唑是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "奥美拉唑",
+        "奥美拉唑"
+      ],
+      "elapsed_ms": 134.5
+    },
+    {
+      "query": "华法林是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "华法林",
+        "华法林"
+      ],
+      "elapsed_ms": 115.2
+    },
+    {
+      "query": "氯雷他定是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "氯雷他定",
+        "氯雷他定",
+        "来去匆匆的神秘风团——荨麻疹"
+      ],
+      "elapsed_ms": 127.9
+    },
+    {
+      "query": "司美格鲁肽是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "【每日一药】司美格鲁肽片",
+        "【每日一药】司美格鲁肽片"
+      ],
+      "elapsed_ms": 152.3
+    },
+    {
+      "query": "艾司唑仑是什么药",
+      "status": "ok",
+      "passed": true,
+      "titles": [
+        "艾司唑仑（湖南省药学会药物资料）",
+        "艾司唑仑（湖南省药学会药物资料）",
+        "多种安眠药物联合使用是不是效果一定更好？"
+      ],
+      "elapsed_ms": 122.2
+    },
+    {
+      "query": "华法林和阿司匹林能一起吃吗",
+      "status": "needs_information",
+      "passed": true
+    },
+    {
+      "query": "孩子布洛芬吃多少毫克",
+      "status": "needs_information",
+      "passed": true
+    }
+  ],
+  "chat_llm_calls": 0
+}

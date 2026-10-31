@@ -36,7 +36,7 @@ except ImportError:
 
 MEM0_AVAILABLE = find_spec("mem0") is not None
 if not MEM0_AVAILABLE:
-    logger.warning("mem0ai not installed. Long-term memory disabled. Install with: pip install mem0ai")
+    logger.debug("Legacy mem0ai SDK unavailable; web Mem0 Platform integration uses httpx independently.")
 
 
 class LongTermMemory:
@@ -124,14 +124,15 @@ class LongTermMemory:
 
         try:
             # 构建记忆文本（包含问题和答案摘要）
-            memory_text = f"问题：{question}\\n回答：{answer[:500]}..."
+            memory_text = question
 
             # 添加到 Mem0
             result = self.mem0.add(
                 messages=[{"role": "user", "content": memory_text}],
                 user_id=self.user_id,
                 metadata={
-                    "type": "session_summary",
+                    "type": "user_report",
+                    "source_role": "user",
                     "session_id": session_id,
                     "timestamp": datetime.now().isoformat(),
                     **(metadata or {})

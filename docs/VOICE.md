@@ -10,12 +10,12 @@
 
 ## 执行步骤与代码职责
 
-1. requirements.web.txt 固定 edge-tts 依赖，安装到服务实际使用的 medix-bootstrap 环境。
+1. requirements.integration.txt 固定 edge-tts 依赖，requirements.web.txt 委托到此统一入口，安装到服务实际使用的 medix-bootstrap 环境。
 2. config.py 独立配置 TTS provider/voice/rate/pitch/volume，ASR 的 MEDIX_AUDIO_* 与文本配置保持原有凭据边界。
 3. web/speech.py 适配 Edge 异步流，仅转发 audio 分片，不拼接完整音频，最多 16 MiB；单次总计最多 60 秒，连接 10 秒、接收 30 秒。音频为空、过大、依赖缺失、服务异常和超时均返回可处理错误，不记录播报正文或凭据。
 4. POST /api/voice/speech 沿用原有接口，清理 Markdown；空内容或非法类型返回 400，清理后超过 4000 字返回 413；收到第一段音频后返回 audio/mpeg 流，设置 Cache-Control: no-store、X-Accel-Buffering: no，不发送 Content-Length。首段之前的错误返回对应 HTTP 状态，已开始的音频流若中断则关闭传输，不把 JSON 错误追加到 MP3。
 5. GET /api/health 分开返回 speech_api_configured（ASR）与 tts_configured/tts_provider/tts_voice/tts_streaming（TTS）。配置可用不代表已探测云端网络。
-6. 前端 POST /api/voice/speech/prepare 获取仅当前浏览器可用的短期、一次性播放 URL，再以原生 Audio.src GET /api/voice/speech/stream/{token} 渐进播放 MP3；不调用 response.blob() 等待完整下载。准备地址不启动合成，文本不进入 URL；票据有效期 120 秒，最多 64 个，过期/重复使用返回 404，容量已满返回 429。显示“生成中 · 停止”“缓冲中 · 停止”和“停止”。停止时取消准备请求、暂停播放器、移除 src 并调用 load() 中止取流；服务端取消上游合成并关闭连接，过期响应不得开始播放。失败提示重试，保留文字，不回退系统朗读。
+6. 前端 POST /api/voice/speech/prepare 获取仅当前登录账户与会话可用的短期、一次性播放 URL，再以原生 Audio.src GET /api/voice/speech/stream/{token} 渐进播放 MP3；不调用 response.blob() 等待完整下载。准备地址不启动合成，文本不进入 URL；票据有效期 120 秒，最多 64 个，过期/重复使用返回 404，容量已满返回 429。显示“生成中 · 停止”“缓冲中 · 停止”和“停止”。停止时取消准备请求、暂停播放器、移除 src 并调用 load() 中止取流；服务端取消上游合成并关闭连接，过期响应不得开始播放。失败提示重试，保留文字，不回退系统朗读。
 7. 更新测试、真实 HTTP 合成，保存测试流程/报告/固定示例音频到 E:/AIProject/medix-tts-tests。
 
 ## 默认声音和偏好
@@ -64,3 +64,19 @@ MediX 运行时不落盘用户录音和合成音频；TTS 正文会发送到微�
 人工补充：在网页回答下朗读、停止、切换回答；检查自动朗读偏好；听取测试 MP3 中的中文、数字、单位和停顿；麦克风结束后修改文本再发送。人工项目不在报告中冒充自动通过。
 
 可重复运行命令与实际报告：E:/AIProject/medix-tts-tests/README.md。
+
+## main_copy 合并适配（2026-10-31）
+
+语音四个接口统一使用 require_user，写请求沿用 Origin、X-Medix-Request 和 CSRF 验证，不创建匿名浏览器身份。前端使用 MedixAuth.fetch；原生 Audio GET 自动携带同源 HttpOnly 会话 Cookie，票据同时绑定 users.id 和登录 session id。其他账户、同一账户的新会话均不能使用旧票据；退出登录、切换账户或新对话时取消录音/播报，延迟回调也不得恢复播放。
+
+云端 ASR 使用 JSON 请求以符合统一写接口规范：POST /api/voice/transcribe，body 为 {"audio":"录音的 Base64 字符串","content_type":"audio/webm;codecs=opus"}。服务端有界读取、校验 Base64 和解码后大小，随后沿用供应商 multipart audio/transcriptions 调用；返回 {"text":"识别结果"}。录音最多 16 MiB，JSON/Base64 传输增加约三分之一体积。浏览器原生听写流程不变。
+
+合并回归：
+
+```powershell
+conda run -n medix-bootstrap python scripts/verify_integration.py
+node --check web/static/app.js
+node web/test_voice_playback.cjs
+```
+
+集成回归使用隔离的临时数据库、真实账户 Cookie/CSRF 和模拟的云端服务，不消耗 DeepSeek 或语音 API 配额。旧外部测试脚本中的匿名 HTTP 请求不适用于本次合并后的私有语音接口；真实服务试听应登录网页后操作。新增账户界面与 main_copy 保持一致，不导入测试账户到业务数据库。

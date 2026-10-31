@@ -10,11 +10,11 @@ _kb_instance = None
 
 
 def get_knowledge_base():
-    """获取知识库单例"""
+    """获取知识库单例；Milvus 不可用时回落到本地迷你检索。"""
     global _kb_instance
     if _kb_instance is None:
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        _kb_instance = MedicalKnowledgeBase()
+        from knowledge import get_knowledge_base as resolve_knowledge_base
+        _kb_instance = resolve_knowledge_base()
     return _kb_instance
 
 
@@ -55,6 +55,8 @@ async def search_knowledge(query: str, max_results: int = 5) -> Dict[str, Any]:
             "score": doc["score"],
             "type": doc["metadata"].get("type")
         })
+        if doc['metadata'].get('url'):
+            formatted_results[-1]['content'] += '\n出处：'+doc['metadata']['title']+' '+doc['metadata']['url']
 
     # Skill 的格式化输出
     if formatted_results:
@@ -92,7 +94,7 @@ def format_results(results: list) -> str:
         # 显示相关度分数（如果有）
         score = doc.get("score", 0)
         if score > 0:
-            output.append(f"相关度: {score:.2%}")
+            output.append(f"检索相似度（不代表医学可信度）: {score:.3f}")
 
         output.append("")  # 空行分隔
 

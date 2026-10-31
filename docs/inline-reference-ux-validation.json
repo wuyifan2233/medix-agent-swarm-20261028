@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-30",
+  "llm_calls": 0,
+  "fixture": "previous public-question live response, local ignored artifact",
+  "browser": "headless Microsoft Edge via Playwright",
+  "checks": [
+    "inline sentence source",
+    "quote preview",
+    "safe external source link",
+    "Escape dismissal",
+    "keyboard activation",
+    "full evidence highlight",
+    "390px preview bounds and no horizontal overflow"
+  ],
+  "web_tests_passed": 7,
+  "limitation": "UI regression only; no new clinical or generation evaluation"
+}

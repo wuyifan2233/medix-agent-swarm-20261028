@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("MEDIX_WECHAT_DISABLE", "1")
+os.environ.setdefault("MEDIX_QQ_DISABLE", "1")
 import base64
 import io
 import os
@@ -5,9 +8,15 @@ from pathlib import Path
 import runpy
 import unittest
 from unittest.mock import patch
+import tempfile
 from fastapi.testclient import TestClient
 from PIL import Image
 from web.app import app, jobs, normalize_image
+from auth.schemas import Registration
+from auth.service import AuthService
+from auth.settings import AuthSettings
+from storage.database import make_database
+from storage.migrate import upgrade_database
 
 
 class StubAudioClient:
@@ -31,6 +40,26 @@ class StubAudioClient:
         })()
 
 class WebBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.previous_auth = app.state.auth_service
+        self.temp = tempfile.TemporaryDirectory()
+        url = "sqlite:///" + (Path(self.temp.name) / "web.db").as_posix()
+        upgrade_database(url)
+        self.engine, sessions = make_database(url)
+        settings = AuthSettings(url, False, frozenset({"http://testserver"}), True, password_registration_enabled=True)
+        app.state.auth_service = AuthService(sessions, settings)
+        user = app.state.auth_service.register(Registration(username="alice", display_name="Alice", password="Test-Password2026!"))
+        self.user_id = user.id
+        self.client = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
+        response = self.client.post("/api/auth/login", json={"username":"alice", "password":"Test-Password2026!"})
+        self.client.headers["X-CSRF-Token"] = response.json()["csrf_token"]
+
+    def tearDown(self):
+        self.client.close()
+        app.state.auth_service = self.previous_auth
+        self.engine.dispose()
+        self.temp.cleanup()
+
     def test_image_pixels_are_reencoded(self):
         stream = io.BytesIO()
         Image.new("RGB", (32, 20), "white").save(stream, "PNG")
@@ -48,20 +77,19 @@ class WebBoundaryTests(unittest.TestCase):
             normalize_image({"data": "data:image/svg+xml;base64,PHN2Zz4="})
 
     def test_empty_message_is_rejected(self):
-        client = TestClient(app)
+        client = self.client
         self.assertEqual(client.post("/api/chat", json={"message": "", "images": []}).status_code, 400)
 
     def test_foreign_origin_is_rejected(self):
-        client = TestClient(app)
+        client = self.client
         self.assertEqual(client.post("/api/chat", json={}, headers={"Origin":"https://elsewhere.example"}).status_code, 403)
 
-    def test_other_browser_cannot_read_job(self):
-        jobs["boundary-test"] = {"owner": "a" * 32, "status": "completed"}
+    def test_other_user_cannot_read_job(self):
+        jobs["boundary-test"] = {"owner_user_id": "another-user", "status": "completed"}
         try:
-            client = TestClient(app)
+            client = self.client
             self.assertEqual(client.get("/api/jobs/boundary-test").status_code, 404)
-            client.cookies.clear()
-            client.cookies.set("medix_browser", "a" * 32)
+            jobs["boundary-test"]["owner_user_id"] = self.user_id
             self.assertEqual(client.get("/api/jobs/boundary-test").status_code, 200)
         finally:
             jobs.pop("boundary-test", None)
@@ -73,19 +101,18 @@ class WebBoundaryTests(unittest.TestCase):
         self.assertIn("tts_voice", body)
 
     def test_voice_upload_rejects_unknown_format(self):
-        response = TestClient(app).post(
-            "/api/voice/transcribe", content=b"not-audio", headers={"Content-Type": "text/plain"}
+        response = self.client.post(
+            "/api/voice/transcribe", json={"audio":"bm90LWF1ZGlv", "content_type":"text/plain"}
         )
         self.assertEqual(response.status_code, 415)
 
     def test_voice_upload_requires_audio_configuration(self):
-        response = TestClient(app).post(
-            "/api/voice/transcribe", content=b"audio", headers={"Content-Type": "audio/webm"}
-        )
+        with patch("config.SPEECH_CONFIG", {"remote_enabled": False}):
+            response = self.client.post("/api/voice/transcribe", json={"audio":"YXVkaW8=", "content_type":"audio/webm"})
         self.assertEqual(response.status_code, 503)
 
     def test_empty_speech_text_is_rejected_before_provider_call(self):
-        response = TestClient(app).post("/api/voice/speech", json={"text": "   "})
+        response = self.client.post("/api/voice/speech", json={"text": "   "})
         self.assertEqual(response.status_code, 400)
 
     def test_transcription_uses_configured_model_and_returns_text(self):
@@ -95,14 +122,26 @@ class WebBoundaryTests(unittest.TestCase):
         }
         StubAudioClient.calls = []
         with patch("config.SPEECH_CONFIG", config), patch("httpx.AsyncClient", StubAudioClient):
-            response = TestClient(app).post(
-                "/api/voice/transcribe", content=b"test-recording", headers={"Content-Type": "audio/webm"}
+            response = self.client.post(
+                "/api/voice/transcribe", json={"audio":base64.b64encode(b"test-recording").decode(), "content_type":"audio/webm"}
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"text": "已识别的语音"})
         url, request = StubAudioClient.calls[0]
         self.assertEqual(url, "https://audio.example/v1/audio/transcriptions")
         self.assertEqual(request["data"], {"model": "test-asr", "language": "zh"})
+
+    def test_transcription_rejects_invalid_and_oversized_recordings(self):
+        config = {"remote_enabled":True, "max_audio_bytes":4}
+        cases = [({}, 400), ({"audio":"?", "content_type":"audio/webm"}, 400),
+                 ({"audio":"", "content_type":"audio/webm"}, 400),
+                 ({"audio":base64.b64encode(b"12345").decode(), "content_type":"audio/webm"}, 413)]
+        with patch("config.SPEECH_CONFIG", config), patch("httpx.AsyncClient", StubAudioClient):
+            StubAudioClient.calls = []
+            for payload, status in cases:
+                with self.subTest(payload=payload):
+                    self.assertEqual(self.client.post("/api/voice/transcribe", json=payload).status_code, status)
+            self.assertEqual(StubAudioClient.calls, [])
 
     def test_gpt_transcribe_uses_supported_language_hints(self):
         config = {
@@ -111,8 +150,8 @@ class WebBoundaryTests(unittest.TestCase):
         }
         StubAudioClient.calls = []
         with patch("config.SPEECH_CONFIG", config), patch("httpx.AsyncClient", StubAudioClient):
-            response = TestClient(app).post(
-                "/api/voice/transcribe", content=b"test-recording", headers={"Content-Type": "audio/webm"}
+            response = self.client.post(
+                "/api/voice/transcribe", json={"audio":base64.b64encode(b"test-recording").decode(), "content_type":"audio/webm"}
             )
         self.assertEqual(response.status_code, 200)
         _, request = StubAudioClient.calls[0]

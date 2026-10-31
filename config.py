@@ -1,8 +1,15 @@
-"""Load the supplied config without saving credentials in the project."""
+"""Load external configuration and ignored local defaults without exposing keys."""
 import ast
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
+from runtime_settings import load_setting
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
 
 source = Path(os.environ.get("MEDIX_CONFIG_PATH", "D:/AI training/config.py"))
 settings = {}
@@ -25,6 +32,21 @@ LLM_CONFIG.setdefault("base_url", "https://api.openai.com/v1")
 LLM_CONFIG.setdefault("temperature", 0.7)
 LLM_CONFIG.setdefault("max_tokens", 2048)
 
+# Explicit selection allows local DeepSeek defaults alongside existing providers.
+provider = load_setting('MEDIX_LLM_PROVIDER', 'auto').lower()
+if provider not in {'auto', 'deepseek'}:
+    raise ValueError('MEDIX_LLM_PROVIDER must be auto or deepseek')
+deepseek_key = load_setting('DEEPSEEK_API_KEY')
+if provider == 'deepseek' or (provider == 'auto' and deepseek_key and deepseek_key.lower() != 'xxx'
+                             and LLM_CONFIG['api_key'] == 'not-configured'):
+    LLM_CONFIG.update(
+        api_key=deepseek_key if deepseek_key and deepseek_key.lower() != 'xxx' else 'not-configured',
+        base_url='https://api.deepseek.com',
+        model_name=load_setting('DEEPSEEK_MODEL', 'deepseek-flash'),
+        max_tokens=int(load_setting('DEEPSEEK_MAX_TOKENS', '8192')),
+        request_defaults={'stream': False,
+                          'reasoning_effort': load_setting('DEEPSEEK_REASONING_EFFORT', 'high'),
+                          'extra_body': {'thinking': {'type': load_setting('DEEPSEEK_THINKING', 'enabled')}}})
 # ASR uses its own audio endpoint; Edge cloud TTS never uses text-model credentials.
 _audio_key_override = os.environ.get("MEDIX_AUDIO_API_KEY")
 _audio_base_override = os.environ.get("MEDIX_AUDIO_BASE_URL")

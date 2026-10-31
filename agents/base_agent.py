@@ -59,7 +59,10 @@ class BaseAgent(ABC):
 
     def get_tools_for_llm(self) -> List[Dict[str, Any]]:
         """获取 OpenAI function calling 格式的列表"""
-        return self.skill_registry.to_openai_format()
+        tools = self.skill_registry.to_openai_format()
+        if self.agent_id != "consultation_agent":
+            tools = [tool for tool in tools if tool.get("function", {}).get("name") != "scheduled_reminder"]
+        return tools
 
     async def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -72,6 +75,8 @@ class BaseAgent(ABC):
         Returns:
             Skill 执行结果
         """
+        if tool_name == "scheduled_reminder" and self.agent_id != "consultation_agent":
+            return {"success": False, "needs_clarification": False, "question": "日程提醒只能由健康咨询助手处理。"}
         return await self.skill_registry.execute(tool_name, **arguments)
 
     def format_user_input(self, input_data: Dict[str, Any]) -> str:
