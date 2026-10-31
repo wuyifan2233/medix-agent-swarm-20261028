@@ -181,28 +181,12 @@ function resultMessage(row, result, userText, jobId) {
   }
   renderMemory(main, result);
   const answer = document.createElement('div'); answer.className = 'answer'; main.append(answer);
-  const inline = result.generation === 'model' && result.evidence_links?.length;
-  if (inline) {
-    const hint = document.createElement('p'); hint.className = 'evidence-hint'; hint.textContent = '点击句旁来源，查看原文摘录与出处。'; answer.append(hint);
-    result.evidence_links.forEach(item => {
-      const line = document.createElement('p'); line.className = 'grounded-sentence';
-      const text = document.createElement('span'); text.textContent = item.text.replace(/\[\d+\]/g, '').trim(); line.append(text);
-      item.citations.forEach(id => { const source = result.sources.find(s => s.citation === id); if (!source) return;
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'source-pill';
-        button.textContent = `${source.publisher || '来源'} · ${id}`; button.setAttribute('aria-label', `查看本句来源 ${id}：${source.title}`); button.setAttribute('aria-haspopup', 'dialog');
-        button.onclick = () => citationPreview(button, source, item.quotes.find(q => q.citation === id)?.quote || ''); line.append(button); });
-      if (!item.citations.length) { const note = document.createElement('small'); note.className = 'sentence-caution'; note.textContent = '本句未附引用'; line.append(note); }
-      answer.append(line);
-    });
-  } else answer.innerHTML = richText(result.answer);
-  if (result.retrieval) {
-    if (!inline) {
-      answer.innerHTML = answer.innerHTML.replace(/\[(\d+)\]/g, (match, n) => result.sources.some(s => s.citation === Number(n)) ? `<button type="button" class="citation" data-citation="${n}" aria-label="查看证据 ${n}">[${n}]</button>` : match);
-      answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => citationPreview(button, result.sources.find(s => s.citation === Number(button.dataset.citation))));
-    }
-  }
+  // Render the complete original Markdown first; citations decorate text nodes only.
+  answer.innerHTML = richText(result.answer);
+  window.MedixCitations.decorate(answer, result.sources || [], result.evidence_links || [], citationPreview);
   const meta = document.createElement('div'); meta.className = 'message-meta';
-  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求 · 原文定位' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  if (result.answer_basis === 'general' && result.generation === 'model') tags.push('通用健康信息 · 未命中本地证据');
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
   const elapsed = document.createElement('span'); elapsed.textContent = `${result.elapsed} 秒`; meta.append(elapsed); main.append(meta);
   if (result.image_observations) {
@@ -211,7 +195,7 @@ function resultMessage(row, result, userText, jobId) {
     const text = document.createElement('pre'); text.textContent = result.image_observations; block.append(summary, text); main.append(block);
   }
   if (result.sources.length) {
-    const block = document.createElement('details'); block.className = 'sources'; block.open = !result.retrieval;
+    const block = document.createElement('details'); block.className = 'sources'; block.open = false;
     const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个（含可能未引用的片段）`;
     const grid = document.createElement('div'); grid.className = 'source-grid';
     result.sources.forEach(source => {
@@ -385,12 +369,12 @@ $('questionChips').onclick = event => {
 };
 
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
-const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）',medical_encyclopedia:'专业平台疾病资料，非政府发布',drug_reference:'专业平台药物资料，非具体制剂核准说明书'};
+const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）',local_reference:'本地参考资料，机构来源未核验',medical_encyclopedia:'专业平台疾病资料，非政府发布',drug_reference:'专业平台药物资料，非具体制剂核准说明书'};
 function showEvidence(source, quote = '') {
   if (!source) return;
   $('dialogTitle').textContent = source.title;
   const content = $('dialogContent'); content.replaceChildren();
-  const provenance = document.createElement('p'); provenance.textContent = `${source.publisher} · ${source.published_at || '日期未注明'}\n来源已核对（机构、链接与原文），未作临床审核。`;
+  const provenance = document.createElement('p'); provenance.textContent = `${source.publisher || '本地参考资料'} · ${source.published_at || '日期未注明'}\n${source.source_checked ? '来源已核对（机构、链接与原文），未作临床审核。' : '机构与网页来源尚未核验，请核对原文。'}`;
   const section = document.createElement('p'); section.textContent = `章节：${source.section} · 本地原文字符位置：${source.start_char}`;
   const audience = document.createElement('p'); audience.textContent = `资料类型：${evidenceKindLabels[source.evidence_kind] || source.evidence_kind || '未注明'}。适用范围：${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}。${source.applicability === 'needs_confirmation' ? '当前未确认提问者是否属于该人群，请核对后使用。' : '范围标签仅说明原文主题，不代表个人适用性确认。'}`;
   const excerpt = document.createElement('pre'); excerpt.className = 'evidence-text';
@@ -401,8 +385,9 @@ function showEvidence(source, quote = '') {
   } else excerpt.textContent = source.content;
   const link = document.createElement('a'); link.textContent = '查看机构发布页面 ↗';
   try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) link.href = url.href; } catch {}
+  if (!link.hasAttribute('href')) link.textContent = '本地资料，未提供可核验网页链接';
   link.target = '_blank'; link.rel = 'noopener noreferrer';
-  const version = document.createElement('small'); version.textContent = `来源快照 SHA-256：${source.content_sha256}`;
+  const version = document.createElement('small'); version.textContent = source.content_sha256 ? `来源快照 SHA-256：${source.content_sha256}` : '本地参考资料，暂无网页快照哈希。';
   content.append(provenance, audience, section, excerpt, link, document.createElement('hr'), version);
   if (!$('infoDialog').open) $('infoDialog').showModal();
   if (quote) requestAnimationFrame(() => excerpt.querySelector('mark')?.scrollIntoView({block:'center'}));

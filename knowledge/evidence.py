@@ -22,7 +22,7 @@ def tokens(text):
 def validate_citations(answer, count):
     answer=re.sub(r'\[(\d+(?:\s*[,，]\s*\d+)+)\]',lambda m:''.join('['+n+']' for n in re.findall(r'\d+',m[1])),answer)
     invalid = sorted({int(n) for n in re.findall(r'\[(\d+)\]', answer) if not 1 <= int(n) <= count})
-    answer = re.sub(r'\[(\d+)\]', lambda m: m.group() if 1 <= int(m[1]) <= count else '（引用无效）', answer)
+    answer = re.sub(r'\[(\d+)\]', lambda m: m.group() if 1 <= int(m[1]) <= count else '', answer)
     return answer, invalid
 
 
@@ -55,7 +55,7 @@ class EvidenceKnowledgeBase:
             self.db_path = validate_target(Path(load_setting('MEDIX_EVIDENCE_ROOT', str(default)))/self.version/'milvus.db')
             self.collection_name = 'medical_evidence'
             self._lock = threading.RLock()
-            self.milvus_client = MilvusClient(self.db_path)
+            self.milvus_client = MilvusClient(self.db_path,grpc_options={"grpc.keepalive_time_ms":60000,"grpc.keepalive_timeout_ms":20000,"grpc.keepalive_permit_without_calls":False})
             try:
                 if not self.milvus_client.has_collection(self.collection_name):
                     self.milvus_client.create_collection(collection_name=self.collection_name,dimension=self.embedding_dim,metric_type='COSINE',auto_id=False,id_type='string',max_length=64)

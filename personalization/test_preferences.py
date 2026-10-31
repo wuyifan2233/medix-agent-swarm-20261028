@@ -91,6 +91,20 @@ class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result[1],'fallback')
             self.assertIn('若胸痛持续，请立即就医',result[0])
 
+    async def test_rewrite_cannot_drop_or_invent_evidence_numbers(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock,patch
+        from personalization.reply_render import render_reply
+        from config import LLM_CONFIG
+        draft='这是已引用的原答复。[1]'
+        create=AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content='{"answer":"这是没有引用的改写。"}'))]))
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)),close=AsyncMock())
+        prefs={'data':Preferences(enabled=True).model_dump(),'revision':1}
+        with patch.dict(LLM_CONFIG,{'api_key':'test-only-placeholder'}),patch('openai.AsyncOpenAI',return_value=client):
+            answer,status=await render_reply(draft,'测试',prefs)
+        self.assertEqual(status,'fallback');self.assertEqual(answer,draft)
+        create.assert_awaited_once();client.close.assert_awaited_once()
+
     async def test_explicit_no_nickname_and_no_duplicate_address(self):
         from personalization.reply_render import address
         self.assertEqual(address('原回答','小林','本轮不要称呼我'),'原回答')

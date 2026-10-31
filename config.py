@@ -47,4 +47,8 @@ if provider == 'deepseek' or (provider == 'auto' and deepseek_key and deepseek_k
                           'reasoning_effort': load_setting('DEEPSEEK_REASONING_EFFORT', 'high'),
                           'extra_body': {'thinking': {'type': load_setting('DEEPSEEK_THINKING', 'enabled')}}})
 MEM0_CONFIG = dict(settings.get("MEM0_CONFIG", {}))
-MEM0_CONFIG["api_key"] = os.environ.get("MEM0_API_KEY") or MEM0_CONFIG.get("api_key", "")
+MEM0_CONFIG["api_key"] = load_setting("MEM0_API_KEY") or MEM0_CONFIG.get("api_key", "")
+
+# Optional placeholder credentials must not enable cloud memory.
+if str(MEM0_CONFIG.get('api_key', '')).strip().lower() == 'xxx':
+    MEM0_CONFIG['api_key'] = ''

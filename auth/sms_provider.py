@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 class AliyunSms:
     def configured(self):
-        return all(os.getenv(key) for key in ("MEDIX_SMS_ACCESS_KEY_ID", "MEDIX_SMS_ACCESS_KEY_SECRET", "MEDIX_SMS_SIGN_NAME"))
+        return all(os.getenv(key, "").strip().lower() not in {"", "xxx"} for key in ("MEDIX_SMS_ACCESS_KEY_ID", "MEDIX_SMS_ACCESS_KEY_SECRET", "MEDIX_SMS_SIGN_NAME"))
 
     def _client(self):
         if not self.configured():
