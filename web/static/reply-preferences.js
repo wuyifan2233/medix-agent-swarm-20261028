@@ -4,7 +4,7 @@
   document.querySelector('.health-profile-tools').append(open);
   const dialog=document.createElement('dialog');dialog.id='replyPreferencesDialog';dialog.setAttribute('aria-labelledby','rpTitle');
   dialog.innerHTML=`<header><div><small>让回答更适合你</small><h2 id="rpTitle">回答偏好</h2></div><button type="button" id="rpClose">关闭</button></header>
-  <p class="rp-intro">设置称呼、语气与阅读方式。健康信息仍在“我的健康档案”中管理，使用时需要单独授权。</p>
+  <p class="rp-intro">设置称呼、语气与阅读方式。注册基本信息默认用于相关回答，表达偏好可在这里单独设置。</p>
   <form id="rpForm"><label class="rp-enable"><input type="checkbox" name="enabled">在后续问答中使用已保存的回答偏好</label>
   <section><h3>怎么称呼、怎么说</h3><div class="rp-grid">
   <label>称呼我<input name="nickname" maxlength="20" placeholder="可留空，例如：小林" autocomplete="off"></label>

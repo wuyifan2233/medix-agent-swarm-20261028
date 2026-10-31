@@ -25,7 +25,7 @@ def register(data: Registration, request: Request):
     if not auth.settings.registration_enabled:
         raise HTTPException(403, "当前未开放注册，请联系管理员。")
     if data.basic_profile is None:
-        raise HTTPException(422,"请填写注册基本信息并确认，也可以将各项选择为不愿提供。")
+        raise HTTPException(422,"请填写注册基本信息，也可以将各项选择为不愿提供。")
     auth.limit("register", client_ip(request))
     return public_user(auth.register(data))
 

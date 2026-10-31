@@ -10,7 +10,7 @@ class RegistrationProfileTests(unittest.TestCase):
     tearDown=ProfileTests.tearDown
     client_for=ProfileTests.client_for
     def register(self,username='newperson',**changes):
-        return self.client.post('/api/auth/register',json={'username':username,'password':'Test-Password2026!','basic_profile':{'age':30,'sex':'female','height_cm':165,'weight_kg':55,'acknowledged':True,**changes}})
+        return self.client.post('/api/auth/register',json={'username':username,'password':'Test-Password2026!','basic_profile':{'age':30,'sex':'female','height_cm':165,'weight_kg':55,**changes}})
     def test_registration_is_atomic_private_and_immutable(self):
         result=self.register();self.assertEqual(result.status_code,201,result.text)
         client=self.client_for('newperson')
@@ -23,9 +23,9 @@ class RegistrationProfileTests(unittest.TestCase):
             self.assertEqual(self.register().status_code,409)
             with self.sessions() as db:self.assertEqual(len(db.scalars(select(RegistrationProfile)).all()),1)
         finally:client.close()
-    def test_required_acknowledgement_and_bounds(self):
+    def test_registration_fields_and_bounds(self):
         self.assertEqual(self.client.post('/api/auth/register',json={'username':'missing','password':'Test-Password2026!'}).status_code,422)
-        for change in [{'acknowledged':False},{'age':True},{'height_cm':999},{'weight_kg':0},{'weight_kg':True},{'conditions':[]}]:
+        for change in [{'age':True},{'height_cm':999},{'weight_kg':0},{'weight_kg':True},{'conditions':[]}]:
             self.assertEqual(self.register(**change).status_code,422)
         self.assertEqual(self.register(age=None,sex='undisclosed',height_cm=None,weight_kg=None).status_code,201)
     def test_legacy_records_not_reused(self):
@@ -48,6 +48,11 @@ class RegistrationProfileTests(unittest.TestCase):
                 request={'message':'测试','chat_id':str(uuid.uuid4()),'use_profile':True,'profile_revision':1,'profile_fields':['height_cm']}
                 response=client.post('/api/chat',json=request);self.assertEqual(response.status_code,202,response.text)
                 self.assertEqual(submit.call_args.args[2]['profile_snapshot']['data'],{'height_cm':165})
+                automatic={'message':'测试默认引用','chat_id':str(uuid.uuid4())}
+                self.assertEqual(client.post('/api/chat',json=automatic).status_code,202)
+                self.assertEqual(submit.call_args.args[2]['profile_snapshot']['data']['age'],30)
+                self.assertEqual(self.other.post('/api/chat',json=automatic).status_code,202)
+                self.assertIsNone(submit.call_args.args[2]['profile_snapshot'])
                 request['profile_fields']=['conditions']
                 self.assertEqual(client.post('/api/chat',json=request).status_code,400)
         finally:client.close()

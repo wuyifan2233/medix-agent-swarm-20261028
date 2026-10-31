@@ -361,12 +361,12 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
         remember = payload.get("remember", False)
         if not isinstance(remember, bool):
             raise ValueError("记忆选项格式不正确。")
-        use_profile = payload.get("use_profile", False)
+        use_profile = payload.get("use_profile", True)
         if not isinstance(use_profile, bool):
             raise ValueError("档案选项格式不正确。")
         if any(key in payload for key in ("profile", "profile_data", "profile_snapshot", "user_id")):
             raise ValueError("用户身份与档案必须由服务端读取。")
-        revision = payload.get("profile_revision")
+        revision = payload.get("profile_revision", 1)
         if use_profile and (type(revision) is not int or revision < 1):
             raise ValueError("请先确认档案并提交对应版本。")
         fields=payload.get('profile_fields',list(PROFILE_FIELDS))
@@ -375,7 +375,8 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     except (ValueError, TypeError, KeyError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
     owner = user.id
-    snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
+    baseline_store = ProfileStore(request.app.state.auth_service.sessions)
+    snapshot = baseline_store.snapshot(owner, revision) if use_profile and baseline_store.load(owner)["usable"] else None
     if snapshot: snapshot=select_fields(snapshot,fields)
     for key, old in list(contexts.items()):
         if time.time() - old["updated"] > 3600:

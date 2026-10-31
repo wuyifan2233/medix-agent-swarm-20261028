@@ -40,7 +40,7 @@ class AuthService:
                 db.flush()
                 if data.basic_profile is not None:
                     from personalization.models import RegistrationProfile
-                    db.add(RegistrationProfile(user_id=user.id,data=data.basic_profile.model_dump(exclude={'acknowledged'}),recorded_at=time.time()))
+                    db.add(RegistrationProfile(user_id=user.id,data=data.basic_profile.model_dump(),recorded_at=time.time()))
                 db.commit()
             except IntegrityError:
                 db.rollback()

@@ -1,18 +1,18 @@
 # 个性化接口文档 v4：注册基本信息
 
-更新日期：2026-10-31；分支feature/health-profile-evolution。本版以注册时一次填写、后续只读的身体基本信息替代病情档案演进流程。
+更新日期：2026-10-31；分支feature/health-profile-evolution。本版以注册时一次填写、默认参考、后续只读的身体基本信息替代病情档案演进流程。
 
 ## 注册
 
 POST /api/auth/register，保持原用户名与密码认证，新增必填basic_profile对象：
 
 ```json
-{"username":"example_user","password":"由用户自行设置","basic_profile":{"age":30,"sex":"undisclosed","height_cm":165,"weight_kg":55,"acknowledged":true}}
+{"username":"example_user","password":"由用户自行设置","basic_profile":{"age":30,"sex":"undisclosed","height_cm":165,"weight_kg":55}}
 ```
 
 - age：null或0–130整数；sex：female/male/undisclosed；height_cm：null或30–250数字；weight_kg：null或1–400数字。
-- 可全部不提供，仍需传入对象并主动确认acknowledged=true。空输入对应null，不推断缺失值。
-- 不收集疾病、过敏、用药或近期症状；额外字段、无确认或无basic_profile返回422。
+- 可全部不提供，仍需传入basic_profile对象，不再要求勾选确认。空输入对应null，不推断缺失值。
+- 不收集疾病、过敏、用药或近期症状；额外字段、无basic_profile返回422。
 - 注册201后保持原流程，用户再登录。重复用户名409。账号与基本信息在同一事务创建，失败整体回滚。
 - 本接口不会将基本信息发送给模型。
 
@@ -50,3 +50,11 @@ GET/PUT /api/profile/reply-preferences保持v3实现：独立保存称呼、语�
 新增独立registration_profiles表，迁移20261031_05，仅添加表，不修改或删除旧档案及其历史。
 本版没有身体基本信息编辑、删除或恢复接口。需修改历史错误信息时应另行定义维护/隐私流程，不能靠问答自动改写。
 这次属于产品流程与接口契约变更，旧档案演进测试和调用方需要迁移，不能继续按v3写入接口使用。
+
+
+## 默认参考更新
+
+注册表单已删除核对确认勾选及“不询问疾病或用药”文案；basic_profile不再接收acknowledged。
+已填写的注册基本信息默认用于个性化回答，页面不再提供逐轮开关或字段选择。POST /api/chat省略use_profile时默认为true，profile_revision默认1，profile_fields默认为四项。
+旧账号无注册记录时正常回答且不注入档案。接口兼容显式use_profile=false或字段裁剪；本轮明确询问他人或假设情况时，不得将本人背景套用其中。
+注册信息保持只读，回答偏好仍需要独立保存和启用。本节取代前文逐轮授权、主动确认相关描述。
