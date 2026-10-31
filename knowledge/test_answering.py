@@ -47,6 +47,7 @@ class AnswerTests(unittest.TestCase):
         with patch.dict(os.environ,{'MEDIX_KB_MODE':'evidence','MEDIX_EVIDENCE_GENERATOR':'direct'}), \
              patch.dict(LLM_CONFIG,{'api_key':'mock-key'}), \
              patch('knowledge.milvus_kb.MedicalKnowledgeBase') as kb, \
+             patch('web.request_routing.classify_request',new=AsyncMock(return_value={'kind':'medical','subject':'general'})), \
              patch('knowledge.evidence.evidence_sources',return_value=SOURCES), \
              patch('knowledge.answering.generate_answer',new=AsyncMock(return_value=generated)) as generate, \
              patch('swarm.SwarmCoordinator',side_effect=AssertionError('No swarm in direct mode')):
