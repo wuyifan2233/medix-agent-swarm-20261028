@@ -12,7 +12,7 @@
 | 健康档案与个性化 | feature/health-profile-evolution | bef7325 |
 | 原有 RAG | feature/rag | 9902806 |
 | 证据知识库与扩库 | feature/knowledge_db | a074939 |
-| 多模态病例分析 | feature/mllm-report-analysis | 4fae7c9 |
+| 多模态病例分析 | feature/mllm-report-analysis | 9f6a35e |
 | 长短期记忆 | memory | bafe845 |
 | 定时提醒、微信与QQ渠道 | feature/scheduled-reminder | 2a3b6c8 |
 | 会话持久化、流式响应与关怀点 | feature/chat-streaming-wallet | e51fd2a |
@@ -186,3 +186,7 @@ main_copy提交号（git rev-parse --short HEAD）：
 1. Chrome中点击语音输入，按浏览器提示自行授权麦克风；说完后核对、编辑文字，再自行发送。SpeechRecognition由浏览器提供，不承诺离线；服务端ASR为可选独立MEDIX_AUDIO_*配置，不能用DeepSeek文字Key代替。
 2. 回答下点击朗读/停止，验证边接收边播放。Edge TTS无需Key但需要联网，正文会发送微软云端，不落盘用户音频。自动朗读由每个账号显式开启，恢复历史不自动重播。
 3. 个性化声音中试听固定短句、保存音色，切换账号不继承对方设置，关闭或停止应取消播放。音色复用当前账号偏好表，无额外数据库。
+
+## 追加验收：病例报告一致性
+
+验证同一报告重复上传不覆盖用户已更正的结果；不同报告即使数值相同也保留为不同记录。中文日期和项目别名应能定位历史记录，日期不明确或有歧义时保留空值并提示核对。图片分块重叠的相同项目合并，结果冲突的项目不当成确定事实入库；更正后的记录需继续保留。

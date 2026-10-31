@@ -2,6 +2,8 @@
 import base64
 import io
 import json
+import hashlib
+from web.report_identity import deduplicate, dates_in
 from PIL import Image
 from web.case_memory import result_cell_matches
 
@@ -88,13 +90,20 @@ async def read_reports(client, images):
                     part['complete'] = False
             # Crops overlap; deduplicate the same transcribed row, retaining distinct results.
             rows = list({json.dumps(row, sort_keys=True, ensure_ascii=False): row for row in rows}.values())
-        complete = all(part['complete'] for part in parts)
+        # Retry metadata independently when tabular cells were read but dates were omitted.
+        if rows and not any(dates_in(str(p.get('text',''))) for p in [first,*parts]):
+            header = await read_part(client, data)
+            parts.append(header)
+        rows, conflicts = deduplicate(rows)
+        if conflicts:
+            warnings.append(f'第 {number} 张图片同一项目存在冲突，未采用这些项目：' + '、'.join(conflicts))
+        complete = all(part['complete'] for part in parts) and not conflicts
         # A full-image row count is an independent lower bound for crop coverage.
         if len(rows) < first.get('visible_rows', 0):
             complete = False
         if not complete:
             warnings.append(f'第 {number} 张图片仍有模糊、遗漏或结果列无法核实的内容，本次仅使用可确认部分，请补充清晰图片。')
-        texts.append(f'【图片 {number}】\n' + '\n'.join(str(p.get('text', '')) for p in [first, *parts] if p.get('text')))
+        texts.append(f'【图片 {number}】\n【报告标识 {hashlib.sha256(data.encode()).hexdigest()}】\n' + '\n'.join(str(p.get('text', '')) for p in [first, *parts] if p.get('text')))
         for row in rows:
             texts.append(f"{row['name']}【结果】{row['result']}【单位】{row.get('unit', '')}【参考】{row.get('reference', '')}")
         counts.append({'image': number, 'readable_rows': len(rows), 'complete': complete})

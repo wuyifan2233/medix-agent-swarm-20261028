@@ -3,6 +3,7 @@ import json
 import re
 from datetime import datetime, timezone
 from web import case_memory as store
+from web.report_identity import report_rows, item_key
 
 COLLECTION = "medix_case_facts_v1"
 
@@ -43,6 +44,15 @@ async def propose_changes(message, observed, facts):
         result = json.loads(answer)
         if not isinstance(result, dict) or not isinstance(result.get("questions", []), list):
             raise ValueError("病例整理格式异常，请重试。")
+        operations=result.get('operations',[])
+        if not isinstance(operations,list) or any(not isinstance(op,dict) or not isinstance(op.get('fact'),dict) for op in operations):
+            raise ValueError("病例操作格式异常，请重试。")
+        questions=[]
+        for q in result.get('questions',[]):
+            if isinstance(q,dict):q=q.get('question')
+            if not isinstance(q,str):raise ValueError("病例问题格式异常，请重试。")
+            questions.append(q)
+        result['questions']=questions
         return result
     finally:
         await client.client.close()
@@ -116,6 +126,11 @@ async def extraction_proposal(question, observed, facts):
             proposals.append(await propose_changes(question if not proposals else "仅整理这批新增图片记录，不重复处理用户文字更正。",
                              metadata + "\n" + "\n".join(group_rows[start:start + 24]), facts))
     operations = [op for proposal in proposals for op in proposal.get("operations", [])]
+    verified=list(report_rows(observed))
+    if verified:
+        operations=[op for op in operations if op.get('source')!='image']
+        operations.extend({'action':'add','source':'image','quote':line,'fact':fact} for line,fact in verified)
+
     # One targeted retry for readable rows omitted by the field extractor.
     def missing_rows():
         return [row for row in rows if not any(
@@ -175,8 +190,17 @@ async def prepare_context(owner, chat_id, selected_case, request_id, question, n
         warnings.append(f"本次按问题选取 {len(chosen)} 条相关记录，未逐项核查全部 {len(facts)} 条历史资料。")
     # Reconcile readable image cells against persisted, current records, not model proposals.
     image_rows = [line for line in new_observed.splitlines() if "【结果】" in line]
-    unmatched = [line for line in image_rows if not any(
-        fact["data"]["name"] in line and store.result_cell_matches(fact["data"], line) for fact in facts)]
+    expected=list(report_rows(new_observed))
+    if expected:
+        unmatched=[line for line,row in expected if not any(
+            f['data'].get('report_id')==row['report_id'] and f['data']['date']==row['date']
+            and item_key(f['data']['name'])==item_key(row['name'])
+            and (store.result_cell_matches(f['data'],line) or f['revision']>1) for f in facts)]
+    else:
+        unmatched = [line for line in image_rows if not any(
+            fact["data"]["name"] in line and store.result_cell_matches(fact["data"], line) for fact in facts)]
+    if expected and any(not row['date'] for _,row in expected):
+        warnings.append('本次报告日期未能唯一确认，已保留空日期；请核对图片日期，不能将其视为无日期报告。')
     if unmatched:
         warnings.append(f"本次有 {len(unmatched)} 项图片信息未能可靠入库，未作为确定的病例依据；请补充清晰图片或说明项目。")
     comparisons = store.trends(chosen)

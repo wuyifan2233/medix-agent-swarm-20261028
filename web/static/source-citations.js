@@ -28,7 +28,7 @@
           if (!source) { fragment.append(doc.createTextNode('[' + id + ']')); continue; }
           const range = doc.createRange(); range.selectNodeContents(block); range.setEnd(node, match.index);
           const prefix = plain(range.toString());
-          const annotation = evidenceLinks.find(item => (item.citations || []).includes(id) && plain(item.text) && prefix.endsWith(plain(item.text))); 
+          const annotation = evidenceLinks.find(item => (item.citations || []).includes(id) && plain(item.text) && prefix.endsWith(plain(item.text)));
           const quote = (annotation?.quotes || []).find(q => q.citation === id)?.quote || '';
           const anchor = doc.createElement('button');
           anchor.type = 'button'; anchor.className = 'citation-anchor'; anchor.textContent = '[' + id + ']';

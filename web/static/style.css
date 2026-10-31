@@ -160,4 +160,3 @@ button.source-card:hover{border-color:#8d7bdc;background:#f7f4ff}
 /* Compact references stay beside the original conclusion, including in lists/tables. */
 .answer .citation-anchor{display:inline-flex;align-items:center;justify-content:center;vertical-align:baseline;transform:translateY(-.25em);font-family:inherit;font-size:.68em;font-weight:600;line-height:1.2;padding:1px 4px;margin:0 2px;border:1px solid #cbd7ff;border-radius:5px;background:#f1f5ff;color:#4b66b5;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s}
 .answer .citation-anchor:hover{background:#e5edff;border-color:#8fa8f0}.answer .citation-anchor:focus-visible{outline:2px solid #7189de;outline-offset:2px}
-

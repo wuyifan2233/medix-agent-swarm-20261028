@@ -88,7 +88,8 @@ class BootstrapTests(unittest.TestCase):
         module.MedicalKnowledgeBase._instance=None
         client=Client()
         try:
-            with tempfile.TemporaryDirectory() as directory, patch.object(module,"SentenceTransformer") as model, patch.object(module,"MilvusClient",return_value=client), patch("knowledge.bootstrap.read_legacy_rows",return_value=self.rows()):
+            with tempfile.TemporaryDirectory() as directory, patch.object(module,"SentenceTransformer") as model, patch.object(module,"MilvusClient",return_value=client), patch("knowledge.bootstrap.read_legacy_rows",return_value=self.rows()), patch("knowledge.embeddings.LocalBGEEmbedding") as local:
+                local.return_value.model_instance=model.return_value
                 model.return_value.get_sentence_embedding_dimension.return_value=512
                 kb=module.MedicalKnowledgeBase(db_path=str(Path(directory)/"v3.db"))
                 self.assertEqual(kb.count_documents(),180)

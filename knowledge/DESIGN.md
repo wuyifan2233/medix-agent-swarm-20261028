@@ -337,3 +337,16 @@ knowledge/answering.py的GENERAL_ANSWER_POLICY规定先回应问题、说明必�
 
 
 main_copy整合a074939：保留总体语义路由、会话/账本和语音；新的完整Markdown答案与关键句引用通过source-citations.js修饰文本节点，不拆散原标题列表表格。direct正文流支持新answer字段的渐进解析，兼容旧sentences格式；不显示JSON或无效引用。no_results在模型可用时按GENERAL_ANSWER_POLICY提供明确标记的一般信息，needs_information仍提前追问、不生成个人剂量。未命中不伪装为本地证据。
+## Local report integrity revision (2026-10-31)
+
+Private report facts now carry a report_id derived from normalized upload bytes. This is stored in the existing JSON fact payload; no new database or migration is introduced. Account ownership and revision checks remain mandatory. Identical reuploads retain user-corrected revisions. Different image encodings are not guaranteed to share an identity; legacy records without report_id are not automatically merged or deleted.
+
+Report reading conservatively merges overlapping crop rows after laboratory-code, whitespace and range-symbol normalization. Conflicting results or incompatible nonempty units/ranges are excluded with a warning. Validated tabular rows are mapped directly into image operations, retaining original row evidence and report-local unambiguous dates; the model continues to propose patient switches, text changes and non-tabular facts. Missing dates trigger a full-image reread. Multiple distinct dates remain unresolved rather than choosing a date or substituting the upload date. This does not establish OCR accuracy for arbitrary reports.
+
+Correction candidates recognize Chinese dates and prefixed laboratory names. Extraction question objects are normalized at the model boundary, and malformed operations are rejected. Coverage checks require the current report identity and date, so matching values in older reports cannot conceal a missed new observation. These changes affect private report retrieval, not the public knowledge corpus or embedding identity.
+
+Validation: python -m unittest web.test_report_integrity -v (7 regressions); python scripts/verify_integration.py includes these cases. Real DeepSeek runs use the repository's two sample reports, isolated accounts/business storage, strict Milvus and local trace artifacts. Trace artifacts contain report data and must not be committed. Original-code date extraction was replayed three times against the saved transcript and retained dates each time; the earlier untraced loss cannot be uniquely attributed retroactively. New traces cover vision input/output, extraction proposals, program-selected fields, date anchoring and final persisted records.
+
+新版代码离线兼容复验通过：现有b753b43fda077d23索引3,298篇/22,376分块，检索返回3条，未抓取正文或重新编码语料。旧启动回归改为模拟LocalBGEEmbedding，避免新版加载路径触发真实模型下载。
+
+最新知识库及病例整合验收：415项离线集成回归通过，网页原文预览与Markdown保留检查通过；语料和模型缓存继续本地保存，不进入Git。
