@@ -81,3 +81,7 @@ knowledge/data/evidence/
 *.sqlite3-*
 *.db/
 .medix-data/
+
+# Local voice/model credentials
+local.config.py
+.merge-work/

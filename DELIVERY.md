@@ -13,6 +13,7 @@ py -3.12 -m venv ..\.medix-venv
 按隐藏输入提示提供模型 Key，再打开 http://127.0.0.1:8765/ 。Mem0 可选，使用 `start_web.ps1 -EnableMem0` 并手动开启页面开关。
 
 - [项目说明与后续功能优先级](README.md)
+- [语音输入与播报调研及配置](docs/VOICE.md)
 - [运行架构与排障](docs/RUNTIME.md)
 - [测试方法与范围](docs/TESTING.md)
 - [医疗助手代码解读 Word 文档](docs/医疗助手代码解读.docx)
