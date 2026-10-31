@@ -22,8 +22,37 @@ class SemanticRoutingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_route_is_not_a_knowledge_gap(self):
         for response in ('bad json','{"kind":"ignore_auth","subject":"self"}'):
-            with self.assertRaisesRegex(ValueError,'无法判断本次请求'):
+            with self.assertRaisesRegex(ValueError,'没有理解本次请求'):
                 await classify_request('随便聊聊',{},client=NS(chat=AsyncMock(return_value=response)))
+
+    async def test_nonpersonal_routes_do_not_require_person_identity(self):
+        for kind in ('conversation','action','medical','report'):
+            for subject in (None,'unknown','none',{'unexpected':'object'}):
+                client=NS(chat=AsyncMock(return_value=json.dumps({'kind':kind,'subject':subject})))
+                result=await classify_request('一个普通请求',{},client=client)
+                self.assertEqual(result,{'kind':kind,'subject':'general'})
+                client.chat.assert_awaited_once()
+
+    async def test_personal_missing_subject_does_not_guess_self(self):
+        client=NS(chat=AsyncMock(return_value='{"kind":"personal"}'))
+        result=await classify_request('记得那个人吗',{},client=client)
+        self.assertEqual(result['subject'],'unknown')
+
+    async def test_format_retry_and_fenced_json(self):
+        client=NS(chat=AsyncMock(side_effect=['invalid','```json\n{"kind":"conversation","subject":null}\n```']))
+        self.assertEqual((await classify_request('聊聊吧',{},client=client))['kind'],'conversation')
+        self.assertEqual(client.chat.await_count,2)
+
+    async def test_provider_failures_are_not_mislabeled_as_bad_intent(self):
+        client=NS(chat=AsyncMock(side_effect=RuntimeError('provider unavailable')))
+        with self.assertRaisesRegex(RuntimeError,'provider unavailable'):
+            await classify_request('聊聊吧',{},client=client)
+        client.chat.assert_awaited_once()
+
+    async def test_deepseek_router_disables_reasoning_without_changing_text_config(self):
+        client=NS(model_name='deepseek-flash',chat=AsyncMock(return_value='{"kind":"medical","subject":"general"}'))
+        await classify_request('健康问题',{},client=client)
+        self.assertEqual(client.chat.call_args.kwargs['extra_body'],{'thinking':{'type':'disabled'}})
 
     async def test_images_route_to_report_without_classifier(self):
         client=NS(chat=AsyncMock())

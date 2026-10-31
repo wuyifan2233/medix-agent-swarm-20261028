@@ -350,3 +350,5 @@ Validation: python -m unittest web.test_report_integrity -v (7 regressions); pyt
 新版代码离线兼容复验通过：现有b753b43fda077d23索引3,298篇/22,376分块，检索返回3条，未抓取正文或重新编码语料。旧启动回归改为模拟LocalBGEEmbedding，避免新版加载路径触发真实模型下载。
 
 最新知识库及病例整合验收：415项离线集成回归通过，网页原文预览与Markdown保留检查通过；语料和模型缓存继续本地保存，不进入Git。
+
+2026-10-31 路由可靠性：功能分类独立于人物标签校验；非personal请求的人物字段缺失、null或unknown不再阻断请求，统一为general。personal人物不明确时保持unknown，不能默认读取本人记忆。JSON格式异常至多重试一次，共享40秒总时限，DeepSeek分类关闭长思考；网络/鉴权异常保留原类型，不再都伪装成意图失败。不会回退成任意非医疗路由来绕过医学约束。
