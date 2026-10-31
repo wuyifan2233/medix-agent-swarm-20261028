@@ -1,5 +1,9 @@
 # MediX 本地医学证据库完整设计
 
+## 2026-10-31 可配置召回阈值
+
+`.env.local` 的 `MEDIX_EVIDENCE_MIN_SIMILARITY=0.4` 控制证据库候选的最低余弦相似度，进程环境变量优先。接受 0–1 的有限数值，非法值在初始化时报错。低于阈值的候选被过滤，等于阈值保留；关键词候选同样检查其向量相似度。检索 trace 的 min_similarity 记录实际值。该参数不控制 Mini 或 reranker，不改变向量和索引版本；修改后重启服务，无需重建库。提高阈值会减少候选，也可能漏召回。
+
 ## 2026-10-31 检索启动与 Mini 边界
 
 网页默认 `MEDIX_KB_MODE=evidence`、`MEDIX_EMBEDDING_PROVIDER=local`，已有显式配置仍优先。BGE 证据库初始化失败时，健康接口返回 knowledge=error，页面显示初始化失败，不自动切换 Mini。证据索引使用 MEDIX_EVIDENCE_ROOT。
