@@ -1,5 +1,11 @@
 # MediX 本地医学证据库完整设计
 
+## 2026-10-31 检索启动与 Mini 边界
+
+网页默认 `MEDIX_KB_MODE=evidence`、`MEDIX_EMBEDDING_PROVIDER=local`，已有显式配置仍优先。BGE 证据库初始化失败时，健康接口返回 knowledge=error，页面显示初始化失败，不自动切换 Mini。证据索引使用 MEDIX_EVIDENCE_ROOT。
+
+Mini 仅供显式设置非 evidence 模式及 MEDIX_KB_BACKEND=mini 的简易演示。删除匹配词触发的 0.45 保底提分，仅按词项重合比例打分，低于 0.4 返回前过滤，允许零结果。此规则是演示启发式，不是语义相似度或医学准确率；不改变 BGE 索引及可选 reranker。
+
 ## 2026-10-31 流式生成补充
 
 本功能分支对 `generate_answer` 使用真实上游流。原始 JSON 不展示：增量解析完整 sentence 对象后，复用 `parse_answer` 检查引用编号与逐字 quote，再发布已完成句子；最后仍对完整 JSON 校验，以最终结果替换草稿。quote 仍只证明原文存在。格式异常不把未完成 JSON 当作最终答案。Agent 路径在生成期标识草稿，结束后保留原有引用核验和输出修复。模型推理内容仅用于内存中的工具续传，不写入事件或聊天记录。单次生成不额外发起“流式美化”请求；底层禁用隐藏 SDK 重试，每个显式重试单独记用量。检索、语料与索引版本未改变。

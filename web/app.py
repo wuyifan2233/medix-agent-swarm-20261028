@@ -102,6 +102,8 @@ def normalize_image(item):
 
 
 def warmup():
+    os.environ.setdefault('MEDIX_KB_MODE', 'evidence')
+    os.environ.setdefault('MEDIX_EMBEDDING_PROVIDER', 'local')
     try:
         if os.environ.get('MEDIX_KB_MODE') == 'evidence':
             health.update(knowledge_stage='preparing_sources')
@@ -125,7 +127,7 @@ def warmup():
                           embedding=kb.embedding_model.identity,
                           reranker=kb.reranker.identity if kb.reranker else {'provider':'none'})
     except Exception as exc:
-        health.update(knowledge="error", documents=0, error="知识库初始化失败。请确认依赖与模型缓存；如被其他实例占用，请关闭其他实例或用 --db-path 指定独立向量索引。")
+        health.update(knowledge="error", documents=0, knowledge_stage="error", error="知识库初始化失败，未切换到简易检索。请检查依赖、BGE模型缓存和原文/索引；证据库路径使用 MEDIX_EVIDENCE_ROOT，同一索引不能被多个实例占用。")
         logger.error("Web knowledge initialization failed ({})", type(exc).__name__)
 
 
