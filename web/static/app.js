@@ -492,18 +492,6 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
     const chips = document.createElement('div'); chips.className = 'pending-steps';
     [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
   }
-  const actions=document.createElement('section');actions.className='answer-profile-actions';actions.setAttribute('aria-label','本轮回答后续操作');
-  const actionRow=document.createElement('div');actionRow.className='answer-profile-action-row';
-  const copy=document.createElement('div'),title=document.createElement('strong'),hint=document.createElement('p');
-  title.textContent='把有用的信息留在健康档案';hint.textContent='整理本轮内容，逐项选择；保存前由你确认。';copy.append(title,hint);
-  const pickerSlot=document.createElement('div');pickerSlot.className='answer-profile-picker-slot';
-  const update=document.createElement('button');update.type='button';update.className='answer-profile-save';update.textContent='选择加入健康档案';
-  update.onclick=()=>{let picker=pickerSlot.querySelector('.conversation-profile-picker');if(!picker)picker=window.MedixInlineProfilePicker?.(pickerSlot,userText,jobId);picker?.scrollIntoView({behavior:'smooth',block:'nearest'});};
-  actionRow.append(copy,update);actions.append(actionRow,pickerSlot);
-  const reference=document.createElement('details');reference.className='answer-profile-reference';
-  const referenceTitle=document.createElement('summary');referenceTitle.textContent=[result.profile_used?'本轮已参考健康档案':'本轮未使用健康档案',result.reply_preferences_used?(result.reply_preferences_status==='applied'?'回答偏好已应用':'回答偏好整理未完成'):''].filter(Boolean).join(' · ')+' · 查看说明';
-  reference.open=Boolean(result.reply_preferences_used && result.reply_preferences_status!=='applied');
-  reference.append(referenceTitle,profileNote);actions.append(reference);main.append(actions);
   const playbackEpoch = authEpoch, playbackToken = state.speechToken;
   if (autoPlayback && $('autoSpeak').checked) setTimeout(() => {
     if (authEpoch === playbackEpoch && state.speechToken === playbackToken && speak.isConnected && $('autoSpeak').checked) speakAnswer(result.answer, speak);

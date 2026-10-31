@@ -30,14 +30,12 @@ from auth.settings import AuthSettings
 from auth.middleware import AuthBodyLimit
 from storage.database import make_database
 from storage.migrate import upgrade_database
-from personalization.router import router as profile_router
-from personalization.store import ProfileStore
+from personalization.registration_profile import router as profile_router
+from personalization.registration_profile import BaselineStore as ProfileStore
 from personalization.middleware import ProfileBodyLimit
 from personalization.memory_tools import memory_tool_result
-from personalization.report_imports import router as report_import_router
-from personalization.conversation_updates import router as conversation_profile_router
-from personalization.context import profile_context, retrieval_query, scope as profile_scope
-from personalization.context import select_fields, PROFILE_FIELDS
+from personalization.registration_profile import profile_context, retrieval_query, scope as profile_scope
+from personalization.registration_profile import select_fields, FIELDS as PROFILE_FIELDS
 from personalization.preferences import router as preferences_router, load_preferences, preference_context
 from personalization.reply_render import render_reply
 from web.care_router import router as care_router
@@ -164,8 +162,6 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=sorted(
 app.include_router(auth_router)
 app.include_router(sms_router)
 app.include_router(profile_router)
-app.include_router(report_import_router)
-app.include_router(conversation_profile_router)
 app.include_router(preferences_router)
 app.include_router(care_router)
 
@@ -527,7 +523,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         current = ProfileStore(app.state.auth_service.sessions).snapshot(job["owner_user_id"], snapshot["revision"])
         current = select_fields(current, snapshot.get('selected_fields',PROFILE_FIELDS))
         if profile_scope(current) != profile_scope(snapshot):
-            raise ValueError("档案确认状态已变化，请重新提交问题。")
+            raise ValueError("注册基本信息状态已变化，请重新提交问题。")
         snapshot = current
     from personalization.preferences import Preferences
     preferences = load_preferences(app.state.auth_service.sessions,job["owner_user_id"]) if job.get("owner_user_id") else {"data":Preferences().model_dump(),"revision":0}
@@ -949,14 +945,14 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
         remember = payload.get("remember", False)
         if not isinstance(remember, bool):
             raise ValueError("记忆选项格式不正确。")
-        use_profile = payload.get("use_profile", False)
+        use_profile = payload.get("use_profile", True)
         if not isinstance(use_profile, bool):
             raise ValueError("档案选项格式不正确。")
         if any(key in payload for key in ("profile", "profile_data", "profile_snapshot", "user_id")):
             raise ValueError("用户身份与档案必须由服务端读取。")
-        revision = payload.get("profile_revision")
+        revision = payload.get("profile_revision", 1)
         if use_profile and (type(revision) is not int or revision < 1):
-            raise ValueError("请先确认档案并提交对应版本。")
+            raise ValueError("注册基本信息版本格式不正确。")
         fields=payload.get('profile_fields',list(PROFILE_FIELDS))
         if use_profile and (not isinstance(fields,list) or not fields or any(type(field) is not str or field not in PROFILE_FIELDS for field in fields) or len(fields)!=len(set(fields))):
             raise ValueError('请选择有效且不重复的档案字段。')
@@ -969,7 +965,8 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     except (ValueError, TypeError, KeyError, LookupError) as exc:
         raise HTTPException(400, str(exc) if isinstance(exc, ValueError) else "请求格式不正确。") from exc
     owner = user.id
-    snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
+    baseline_store = ProfileStore(request.app.state.auth_service.sessions)
+    snapshot = baseline_store.snapshot(owner, revision) if use_profile and baseline_store.load(owner)["usable"] else None
     if snapshot: snapshot=select_fields(snapshot,fields)
     for key, old in list(jobs.items()):
         if time.time() - old["created"] > 3600 and old["status"] in {"completed", "failed"}:

@@ -1,10 +1,10 @@
 /* Account preferences: explicit save, no browser persistence or clinical profile writes. */
 (() => {
-  const open=document.createElement('button');open.type='button';open.id='rpOpen';open.textContent='回答偏好';
-  document.querySelector('.health-profile-tools').append(open);
+  const open=document.createElement('button');open.type='button';open.id='rpOpen';open.className='attach-btn';open.setAttribute('aria-haspopup','dialog');open.setAttribute('aria-controls','replyPreferencesDialog');open.textContent='回答偏好';
+  document.getElementById('attachButton').before(open);
   const dialog=document.createElement('dialog');dialog.id='replyPreferencesDialog';dialog.setAttribute('aria-labelledby','rpTitle');
   dialog.innerHTML=`<header><div><small>让回答更适合你</small><h2 id="rpTitle">回答偏好</h2></div><button type="button" id="rpClose">关闭</button></header>
-  <p class="rp-intro">设置称呼、语气、阅读方式与播报声音。健康信息仍在“我的健康档案”中管理，使用时需要单独授权。</p>
+  <p class="rp-intro">设置称呼、语气、阅读方式与播报声音。注册时填写的信息可在账号菜单的“我的基本信息”中查看，之后不可修改。</p>
   <form id="rpForm"><label class="rp-enable"><input type="checkbox" name="enabled">在后续问答中使用已保存的回答偏好</label>
   <section><h3>怎么称呼、怎么说</h3><div class="rp-grid">
   <label>称呼我<input name="nickname" maxlength="20" placeholder="可留空，例如：小林" autocomplete="off"></label>

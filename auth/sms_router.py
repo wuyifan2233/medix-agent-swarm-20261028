@@ -33,6 +33,9 @@ class PhoneBind(SmsVerify):
     pass
 
 
+from personalization.body_schema import BodyInfo
+from personalization.models import RegistrationProfile
+
 class PhoneUnbind(SmsVerify):
     new_password: str = Field(min_length=8, max_length=20)
 
@@ -251,8 +254,12 @@ def send_phone_registration(data: Phone, request: Request):
     return begin(data, request, "signup")
 
 
+class PhoneRegistration(PhoneUnbind):
+    basic_profile: BodyInfo
+
+
 @router.post("/api/auth/phone/register")
-def register_phone(data: PhoneUnbind, request: Request, response: Response):
+def register_phone(data: PhoneRegistration, request: Request, response: Response):
     auth = service(request)
     if not auth.settings.registration_enabled:
         raise HTTPException(403, "当前未开放注册。")
@@ -278,6 +285,8 @@ def register_phone(data: PhoneUnbind, request: Request, response: Response):
             phone_number=phone, password_hash=hashed, has_password=True, role="user")
         db.add(row)
         try:
+            db.flush()
+            db.add(RegistrationProfile(user_id=row.id,data=data.basic_profile.model_dump(),recorded_at=time.time()))
             db.commit()
         except IntegrityError:
             db.rollback()

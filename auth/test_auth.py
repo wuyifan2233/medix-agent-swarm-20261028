@@ -216,9 +216,12 @@ class AuthTests(unittest.TestCase):
             sms.configured.return_value=True; sms.verify.return_value=True
             phone="13800000009"
             c=self.client.post("/api/auth/phone/register/send",json={"phone_number":phone}).json()["challenge_id"]
-            result=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            result=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD,"basic_profile":{"name":"测试用户","birth_month":"1990-01","sex":"undisclosed"}})
             self.assertEqual(result.status_code,200,result.text)
             user=result.json()["user"]
+            baseline=self.client.get("/api/profile").json()
+            self.assertTrue(baseline["read_only"])
+            self.assertEqual(baseline["data"], {"name":"测试用户","birth_month":"1990-01","sex":"undisclosed"})
             self.assertRegex(user["avatar_url"],r"^/assets/avatars/robot-[1-8]\.svg$")
             self.assertEqual(self.client.get("/api/auth/me").json()["avatar_url"],user["avatar_url"])
             self.client.headers["X-CSRF-Token"] = result.json()["csrf_token"]
@@ -233,13 +236,14 @@ class AuthTests(unittest.TestCase):
             current=self.client.get("/api/auth/me").json()
             self.assertEqual(current["id"],user["id"])
             self.assertIsNone(current["phone_masked"])
+            self.assertEqual(self.client.get("/api/profile").json(),baseline)
 
     def test_sms_first_password_requires_sms_and_enables_password_login(self):
         from auth.models import AuthAttempt
         with patch("auth.sms_router.provider") as sms:
             sms.configured.return_value=True;sms.verify.return_value=True
             c=self.client.post("/api/auth/phone/register/send",json={"phone_number":"13800000008"}).json()["challenge_id"]
-            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD,"basic_profile":{"name":"测试用户","birth_month":"1990-01","sex":"undisclosed"}})
             self.client.headers["X-CSRF-Token"]=r.json()["csrf_token"]
             u=r.json()["user"]
             with self.sessions() as db:
@@ -329,7 +333,7 @@ class AuthTests(unittest.TestCase):
                 from auth.models import AuthAttempt
                 db.query(AuthAttempt).delete();db.commit()
             c=self.client.post("/api/auth/phone/register/send",json={"phone_number":phone}).json()["challenge_id"]
-            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD})
+            r=self.client.post("/api/auth/phone/register",json={"challenge_id":c,"code":"123456","new_password":PASSWORD,"basic_profile":{"name":"测试用户","birth_month":"1990-01","sex":"undisclosed"}})
             self.assertEqual(r.status_code,200,r.text)
             self.assertNotEqual(r.json()["user"]["id"],user.id)
 

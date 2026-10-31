@@ -1,122 +1,52 @@
-# 个性化功能接口文档 v3
+# 个性化接口文档 v4：注册基本信息
 
-更新日期：2026-10-30。对应分支：`feature/health-profile-evolution`。
-基础地址：`http://127.0.0.1:8765`。本文按当前实现整理；文档v3不改变导出接口的`schema_version: 2`。
+更新日期：2026-10-31；分支 `feature/health-profile-evolution`。
 
-## 共同约定
+## 注册
 
-- 复用现有认证系统；用户身份来自服务端登录会话，不接受客户端user_id或完整档案快照。
-- 写请求需要可信Origin、JSON Content-Type、`X-Medix-Request: 1`、会话Cookie及`X-CSRF-Token`。网页统一使用`MedixAuth.fetch`。
-- 结构化请求禁止额外字段；版本为整数，日期为YYYY-MM-DD，时间戳为Unix秒。
-- `expected_revision`是读取时的当前版本。冲突返回409，应重新读取并核对，不盲目重试覆盖。
-- 档案使用授权、发送模型提取授权、逐项采纳、主动确认和回答偏好启用彼此独立。
-
-## 档案数据
-
-`ProfileData`包含七类可授权字段：`age / sex / conditions / allergies / medications / symptoms / followups`，以及`field_sources`。
-
-| 字段 | 约束与含义 |
-| --- | --- |
-| age | null或0–130整数，记录时年龄，不自动增长 |
-| sex | unknown / female / male / other / undisclosed |
-| conditions | 基础病史；对话提取仅接受明确自述获诊断的内容 |
-| allergies / medications / symptoms | 过敏、用药、症状与近期身体状况 |
-| followups | 建议与待核实事项，不是病情事实、已执行检查或当前用药 |
-| field_sources | 仅age、sex的来源 |
-
-五个列表字段均为`{status, items}`。组status为unknown、none_reported或reported；reported必须有条目，其余必须为空，每组最多20项。
-条目包含`name`(1–80字)、`note`(最多160字)、`status`、`source`；药物还可含`dose/frequency`(各最多60字)。
-条目status为reported、historical、unknown、current或stopped；它们表示记录性质，不能验证实时病情。
-followups里的current仅表示用户选择跟进中，不代表已经执行建议。
-
-来源为null或`{kind,label,report_date,excerpt}`：kind为manual/report/conversation/assistant，label最多100字，excerpt最多240字。
-来源记录不等于真实性认证；旧档案缺失symptoms、followups时默认补为未知空列表。
-
-## 档案、版本和确认
-
-| 方法与路径 | 请求 | 返回/行为 |
-| --- | --- | --- |
-| GET `/api/profile` | 无 | `{data,revision,updated_at,confirmed_at,status,usable}`，首次revision=0 |
-| PUT `/api/profile` | `{expected_revision,data}` | 新版本待确认草稿 |
-| POST `/api/profile/confirm` | `{expected_revision,acknowledged:true}` | 主动确认已保存版本 |
-| DELETE `/api/profile` | `{expected_revision}` | 清空档案、历史及待采纳候选；不可恢复 |
-| GET `/api/profile/history` | 无 | `{items:[...]}`，仅当前账号历史 |
-| POST `/api/profile/restore` | `{expected_revision,target_revision}` | 恢复为新草稿，不继承旧确认 |
-| GET `/api/profile/export` | 无 | `{schema_version:2,profile:{...}}`，仅当前档案 |
-
-档案状态为empty、draft、confirmed或review_required；确认超过90天需重新核对。这是产品复核周期，不是临床有效期。
-保存、采纳或恢复都会使档案重新待确认。
-
-## 病历提取候选
-
-`POST /api/profile/imports`，成功201：
+`POST /api/auth/phone/register` 使用手机号短信注册，必须传入 `basic_profile` 对象（旧用户名注册仅用于显式启用的兼容测试）：
 
 ```json
-{"text":"虚构病历文字","images":[],"label":"测试病历","report_date":"2020-01-01","subject":"self","consent_to_model":true,"expected_revision":3}
+{"challenge_id":"短信挑战ID","code":"短信验证码","new_password":"由用户自行设置","basic_profile":{"name":"示例姓名","birth_month":"1995-06","sex":"female"}}
 ```
 
-text最多12000字；images最多3张，为图片data URL字符串。文字和图片至少提供一种；日期不得晚于今天。
-支持PNG/JPEG/WebP，经过格式、大小、像素校验和元数据处理；不支持直接解析PDF或Word。
-只生成带证据的临时候选，不写入档案；旧病历条目为historical或unknown，不自动视为当前正在用药。
+- `birth_month`：null 或 `YYYY-MM` 字符串，只记录出生年月，不含出生日。不能晚于当前月份，不能早于当前月份前130年。
+- `sex`：`female`、`male` 或 `undisclosed`（默认）。
+- 三项均可不提供，空表单仍提交对象；不要求勾选确认。未知值不推断。
+- 年龄、身高、体重及病史、用药等额外字段均返回422；缺少对象同样返回422。
+- 手机号注册成功200并自动登录；重复账号按现有短信认证流程拒绝。账号和基本信息同事务创建，失败整体回滚；注册接口不调用模型。
 
-## 对话与回答候选
+## 只读查看
 
-`POST /api/profile/conversation-candidates`，成功201：
+`GET /api/profile` 需要登录，仅返回当前账号记录。包含 `data`、`revision`、`confirmed_at`、`updated_at`、`usable`、`status`、`read_only`。
 
-```json
-{"text":"我这两天头痛","subject":"self","consent_to_model":true,"expected_revision":3,"job_id":"本轮已完成任务ID，可省略"}
-```
+`data` 仅含 `name`、`birth_month`、`sex`。有记录时版本1、只读true、状态 `registration_record`，时间戳为注册记录时间。无记录时版本0、usable=false、状态 `not_recorded`。
 
-- text为用户本轮原话，1–8000字；subject必须self且主动授权。
-- 不传job_id：仅整理本人原话；他人、假设、否定和纯问题不作为本人事实，归属不明或推断疾病转为澄清。
-- 传job_id：服务器读取本账号已完成且原问题与text一致的回答，客户端不能提交任意助手回答替代。
-- 助手回答只可产生followups候选，保留助手原文和assistant来源，强制uncertain=true、status=unknown，不补写用户诊断或药物事实。
-- job不存在或不属于当前账号返回404，未完成或原问题不匹配返回409。服务重启或任务过期后需重新提问。
-- 对话自述来源日期是整理日期，发病时间保留在原话/说明中；系统不能核验病情真伪。
+已有记录中的年龄、身高和体重不再展示或注入问答；不从旧年龄反推出生年月。不迁入旧病史，不提供登录后补填。
 
-两类提取响应共有：`id,base_revision,current_revision,expires_at,consumed,candidates`。
-每项候选包含`id,field,value,evidence,uncertain,source,existing`；对话接口额外返回`clarifications,notice`。
-候选有效期1小时，每账号最多10个未消费批次。
+## 问答默认参考
 
-## 逐项采纳和替换规则
+`POST /api/chat` 默认 `use_profile=true`、`profile_revision=1`、`profile_fields=["name","birth_month","sex"]`。页面不显示逐轮开关或字段选择。
 
-| 方法与路径 | 行为 |
-| --- | --- |
-| GET `/api/profile/imports/{id}` | 读取本账号候选和当前字段对照 |
-| DELETE `/api/profile/imports/{id}` | 丢弃候选，成功204，不修改档案 |
-| POST `/api/profile/imports/{id}/apply` | 原子采纳所选项，成功返回新档案草稿 |
+接口兼容显式 `use_profile=false` 和字段裁剪；范围非空且无重复，只接受三项基本信息字段，非法范围返回400。存在记录时版本不匹配返回409，无记录时正常回答，不注入档案。
 
-```json
-{"expected_revision":3,"selections":[{"candidate_id":"候选ID","action":"append","target_index":null,"acknowledge_uncertainty":false}]}
-```
+后台按登录账号重新读取记录，裁剪后用于检索和上下文。标记注册时间及当前日期，可按出生年月估算年龄，但没有出生日，不能声称知道确切生日或精确日龄。询问他人、假设场景时不得套用本人信息。
 
-- 单次1–30个选择。未选内容不会保存；不确定项必须单独将acknowledge_uncertainty设为true。
-- 年龄、性别只允许replace，target_index为null。
-- 列表追加使用append；更新同名旧项使用replace并指定原列表的target_index。
-- **不同名称不能替换**：“感冒”不能覆盖“头痛”。名称比较采用NFKC规范化、去空白、转小写；不做近义词或疾病关联推断。
-- 同名重复追加返回422，需明确更新同名项或不采纳。不能重复选择候选、重复替换同一下标、替换本次刚追加的项。
-- 跨名称替换返回422；事务回滚，原档案不变，候选不被消费，可改选追加。
+问答不主动追问、重复确认或索要授权；缺失信息说明判断范围及适用条件，保留必要风险提示。本轮描述只参与回答，不写回档案。
 
-前端：只有一个操作时隐藏下拉框，以文字说明“采纳后追加保存，保留已有记录”；年龄、性别提示将更新该字段。
-从自述无记录转为有记录时另行说明。存在多个操作时才显示选择框；不会默认替用户选择覆盖旧记录。
-这是界面呈现优化，apply请求结构没有改变。
+响应保留 `profile_used`、`profile_revision`、`profile_fields`、`profile_confirmed_at`，没有档案写入卡片。
 
-## 问答中使用档案
+## 回答偏好与旧接口
 
-`POST /api/chat`，成功202返回`job_id`；`GET /api/jobs/{job_id}`读取本账号进度与结果。
+`GET/PUT /api/profile/reply-preferences` 独立保存称呼、语气、详略和表达设置，需要启用并保存，不修改基本信息。`reply_preferences_status` 为 off/applied/fallback，整理失败保留原回答。生成及表达整理保留 main_copy 的策略和语音设置。
 
-```json
-{"message":"请分析本次问题","images":[],"chat_id":"有效UUID","remember":false,"use_profile":true,"profile_revision":4,"profile_fields":["conditions","allergies"]}
-```
+旧编辑、确认、恢复、病历提取、聊天候选及采纳接口不再挂载，返回404或405。旧数据保留，不用于当前问答。
 
-use_profile默认false。开启时需有效已确认版本；profile_fields省略时为全部七类，显式提供时必须非空且不重复。
-未授权字段不会进入检索、档案上下文；口头同意不能代替页面开关。图片聊天images采用`web/app.py`的图片对象格式，与病历提取的字符串数组不同。
-结果包含`profile_used/profile_revision/profile_fields/profile_confirmed_at/memory_suppressed_for_profile`。
-相关档案需与具体建议对应；旧症状、已停药和待核实建议不能作为当前事实，无关档案不强行影响回答。
+使用基本信息或启用偏好时暂停本轮云端记忆；上下文按账号、使用范围和偏好版本隔离。私有读取依据会话；写请求沿用可信Origin、JSON、自定义请求头与CSRF校验，公开注册沿用原认证规则。
 
-## 回答偏好
+## 数据兼容
 
-GET `/api/profile/reply-preferences`返回`{data,revision,updated_at}`；PUT同路径提交`{expected_revision,data}`。
+`registration_profiles` 表由迁移 `20261031_18` 建立，一账号一条注册记录。此次字段调整不新增数据库迁移，通过输入校验及读取字段过滤生效，不删除历史原始数据。
 
 ```json
 {"expected_revision":0,"data":{"enabled":true,"nickname":"小王","tone":"supportive","voice_profile":"auto","detail":"brief","format":"summary_first","terminology":"plain","communication_note":"先说重点","daily_context":"希望建议拆成小步骤"}}
@@ -140,23 +70,8 @@ GET `/api/profile/reply-preferences`返回`{data,revision,updated_at}`；PUT同�
 最终呈现增加一次模型调用，要求保留关键风险、就医提示和不确定性，不能机械截断；简短目标120–220字，详细在问题需要时目标700–1000字，不是精确字数保证。
 整理失败或输出截断时保留完整原回答并明确提示，不能声称已完整应用。
 
-聊天结果额外包含`reply_preferences_used/reply_preferences_revision/reply_preferences_status/reply_preferences_detail/memory_suppressed_for_preferences`。
-status为off、applied或fallback；used表示启用了偏好流程，不等于整理一定成功。
-启用档案或偏好时暂停本轮Mem0写入；切换授权范围或偏好版本时隔离旧对话上下文。
+姓名用于只读展示及自然称呼；已设置回答偏好称呼时优先偏好。姓名不参与医学检索，也不用于推断身体状况。新增双账号、重新登录、重新建立数据库连接及伪造user_id查询的持久保存与隔离验证。
 
-## 错误处理与页面入口
+## 回答偏好单次保存
 
-| 状态码 | 常见含义 |
-| --- | --- |
-| 400 | 聊天参数或字段范围错误 |
-| 401 / 403 | 未登录 / CSRF或来源校验失败 |
-| 404 | 当前账号无权访问的候选、任务或版本 |
-| 409 | 版本冲突、草稿不可用于问答、任务不匹配 |
-| 410 | 提取候选过期 |
-| 413 / 422 | 内容过大 / 字段、选择或替换规则不合法 |
-| 429 | 未处理候选或排队任务过多 |
-| 502 / 503 / 504 | 提取失败 / 模型未配置 / 超时 |
-
-回答末尾提供“把有用的信息留在健康档案”操作区，点击“选择加入健康档案”展开选择面板。
-档案引用、字段和偏好版本默认收在“查看说明”；偏好整理失败时说明展开。
-“同时参考本轮回答”默认关闭，所有候选默认不选；不自动提取、不自动采纳、不自动确认。
+偏好界面不再提供启用勾选，点击“保存回答偏好”时直接提交enabled=true，一次保存即可在下次提问中生效；恢复默认按钮仍可关闭偏好。删除底部常驻说明与版本提示，仅保留简短保存结果或错误反馈。已有回答不自动改写，后端偏好接口及风险提示约束保持不变。

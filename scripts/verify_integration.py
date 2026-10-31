@@ -7,10 +7,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 MODULES = '''auth.test_auth auth.test_sms_provider
-personalization.test_profile personalization.test_evolution personalization.test_conversation personalization.test_preferences
+personalization.test_registration_profile personalization.test_preferences
 core.test_deepseek tests.test_deepseek_config
 knowledge.test_mini knowledge.test_bulk knowledge.test_initialize knowledge.test_bootstrap knowledge.test_embeddings knowledge.test_reranking knowledge.test_evidence knowledge.test_answering knowledge.test_query_policy
-web.test_request_routing web.test_channel_wallet web.test_care_wallet web.test_chat_delivery web.test_case_memory web.test_case_pipeline web.test_web web.test_speech web.test_startup web.test_provider_errors web.test_report_integrity
+web.test_request_routing web.test_channel_wallet web.test_care_wallet web.test_chat_delivery web.test_case_memory web.test_case_pipeline web.test_web web.test_speech web.test_startup web.test_provider_errors web.test_report_integrity web.test_vision
 
 memory.test_case_memory memory.test_patient_resolver memory.test_web_mem0
 storage.test_integration web.test_reminders qq.test_bridge qq.test_snowluma_capture wechat.test_bridge'''.split()

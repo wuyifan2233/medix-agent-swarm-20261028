@@ -87,14 +87,14 @@ class ConversationTests(unittest.TestCase):
         for table in ('chat_events','chat_contexts','chat_turns'):
             with connect() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
 
-    def test_restored_answer_supports_profile_action_and_delete_hides_cached_job(self):
+    def test_restored_answer_cannot_update_registration_profile_and_delete_hides_cached_job(self):
         from web.app import jobs
         self.seed();store.update(self.turn,'completed',{'answer':'历史回答'})
         payload={'text':'虚构演示','job_id':self.turn,'subject':'self','consent_to_model':True,'expected_revision':0}
         with patch('personalization.conversation_updates.assess',AsyncMock(return_value=[])) as assess:
             response=self.a.post('/api/profile/conversation-candidates',json=payload)
-            self.assertEqual(response.status_code,201,response.text)
-            assess.assert_awaited_once_with('虚构演示','历史回答')
+            self.assertEqual(response.status_code,404,response.text)
+            assess.assert_not_awaited()
         jobs[self.turn]={'owner_user_id':self.owner,'status':'completed','_persistent':True,'result':{'answer':'历史回答'}}
         self.assertEqual(self.a.delete('/api/conversations/'+self.chat,headers={'Content-Type':'application/json'}).status_code,200)
         self.assertEqual(self.a.get('/api/jobs/'+self.turn).status_code,404)

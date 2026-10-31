@@ -1,14 +1,14 @@
 import unittest
 from fastapi.testclient import TestClient
-from personalization.test_profile import ProfileTests
+from personalization import test_profile as legacy_profile
 from personalization.preferences import Preferences, preference_context
 from web.app import app, contexts
 
 class ReplyPreferencesTests(unittest.TestCase):
-    setUp=ProfileTests.setUp
-    tearDown=ProfileTests.tearDown
-    client_for=ProfileTests.client_for
-    capture_analysis=ProfileTests.capture_analysis
+    setUp=legacy_profile.ProfileTests.setUp
+    tearDown=legacy_profile.ProfileTests.tearDown
+    client_for=legacy_profile.ProfileTests.client_for
+    capture_analysis=legacy_profile.ProfileTests.capture_analysis
     path='/api/profile/reply-preferences'
 
     def save(self,**changes):
