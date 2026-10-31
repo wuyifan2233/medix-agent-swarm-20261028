@@ -7,6 +7,7 @@ from threading import RLock
 
 from auth.settings import AuthSettings
 from storage.database import make_database
+from sqlalchemy.pool import NullPool
 
 _lock = RLock()
 
@@ -26,7 +27,8 @@ def engine_for(url):
     from storage.migrate import upgrade_database
     with _lock:
         upgrade_database(url)
-    return make_database(url)[0]
+    # Raw SQLite adapters release file handles on close, including on Windows.
+    return make_database(url, poolclass=NullPool)[0]
 
 
 class Connection:

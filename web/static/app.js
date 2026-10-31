@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const state = {demo:false, chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0};
 let authEpoch = 0;
 window.addEventListener('medix-signout', () => {
+  state.eventSource?.close(); state.eventSource=null; state.jobId=null; $('conversationList').replaceChildren();
   authEpoch++; state.busy = false; state.images = []; state.chatId = crypto.randomUUID(); state.count = 0;
   $('messages').replaceChildren(); $('attachments').replaceChildren(); $('message').value = ''; $('remember').checked = false;
   $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话';
@@ -33,13 +34,17 @@ const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&am
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); clearTimeout(state.toast); state.toast = setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function scrollDown() { $('conversation').scrollTop = $('conversation').scrollHeight; }
 function updateComposer() {
-  window.MedixProfile?.setBusy(state.busy);
-  $('sendButton').disabled = state.busy || (!$('message').value.trim() && !state.images.length);
-  $('attachButton').disabled = state.busy;
-  $('message').disabled = state.busy;
-  $('newChat').disabled = state.busy;
-  document.querySelectorAll('[data-action="upload"], [data-prompt], [data-example], #refreshPrompts').forEach(button => { button.disabled = state.busy; });
-  $('remember').disabled = state.busy || !MedixAuth.user || !state.health?.memory_configured;
+  const blocked=state.busy || state.opening;
+  window.MedixProfile?.setBusy(blocked);
+  $('sendButton').disabled = blocked || (!$('message').value.trim() && !state.images.length);
+  $('attachButton').disabled = blocked;
+  $('message').disabled = blocked;
+  $('newChat').disabled = blocked;
+  $('stopGeneration').hidden = !state.busy;
+  $('stopGeneration').disabled = !state.jobId;
+  document.querySelectorAll('.session-more,.session-menu-panel button').forEach(button=>button.disabled=blocked);
+  document.querySelectorAll('[data-action="upload"], [data-prompt], [data-example], #refreshPrompts').forEach(button => { button.disabled = blocked; });
+  $('remember').disabled = blocked || !MedixAuth.user || !state.health?.memory_configured;
   $('message').style.height = 'auto';
   $('message').style.height = Math.min($('message').scrollHeight, 155) + 'px';
 }
@@ -160,7 +165,10 @@ function resultMessage(row, result, userText, jobId) {
     : '本轮未使用健康档案。';
   if(result.reply_preferences_used){const detail={brief:'简短重点',standard:'适中解释',detailed:'详细说明'}[result.reply_preferences_detail] || '';profileNote.textContent+=result.reply_preferences_status==='applied'?` 已应用回答偏好 v${result.reply_preferences_revision} · ${detail}；本轮暂停云端记忆。`:' 回答偏好整理未完成，已保留原始完整回答；可重新发送。本轮暂停云端记忆。';}
 
-  const label = document.createElement('div'); label.className = 'message-label'; label.innerHTML = `MediX <small>${result.generation === 'not_called' ? '本地证据检索 · 未调用模型' : result.agents.length > 1 ? '多位助手协作完成' : '健康助手完成分析'}</small>`; main.append(label);
+  const names=participatingAssistants(result.usage?.calls,result.agents || []);
+  const label = document.createElement('div'); label.className = 'message-label';
+  const labelText=document.createElement('small');labelText.textContent=result.generation === 'not_called' ? '本地证据检索 · 未生成模型回答' : names.length ? names.join('、')+'完成回答' : '已完成回答';
+  label.append(document.createTextNode('MediX '),labelText);main.append(label);
   if (result.case_changes?.length) {
     const notice=document.createElement('p'); notice.className='case-update-note';
     const revised=result.case_changes.filter(item=>item.action!=='add');
@@ -202,9 +210,10 @@ function resultMessage(row, result, userText, jobId) {
     }
   }
   const meta = document.createElement('div'); meta.className = 'message-meta';
-  const tags = [result.generation === 'not_called' ? '仅检索原文' : result.llm_requests === 1 ? '单次模型请求 · 原文定位' : result.agents.length > 1 ? `${result.agents.length} 位助手协作` : '单助手分析', ...(result.image_count ? [`已读取 ${result.image_count} 张图片`] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
+  const tags = [...(result.generation === 'not_called' ? ['仅检索原文'] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
-  const elapsed = document.createElement('span'); elapsed.textContent = `${result.elapsed} 秒`; meta.append(elapsed); main.append(meta);
+  if(result.usage)appendUsage(main,result.usage);
+  if(tags.length)main.append(meta);
   if (result.image_observations) {
     const block = document.createElement('details'); block.className = 'observations';
     const summary = document.createElement('summary'); summary.textContent = '查看图片中实际读取的信息';
@@ -259,31 +268,16 @@ async function submit(message, images, retryRow, requestId = crypto.randomUUID()
     if (epoch !== authEpoch) return;
     if (!response.ok) throw new Error(data.detail || '问题提交失败，请重试。');
     $('message').value = ''; state.images = []; renderAttachments();
-    let errors = 0;
-    for (;;) {
-      await sleep(1100);
-      if (epoch !== authEpoch) return;
-      let status;
-      try {
-        const poll = await MedixAuth.fetch(`/api/jobs/${data.job_id}`);
-        const body = await poll.json();
-        if (epoch !== authEpoch) return;
-        if (!poll.ok) throw new Error(body.detail || '无法读取分析状态。');
-        status = body; errors = 0;
-      } catch (error) { if (++errors < 4) continue; throw error; }
-      row.querySelector('.phase-label').textContent = status.label;
-      const chips = row.querySelector('.pending-steps'); chips.replaceChildren();
-      status.steps.forEach((step, i) => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = `${i < status.steps.length - 1 ? '✓ ' : ''}${step.label.replace('正在', '')}`; chips.append(chip); });
-      if (status.status === 'completed') { resultMessage(row, status.result, message, data.job_id); break; }
-      if (status.status === 'failed') throw new Error(status.error || '分析未能完成，请稍后重试。');
-    }
+    rememberActiveChat(); refreshConversations().catch(()=>{});
+    await streamTurn(data.job_id,row,message,epoch);
+    await refreshConversations();
   } catch (error) {
     if (epoch !== authEpoch) return;
     const main = row.querySelector('.message-main'); main.replaceChildren();
     const text = document.createElement('div'); text.className = 'error-text'; text.textContent = error.message;
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage(), requestId); };
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'retry-button'; button.textContent = '重新分析'; button.onclick = () => { row.remove(); submit(message, images, pendingMessage(), crypto.randomUUID()); };
     main.append(text, button); scrollDown();
-  } finally { if (epoch === authEpoch) { state.busy = false; updateComposer(); $('message').focus(); } }
+  } finally { if (epoch === authEpoch) { state.busy = false; state.jobId=null; updateComposer(); $('message').focus(); } }
 }
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
 $('newChat').onclick = () => { if (state.busy) return; state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
@@ -363,7 +357,7 @@ document.querySelectorAll('[data-action]').forEach(button => button.onclick = ()
     $('dialogContent').innerHTML = `<p>提问时，MediX 会检索项目自带的本地医学知识库，帮助你理解相关信息。</p><div class="dialog-stat"><b>${count}</b> 个已加载资料片段</div><p><strong>涵盖方向</strong><br>常见健康问题、生活方式、疾病编码与临床指南类资料。</p><p><strong>怎样查看来源？</strong><br>回答下方的「本地检索参考」会展示实际检索到的文件名及原文片段。</p><p>本地内容尚未完成权威性与时效性审核，请结合医生意见核实。</p>`;
   } else {
     $('dialogTitle').textContent = '把健康问题，说给我听';
-    $('dialogContent').innerHTML = '<p><strong>01 · 描述你的问题</strong><br>可以说说具体症状、持续时间和已经了解的情况。不确定怎么描述，也可以直接问。</p><p><strong>02 · 图片也能一起问</strong><br>上传清晰的报告、药盒或记录；支持粘贴和拖入图片。最多 3 张，每张不超过 8 MB，支持 JPG、PNG、WebP。</p><p><strong>03 · 接着聊，不必重复</strong><br>可根据本轮图片继续追问。开启新对话会重置本轮上下文；刷新页面不会保留聊天记录。</p><p>默认关闭长期记忆。开启后，对话和图片解读摘要会发送至 Mem0，供后续会话检索。</p>';
+    $('dialogContent').innerHTML = '<p><strong>01 · 描述你的问题</strong><br>可以说说具体症状、持续时间和已经了解的情况。不确定怎么描述，也可以直接问。</p><p><strong>02 · 图片也能一起问</strong><br>上传清晰的报告、药盒或记录；支持粘贴和拖入图片。最多 3 张，每张不超过 8 MB，支持 JPG、PNG、WebP。</p><p><strong>03 · 接着聊，不必重复</strong><br>可根据本轮图片继续追问。会话和压缩后的图片保存在本机账号数据库，刷新或重启后可从历史会话继续。删除会话会删除其消息、图片和用量记录；独立病例与Mem0记忆需分别管理。</p><p>默认关闭长期记忆。开启后，对话和图片解读摘要会发送至 Mem0，供后续会话检索。</p>';
   }
   $('infoDialog').showModal();
 });
@@ -913,3 +907,376 @@ setInterval(refreshLink, 2000);
 
 window.addEventListener('medix-auth-change',()=>{refreshReminders();refreshLink();});
 window.addEventListener('medix-signout',()=>{state.seenReminders.clear();state.cursors={wechat:0,qq:0};state.linkQr='';state.channel='wechat';$('wechatQr').hidden=true;$('wechatQr').removeAttribute('src');$('wechatState').textContent='未连接';$('wechatHint').textContent='请登录后连接微信或 QQ。';renderUpcoming([]);});
+
+
+// Durable conversations and resumable, server-originated model chunks.
+function rememberActiveChat() {
+  if (MedixAuth.user) localStorage.setItem(`medix-active-${MedixAuth.user.id}`,state.chatId);
+}
+function usageText(usage) {
+  const charge=usage.charge;
+  const used=charge?.recorded ? `使用 ${formatPoints(charge.points)} 关怀点${charge.held_points>0?'（部分待结算）':''}` : '';
+  const counts=new Map();
+  for(const call of usage.calls || []){
+    if(!call.agent || call.agent.startsWith('stage:'))continue;
+    const name=walletAgentName(call.agent);counts.set(name,(counts.get(name) || 0)+1);
+  }
+  const assistants=[...counts].map(([name,count])=>`${name}调用 ${count} 次`).join('、');
+  return [used,assistants].filter(Boolean).join(' · ');
+}
+function appendUsage(main,usage) {
+  let line=main.querySelector('.care-usage,.usage-details');const text=usageText(usage);
+  if(!text){line?.remove();return;}
+  if(!line || line.tagName!=='P'){line?.remove();line=document.createElement('p');line.className='care-usage';main.append(line);}
+  line.textContent=text;
+}
+function draftArea(row) {
+  let draft=row.querySelector('.stream-answer');
+  if (!draft) {draft=document.createElement('div');draft.className='answer stream-answer';row.querySelector('.message-main').append(draft);}
+  return draft;
+}
+function stoppedMessage(row,turn) {
+  row.querySelector('.process')?.remove();
+  const label=row.querySelector('.message-label small');if(label)label.textContent='生成已结束';
+  const message=document.createElement('p'); message.className='error-text';message.textContent=turn.error || '生成已中断；以上为未完成草稿。';
+  row.querySelector('.message-main').append(message);
+  if(turn.usage)appendUsage(row.querySelector('.message-main'),turn.usage);
+}
+function streamTurn(jobId,row,message,epoch,after=0) {
+  state.jobId=jobId; updateComposer();
+  return new Promise((resolve,reject)=>{
+    const source=new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/events?after=${after}`);
+    state.eventSource=source;
+    let outage;
+    source.onopen=()=>{clearTimeout(outage);outage=null;};
+    source.onerror=()=>{
+      if(epoch!==authEpoch){source.close();resolve();return;}
+      const label=row.querySelector('.phase-label');if(label)label.textContent='连接中断，正在恢复；不会重复调用模型';
+      if(!outage)outage=setTimeout(()=>{source.close();reject(new Error('连接尚未恢复，刷新页面可恢复历史任务。'));},30000);
+    };
+    source.onmessage=event=>{
+      if(epoch!==authEpoch){source.close();clearTimeout(outage);resolve();return;}
+      let data;try{data=JSON.parse(event.data);}catch{return;}
+      if(data.type==='stage') {const label=row.querySelector('.phase-label');if(label)label.textContent=data.label;}
+      if(data.type==='draft_start') {
+        row.dataset.streamCall=data.call_id;draftArea(row).textContent='';
+        const label=row.querySelector('.phase-label');if(label)label.textContent=`${walletAgentName(data.agent)}正在生成草稿，完成后校验`;
+      }
+      if(data.type==='draft_clear' && row.dataset.streamCall===data.call_id)draftArea(row).textContent='';
+      if(data.type==='delta' && row.dataset.streamCall===data.call_id){draftArea(row).textContent+=data.text;scrollDown();}
+      if(data.type==='usage'){appendUsage(row.querySelector('.message-main'),data.usage);refreshWallet().catch(()=>{});}
+      if(data.type==='done') {
+        source.close();clearTimeout(outage);state.eventSource=null;
+        if(data.status==='completed' && data.result)resultMessage(row,data.result,message,jobId);
+        else stoppedMessage(row,data);
+        refreshWallet().catch(()=>{});scrollDown();resolve();
+      }
+    };
+  });
+}
+$('stopGeneration').onclick=async()=>{
+  if(!state.jobId)return;
+  $('stopGeneration').disabled=true;
+  try{
+    const response=await MedixAuth.fetch(`/api/jobs/${state.jobId}/cancel`,{method:'POST'});
+    if(!response.ok)throw new Error('停止失败，请重试。');
+    toast('已请求停止，正在关闭模型连接并保存已有内容。');
+  }catch(error){toast(error.message);$('stopGeneration').disabled=false;}
+};
+async function refreshConversations() {
+  if(!MedixAuth.user)return;
+  const owner=MedixAuth.user.id;
+  const response=await MedixAuth.fetch('/api/conversations');
+  if(!response.ok)return;
+  const data=await response.json();
+  if(MedixAuth.user?.id!==owner)return;
+  $('conversationList').replaceChildren();
+  data.conversations.forEach(item=>{
+    const row=document.createElement('div');row.className='session-row';
+    const button=document.createElement('button');button.type='button';button.className='conversation-item';
+    const channelLabel=({qq:'QQ',wechat:'微信'})[item.channel];
+    button.textContent=(channelLabel?channelLabel+' · ':'')+item.title;button.title=button.textContent;
+    button.setAttribute('aria-current',String(item.id===state.chatId));
+    button.onclick=()=>openConversation(item.id).catch(error=>toast(error.message));
+    const more=document.createElement('button');more.type='button';more.className='session-more';more.textContent='···';more.setAttribute('aria-label',`更多操作：${item.title}`);
+    const panel=document.createElement('div');panel.className='session-menu-panel';panel.setAttribute('popover','auto');
+    const rename=document.createElement('button');rename.type='button';rename.textContent='重命名';
+    rename.onclick=()=>{panel.hidePopover();editConversation(item,'rename');};
+    const remove=document.createElement('button');remove.type='button';remove.textContent='删除对话';remove.className='session-delete';
+    remove.onclick=()=>{panel.hidePopover();editConversation(item,'delete');};panel.append(rename,remove);
+    more.onclick=()=>{
+      if(state.busy || state.opening)return;
+      document.querySelectorAll('.session-menu-panel:popover-open').forEach(menu=>menu.hidePopover());
+      panel.showPopover();const rect=more.getBoundingClientRect();panel.style.left=`${rect.right+6}px`;panel.style.top=`${Math.min(rect.top,innerHeight-120)}px`;
+    };
+    row.append(button,more,panel);$('conversationList').append(row);
+  });
+}
+async function openConversation(id) {
+  if(state.busy || state.opening)return;
+  state.opening=true;updateComposer();
+  try {
+  const epoch=authEpoch;
+  const response=await MedixAuth.fetch(`/api/conversations/${encodeURIComponent(id)}`);
+  const data=await response.json();
+  if(epoch!==authEpoch)return;
+  if(!response.ok)throw new Error(data.detail || '会话加载失败。');
+  resetChat();state.caseId='';$('caseContext').value='';state.chatId=id;state.count=data.turns.length;rememberActiveChat();
+  $('chatTitle').textContent=data.title;
+  $('welcome').hidden=true;$('messages').classList.add('active');document.body.classList.add('chatting');
+  let totalRequests=0,totalTokens=0;
+  for(const turn of data.turns){
+    userMessage(turn.payload.message,turn.payload.images.map((data,i)=>({data,name:`已保存图片 ${i+1}`})));
+    const row=pendingMessage();
+    if(turn.label)row.querySelector('.phase-label').textContent=turn.label;
+    totalRequests+=turn.usage.requests;totalTokens+=turn.usage.input_tokens+turn.usage.output_tokens;
+    if(turn.status==='completed' && turn.result)resultMessage(row,turn.result,turn.payload.message,turn.id);
+    else {
+      if(turn.draft)draftArea(row).textContent=turn.draft;
+      row.dataset.streamCall=turn.draft_call || '';
+      if(['queued','running'].includes(turn.status)){
+        state.busy=true;updateComposer();
+        try{await streamTurn(turn.id,row,turn.payload.message,epoch,turn.cursor);}
+        finally{if(epoch===authEpoch){state.busy=false;state.jobId=null;updateComposer();}}
+      } else stoppedMessage(row,turn);
+    }
+  }
+  if(epoch!==authEpoch)return;
+
+  refreshConversations().catch(()=>{});scrollDown();
+  } finally {state.opening=false;updateComposer();}
+}
+let conversationAction=null;
+function editConversation(item,kind){
+  if(state.busy || state.opening)return;
+  conversationAction={...item,kind};
+  $('conversationDialogTitle').textContent=kind==='rename'?'为这段对话起个名字':'删除这段对话？';
+  $('conversationDialogHint').textContent=kind==='rename'?'一个好记的名字，方便下次接着聊。':'消息和保存的图片将被删除。独立病例、健康档案和长期记忆需分别管理；已消耗的关怀点不会退回。';
+  $('conversationName').hidden=kind==='delete';$('conversationName').value=item.title;
+  $('conversationDialogSave').textContent=kind==='rename'?'保存名称':'删除对话';
+  $('conversationDialogSave').classList.toggle('danger',kind==='delete');$('conversationEditError').textContent='';
+  $('conversationDialog').showModal();if(kind==='rename'){$('conversationName').focus();$('conversationName').select();}
+}
+$('conversationDialogClose').onclick=$('conversationDialogCancel').onclick=()=>$('conversationDialog').close();
+$('conversationEditForm').onsubmit=async event=>{
+  event.preventDefault();const action=conversationAction;if(!action)return;
+  const title=$('conversationName').value.trim();if(action.kind==='rename' && !title)return;
+  $('conversationDialogSave').disabled=true;
+  try{
+    const response=await MedixAuth.fetch(`/api/conversations/${action.id}`,{method:action.kind==='rename'?'PATCH':'DELETE',body:JSON.stringify(action.kind==='rename'?{title}:{})});
+    if(!response.ok)throw new Error((await response.json()).detail || '操作未完成');
+    $('conversationDialog').close();
+    if(action.id===state.chatId){if(action.kind==='delete')$('newChat').click();else $('chatTitle').textContent=title;}
+    await refreshConversations();
+  }catch(error){$('conversationEditError').textContent=error.message;}
+  finally{$('conversationDialogSave').disabled=false;}
+};
+const originalNewChat=$('newChat').onclick;
+$('newChat').onclick=()=>{originalNewChat();if(!state.busy){rememberActiveChat();refreshConversations();}};
+function formatPoints(value){return Number(value).toLocaleString('zh-CN',{maximumFractionDigits:3});}
+async function refreshWallet(){
+  if(!MedixAuth.user){$('careWallet').hidden=true;return;}
+  const owner=MedixAuth.user.id;const response=await MedixAuth.fetch('/api/wallet');
+  if(!response.ok)return;const wallet=await response.json();if(MedixAuth.user?.id!==owner)return;
+  state.wallet=wallet;$('careWallet').hidden=false;
+  refreshAccountUsage(owner);
+  $('walletAmount').textContent=formatPoints(wallet.available)+' 点';
+  $('walletHeld').hidden=!wallet.held;
+  $('walletHeld').textContent=wallet.held?`另有 ${formatPoints(wallet.held)} 点待核对结算。`:'';
+  $('walletRules').textContent=`每个账户初始赠送 ${formatPoints(wallet.initial)} 关怀点。${formatPoints(wallet.points_per_cny)} 点对应 ¥1 模型消耗，按本轮全部模型调用扣除，精确到 0.001 点。`;
+}
+async function refreshAccountUsage(owner) {
+  try {
+    const response=await MedixAuth.fetch('/api/usage');
+    if(!response.ok)throw new Error();
+    const usage=await response.json();
+    if(MedixAuth.user?.id!==owner)return;
+    const total=usage.input_tokens+usage.output_tokens;
+    $('careBalance').textContent=new Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(total)+' Token';
+    $('careBalance').title='当前保留会话的已知 Token 用量';
+    $('accountTokenUsage').textContent=`当前保留会话：输入 ${formatPoints(usage.input_tokens)} · 输出 ${formatPoints(usage.output_tokens)} Token${usage.unknown_requests?' · 部分请求用量待核对':''}`;
+  } catch {
+    if(MedixAuth.user?.id===owner){$('careBalance').textContent='查看用量';$('accountTokenUsage').textContent='Token 用量暂时无法加载，请稍后重试。';}
+  }
+}
+let walletHistoryOffset=0, walletHistoryEpoch=0;
+function walletElement(tag,className,text){
+  const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;
+}
+function walletAgentName(agent){
+  return ({'stage:patient':'人物判断','stage:case':'病例整理','stage:agents':'任务路由','stage:vision':'图片读取','stage:presentation':'回答整理','stage:answer':'原文阅读','stage:memory':'记忆核对','stage:patient_resolve':'人物判断','stage:case_prepare':'病例整理','stage:route':'任务路由',
+    'stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
+    'consultation_agent':'健康咨询助手','diagnostic_agent':'诊断分析助手','research_agent':'医学研究助手','lead_synthesis':'协作汇总助手','evidence_reader':'原文阅读助手','health_consultant':'健康咨询助手','general_practitioner':'健康咨询助手'})[agent] || (agent?.startsWith('stage:')?'流程处理':agent || '助手');
+}
+function participatingAssistants(calls,fallback=[]){
+  const ids=Array.isArray(calls)?calls.map(call=>call.agent):fallback;
+  return [...new Set(ids.filter(id=>typeof id==='string' && !id.startsWith('stage:')).map(walletAgentName))];
+}
+function walletRecord(entry){
+  const record=walletElement('details','wallet-record');
+  const summary=walletElement('summary','wallet-record-summary');
+  summary.append(walletElement('span','wallet-record-mark','✧'));
+  const info=walletElement('div','wallet-record-info');info.append(walletElement('strong','',entry.title));
+  const date=new Date(entry.created*1000).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+  const channel=({qq:'QQ',wechat:'微信',web:'网页'})[entry.channel] || '网页';
+  const assistants=participatingAssistants(entry.calls);
+  const meta=entry.deleted ? `${date} · ${channel} · 对话已删除` : `${date} · ${channel} · ${assistants.join('、') || '流程处理'} · ${entry.requests} 次模型请求`;
+  info.append(walletElement('span','',meta));summary.append(info);
+  const amount=walletElement('div','wallet-record-amount');amount.append(walletElement('strong','',`−${formatPoints(entry.points)}`));
+  amount.append(walletElement('span','',entry.held_points>0?'有额度待结算':'关怀点'));summary.append(amount,walletElement('span','wallet-record-chevron','⌄'));record.append(summary);
+  const content=walletElement('div','wallet-record-body');
+  if(entry.deleted){content.append(walletElement('p','wallet-record-note','该对话已删除，用量明细已清理。已结算的关怀点保留记录。'));record.append(content);return record;}
+  const metrics=walletElement('div','wallet-metrics');
+  for(const [label,value] of [['输入 Token',entry.input_tokens],['输出 Token',entry.output_tokens],['缓存命中',entry.cache_hit_tokens]]){
+    const metric=walletElement('div','');metric.append(walletElement('span','',label),walletElement('strong','',formatPoints(value)));metrics.append(metric);
+  }
+  content.append(metrics);
+  const assistantLine=`${assistants.length?'参与助手：'+assistants.join('、'):'本轮仅有流程处理'} · 助手调用 ${entry.assistant_requests} 次 · 模型请求 ${entry.requests} 次`;
+  content.append(walletElement('p','wallet-call-caption',assistantLine));
+  const groups=new Map();
+  for(const call of entry.calls){
+    const key=call.agent || 'unknown';let group=groups.get(key);
+    if(!group){group={agent:key,calls:0,input:0,output:0,points:0,unknown:false};groups.set(key,group);}
+    group.calls++;group.input+=call.input_tokens || 0;group.output+=call.output_tokens || 0;group.points+=call.points;group.unknown ||= !call.usage_known;
+  }
+  const list=walletElement('div','wallet-call-list');
+  for(const group of groups.values()){
+    const row=walletElement('div','wallet-call-row');const identity=walletElement('div','');identity.append(walletElement('strong','',walletAgentName(group.agent)),walletElement('span','',`${group.calls} 次调用 · ${formatPoints(group.input)} 输入 / ${formatPoints(group.output)} 输出${group.unknown?' · 用量待核对':''}`));
+    row.append(identity,walletElement('span','wallet-call-points',`${formatPoints(group.points)} 点`));list.append(row);
+  }
+  content.append(list);
+  if(entry.held_points>0)content.append(walletElement('p','wallet-record-note',`${formatPoints(entry.held_points)} 关怀点待结算，已知消耗已计入记录。`));
+  if(entry.unknown_requests && !entry.held_points)content.append(walletElement('p','wallet-record-note','部分用量尚未返回，以上仅统计已知用量。'));
+  record.append(content);return record;
+}
+async function loadWalletHistory(reset=false){
+  if(!MedixAuth.user)return;
+  if(reset){walletHistoryOffset=0;walletHistoryEpoch++;$('walletHistory').replaceChildren(walletElement('p','wallet-empty','正在整理关怀记录…'));$('walletMore').hidden=true;}
+  const epoch=walletHistoryEpoch,owner=MedixAuth.user.id,offset=walletHistoryOffset;
+  $('walletMore').disabled=true;
+  try{
+    const response=await MedixAuth.fetch(`/api/wallet/history?offset=${offset}`);
+    if(!response.ok)throw new Error('暂时无法读取记录');const data=await response.json();
+    if(epoch!==walletHistoryEpoch || owner!==MedixAuth.user?.id)return;
+    if(reset)$('walletHistory').replaceChildren();
+    if(!data.entries.length && !offset)$('walletHistory').append(walletElement('p','wallet-empty','还没有消耗记录，下一次对话将在这里留下足迹。'));
+    data.entries.forEach(entry=>$('walletHistory').append(walletRecord(entry)));
+    walletHistoryOffset=data.next_offset;$('walletMore').hidden=!data.has_more;$('walletMore').textContent='查看更多记录';
+  }catch{
+    if(epoch!==walletHistoryEpoch || owner!==MedixAuth.user?.id)return;
+    if(reset)$('walletHistory').replaceChildren(walletElement('p','wallet-empty','记录暂时无法加载，请稍后重试。'));
+    $('walletMore').hidden=false;$('walletMore').textContent='重新加载';
+  }finally{if(epoch===walletHistoryEpoch)$('walletMore').disabled=false;}
+}
+$('walletMore').onclick=()=>loadWalletHistory(walletHistoryOffset===0);
+$('careWallet').onclick=()=>{refreshWallet().catch(()=>{});loadWalletHistory(true);walletTab('usage');loadRecharge();$('walletDialog').showModal();};
+$('walletClose').onclick=()=>$('walletDialog').close();
+window.addEventListener('medix-auth-change',()=>refreshWallet().catch(()=>{}));
+window.addEventListener('medix-signout',()=>{walletHistoryEpoch++;rechargeEpoch++;rechargeRequest=null;rechargePlans=[];selectedRecharge=null;$('rechargePlans').replaceChildren();$('walletOrders').replaceChildren();$('rechargeFeedback').textContent='';$('walletHistory').replaceChildren();$('careWallet').hidden=true;$('careBalance').textContent='—';$('accountTokenUsage').textContent='正在读取 Token 用量…';$('walletDialog').close();$('conversationDialog').close();});
+MedixAuth.ready.then(()=>refreshWallet()).catch(()=>{});
+async function loadSavedConversations() {
+  if(!MedixAuth.user)return;
+  await refreshConversations();
+  const id=localStorage.getItem(`medix-active-${MedixAuth.user.id}`);
+  if(id && !state.busy && !state.count && !$('message').value.trim())await openConversation(id).catch(()=>{});
+}
+window.addEventListener('medix-auth-change',()=>loadSavedConversations().catch(()=>{}));
+MedixAuth.ready.then(()=>loadSavedConversations()).catch(()=>{});
+
+// Recharge is an unpaid order preview until a merchant payment service is enabled.
+let rechargePlans=[],selectedRecharge=null,rechargeRequest=null,rechargeEpoch=0,ordersOffset=0;
+function walletTab(name){
+  $('walletContent').scrollTop=0;
+  for(const [key,title] of [['usage','Usage'],['recharge','Recharge'],['orders','Orders']]){
+    $(`wallet${title}Panel`).hidden=key!==name;
+    $(`wallet${title}Tab`).setAttribute('aria-selected',String(key===name));
+    $(`wallet${title}Tab`).tabIndex=key===name?0:-1;
+  }
+}
+document.querySelectorAll('[data-wallet-tab]').forEach(button=>{
+  button.onclick=()=>walletTab(button.dataset.walletTab);
+  button.onkeydown=event=>{
+    const buttons=[...document.querySelectorAll('[data-wallet-tab]')];let index=buttons.indexOf(button);
+    if(event.key==='ArrowRight')index=(index+1)%buttons.length;
+    else if(event.key==='ArrowLeft')index=(index+buttons.length-1)%buttons.length;
+    else if(event.key==='Home')index=0;else if(event.key==='End')index=buttons.length-1;else return;
+    event.preventDefault();buttons[index].click();buttons[index].focus();
+  };
+});
+$('walletRechargeOpen').onclick=()=>walletTab('recharge');
+function rechargeMoney(fen){return '¥'+(fen/100).toLocaleString('zh-CN',{maximumFractionDigits:2});}
+function renderRechargePlans(){
+  $('rechargePlans').replaceChildren();
+  for(const plan of rechargePlans){
+    const button=walletElement('button','recharge-plan');button.type='button';button.setAttribute('aria-pressed',String(plan.id===selectedRecharge));
+    button.append(walletElement('span','recharge-plan-name',plan.name),walletElement('strong','recharge-plan-points',formatPoints(plan.points)),walletElement('span','recharge-plan-unit','关怀点'),walletElement('span','recharge-plan-price',rechargeMoney(plan.amount_fen)));
+    button.onclick=()=>{if(selectedRecharge!==plan.id){rechargeRequest=null;$('rechargeFeedback').textContent='';}selectedRecharge=plan.id;renderRechargePlans();};
+    $('rechargePlans').append(button);
+  }
+  const selected=rechargePlans.find(plan=>plan.id===selectedRecharge);
+  $('rechargeTotal').textContent=selected?rechargeMoney(selected.amount_fen):'—';$('rechargeCreate').disabled=!selected;
+}
+async function loadRecharge(){
+  const epoch=++rechargeEpoch,owner=MedixAuth.user?.id;if(!owner)return;
+  rechargePlans=[];selectedRecharge=null;rechargeRequest=null;$('rechargeFeedback').textContent='';
+  $('rechargePlans').replaceChildren(walletElement('p','wallet-empty','正在读取充值档位…'));$('rechargeCreate').disabled=true;
+  loadRechargeOrders(true);
+  try{
+    const response=await MedixAuth.fetch('/api/wallet/plans');if(!response.ok)throw new Error();const data=await response.json();
+    if(epoch!==rechargeEpoch || owner!==MedixAuth.user?.id)return;
+    rechargePlans=data.plans;selectedRecharge=rechargePlans[0]?.id || null;renderRechargePlans();
+  }catch{if(epoch===rechargeEpoch && owner===MedixAuth.user?.id)$('rechargePlans').replaceChildren(walletElement('p','wallet-empty','档位暂时无法加载，请重新打开关怀点页面。'));}
+}
+function rechargeOrderCard(order){
+  const card=walletElement('article','recharge-order');
+  const top=walletElement('div','recharge-order-top');const title=walletElement('div','');title.append(walletElement('strong','',order.plan_name),walletElement('span','',`${formatPoints(order.points)} 关怀点 · ${rechargeMoney(order.amount_fen)}`));
+  const labels={awaiting_payment:'未支付 · 未到账',cancelled:'已取消',expired:'已过期'};
+  top.append(title,walletElement('span',`order-status order-${order.status}`,labels[order.status] || '待核对'));card.append(top);
+  const bottom=walletElement('div','recharge-order-bottom');const meta=walletElement('div','');
+  meta.append(walletElement('span','',new Date(order.created*1000).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})),walletElement('span','order-number','订单号 '+order.id));bottom.append(meta);
+  if(order.status==='awaiting_payment'){
+    const cancel=walletElement('button','order-cancel','取消订单');cancel.type='button';
+    cancel.onclick=async()=>{
+      const epoch=rechargeEpoch,owner=MedixAuth.user?.id;cancel.disabled=true;
+      try{
+        const response=await MedixAuth.fetch(`/api/wallet/orders/${order.id}/cancel`,{method:'POST',body:'{}'});
+        if(!response.ok)throw new Error((await response.json()).detail || '取消未完成');
+        if(epoch!==rechargeEpoch || owner!==MedixAuth.user?.id)return;await loadRechargeOrders(true);
+      }catch(error){if(epoch===rechargeEpoch && owner===MedixAuth.user?.id){toast(error.message);cancel.disabled=false;}}
+    };
+    bottom.append(cancel);
+  }
+  card.append(bottom);return card;
+}
+async function loadRechargeOrders(reset=false){
+  const epoch=rechargeEpoch,owner=MedixAuth.user?.id;if(!owner)return;
+  if(reset){ordersOffset=0;$('walletOrders').replaceChildren(walletElement('p','wallet-empty','正在读取订单…'));$('walletOrdersMore').hidden=true;}
+  const offset=ordersOffset;$('walletOrdersMore').disabled=true;
+  try{
+    const response=await MedixAuth.fetch(`/api/wallet/orders?offset=${offset}`);if(!response.ok)throw new Error();const data=await response.json();
+    if(epoch!==rechargeEpoch || owner!==MedixAuth.user?.id)return;
+    if(reset)$('walletOrders').replaceChildren();
+    if(!offset && !data.orders.length)$('walletOrders').append(walletElement('p','wallet-empty','还没有充值订单，愿每一次关心都从容。'));
+    data.orders.forEach(order=>$('walletOrders').append(rechargeOrderCard(order)));ordersOffset=data.next_offset;
+    $('walletOrdersMore').hidden=!data.has_more;$('walletOrdersMore').textContent='查看更多订单';
+  }catch{
+    if(epoch!==rechargeEpoch || owner!==MedixAuth.user?.id)return;
+    if(reset)$('walletOrders').replaceChildren(walletElement('p','wallet-empty','订单暂时无法加载，请稍后重试。'));
+    $('walletOrdersMore').hidden=false;$('walletOrdersMore').textContent='重新加载';
+  }finally{if(epoch===rechargeEpoch)$('walletOrdersMore').disabled=false;}
+}
+$('walletOrdersMore').onclick=()=>loadRechargeOrders(ordersOffset===0);
+$('rechargeCreate').onclick=async()=>{
+  if(!selectedRecharge || !MedixAuth.user)return;
+  const epoch=rechargeEpoch,owner=MedixAuth.user.id,plan=selectedRecharge;
+  rechargeRequest ||= crypto.randomUUID();const requestId=rechargeRequest;
+  $('rechargeCreate').disabled=true;$('rechargeFeedback').textContent='正在创建订单…';
+  try{
+    const response=await MedixAuth.fetch('/api/wallet/orders',{method:'POST',body:JSON.stringify({plan_id:plan,request_id:requestId})});
+    const data=await response.json();if(!response.ok)throw new Error(data.detail || '订单未能创建，请稍后重试。');
+    if(epoch!==rechargeEpoch || owner!==MedixAuth.user?.id)return;
+    rechargeRequest=null;$('rechargeFeedback').textContent='订单已保存，暂未开放付款，关怀点余额未变。';
+    await loadRechargeOrders(true);if(epoch===rechargeEpoch && owner===MedixAuth.user?.id)walletTab('orders');
+  }catch(error){if(epoch===rechargeEpoch && owner===MedixAuth.user?.id)$('rechargeFeedback').textContent=typeof error.message==='string'?error.message:'订单未能创建，请稍后重试。';}
+  finally{if(epoch===rechargeEpoch)$('rechargeCreate').disabled=!selectedRecharge;}
+};

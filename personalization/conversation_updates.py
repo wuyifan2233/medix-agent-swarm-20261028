@@ -121,6 +121,12 @@ async def create(data:ConversationInput,request:Request,user:CurrentUser=Depends
     if data.job_id:
         from web.app import jobs
         job=jobs.get(data.job_id)
+        if not job or job.get('_persistent'):
+            from storage.chat import store as chat_store
+            try: saved=chat_store.turn(user.id,data.job_id)
+            except LookupError: raise HTTPException(404,'未找到本账号的本轮回答。')
+            job={'owner_user_id':user.id,'status':saved['status'],
+                 'request_text':saved['payload']['message'],'result':saved['result'] or {}}
         if not job or job.get('owner_user_id')!=user.id:raise HTTPException(404,'未找到本账号的本轮回答。')
         if job.get('status')!='completed' or job.get('request_text')!=data.text:raise HTTPException(409,'回答尚未完成或与本轮描述不匹配，请重新提问。')
         answer=job.get('result',{}).get('answer','')[:12000]

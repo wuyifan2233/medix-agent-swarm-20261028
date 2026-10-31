@@ -4,6 +4,7 @@ import json
 import re
 from loguru import logger
 from personalization.preferences import preference_context
+from core.chat_runtime import completion
 
 
 def address(answer, nickname, question):
@@ -32,10 +33,10 @@ async def render_reply(draft, question, preferences):
     client=AsyncOpenAI(api_key=LLM_CONFIG['api_key'],base_url=LLM_CONFIG['base_url'],timeout=35,max_retries=0)
     try:
         options={'extra_body':{'thinking':{'type':'disabled'}}} if 'api.deepseek.com' in LLM_CONFIG['base_url'] else {}
-        response=await asyncio.wait_for(client.chat.completions.create(
+        response=await asyncio.wait_for(completion(client, dict(
             model=LLM_CONFIG['model_name'],messages=[{'role':'system','content':system},
             {'role':'user','content':json.dumps({'question':question,'draft':draft},ensure_ascii=False)}],
-            response_format={'type':'json_object'},max_tokens=2400,**options),timeout=38)
+            response_format={'type':'json_object'},max_tokens=2400,**options), agent="reply_presentation"),timeout=38)
         choice=response.choices[0]
         if choice.finish_reason!='stop':raise ValueError('Incomplete presentation')
         answer=json.loads(choice.message.content or '').get('answer')

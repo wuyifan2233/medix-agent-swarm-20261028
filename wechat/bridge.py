@@ -292,7 +292,8 @@ class WeChatBridge:
         try:
             if self.reply is None:
                 raise RuntimeError("MediX reply is not ready")
-            answer = self.reply(expected_owner, "web-" + expected_owner + "-wechat", text)
+            message_id=f"{self._bot_id}:{user}:{job['id']}" if job.get('id') else None
+            answer = self.reply(expected_owner, "web-" + expected_owner + "-wechat", text, message_id)
         except ValueError as exc:
             answer = str(exc) or "这次没能完成分析，请稍后再问我。"
         except Exception:

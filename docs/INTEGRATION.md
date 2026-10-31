@@ -39,7 +39,7 @@
 
 ## 数据库到底怎么统一
 
-只有一份 SQLite **业务数据库**：默认 `.medix-data/app.db`，由 Alembic 自动升级到单一 head `20261030_14`。包含账号、档案、偏好、病例、记忆、本地提醒、送达、渠道绑定。导入模块复用 `storage/business.py`，不再读取各成员的病例/提醒 SQLite 文件。
+只有一份 SQLite **业务数据库**：默认 `.medix-data/app.db`，由 Alembic 自动升级到单一 head `20261031_17`。包含账号、档案、偏好、病例、记忆、本地提醒、送达、渠道绑定。导入模块复用 `storage/business.py`，不再读取各成员的病例/提醒 SQLite 文件。
 
 - `MEDIX_DATABASE_URL` / `MEDIX_DATA_DIR`：业务数据。
 - `MEDIX_DB_PATH` / `--db-path`：公共医学资料的向量索引，独立目录，不能指向业务 SQLite 文件。
@@ -91,3 +91,13 @@ Copy-Item .env.example .env.local
 - 最终变更后的定向补验：29项存储/启动/记忆、23项渠道与隔离，以及渠道切换竞态用例通过；全部前端 JavaScript 语法检查通过。
 
 main_copy 验收后再由组长决定是否合入 main；本轮没有执行该操作，也没有推送覆盖成员分支。
+
+## 2026-10-31：会话流式与用量分支
+
+完整合入 `feature/chat-streaming-wallet` 的 `e51fd2a`，无文本冲突，原分支与main不变。业务迁移在原14之后连续增加15/16/17，聊天、流式事件、模型用量、关怀点和未支付订单继续使用同一业务SQLite及服务端user.id。
+
+Windows适配：业务原生SQLite连接使用NullPool，关闭后释放文件句柄；原ORM连接策略不变。异步流式测试在asyncSetUp中绑定请求ContextVar，兼容Python3.10；模型回退测试显式隔离本机DeepSeek配置。
+
+使用情况入口位于左下角账号菜单，右侧显示保留会话的已知Token总量；点击可看输入输出、余额和逐轮记录，不显示没有依据的剩余百分比。充值仍为未支付订单预览，不提供真实支付或充值入账。
+
+本机Windows / Python3.10最终完整集成回归353项通过；前端JavaScript语法检查通过。浏览器真实请求后显示1,634 Token，刷新后会话和用量保留。该测试问题触发检索范围不足，未生成模型正文，Token来自前置流程调用；不将其作为完整医学问答或云端记忆验收。扩充证据库健康状态ready，3,298篇/22,376分块。

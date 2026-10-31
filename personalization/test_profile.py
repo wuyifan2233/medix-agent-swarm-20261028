@@ -140,6 +140,10 @@ class ProfileTests(unittest.TestCase):
             response=self.client.post('/api/chat',json={'message':'测试','images':[],'chat_id':chat_id})
             self.assertEqual(response.status_code,202)
             self.assertIsNone(submit.call_args.args[2]['profile_snapshot'])
+            # The mocked executor never finishes; end this turn before submitting
+            # another turn to the same now-serialized conversation.
+            from storage.chat import store as chat_store
+            chat_store.update(response.json()['job_id'], 'completed')
             response=self.client.post('/api/chat',json={'message':'测试','images':[],'chat_id':chat_id,'use_profile':True,'profile_revision':1})
             self.assertEqual(response.status_code,202)
             args=submit.call_args.args

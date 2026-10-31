@@ -67,7 +67,8 @@ class BridgeTests(unittest.TestCase):
         self.store.close()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _reply(self, user_id, session_id, message):
+    def _reply(self, user_id, session_id, message, message_id=None):
+        self.assertIsNotNone(message_id)
         self.replies.append((user_id, session_id, message))
         return "这是回复：" + message
 

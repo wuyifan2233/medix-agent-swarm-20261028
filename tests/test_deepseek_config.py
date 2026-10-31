@@ -24,6 +24,7 @@ class DeepSeekConfigTests(unittest.TestCase):
 
     def test_openai_fallback_remains_available(self):
         with patch.dict(os.environ, {"MEDIX_CONFIG_PATH": str(ROOT / "absent-config.py"),
+                                     "MEDIX_LLM_PROVIDER": "auto", "DEEPSEEK_API_KEY": "xxx",
                                      "OPENAI_API_KEY": "dummy-openai"}, clear=True):
             config = runpy.run_path(str(ROOT / "config.py"))
         self.assertEqual(config["LLM_CONFIG"]["model_name"], "gpt-4.1-mini")

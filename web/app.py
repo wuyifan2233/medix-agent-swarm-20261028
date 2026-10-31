@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -40,6 +40,7 @@ from personalization.context import profile_context, retrieval_query, scope as p
 from personalization.context import select_fields, PROFILE_FIELDS
 from personalization.preferences import router as preferences_router, load_preferences, preference_context
 from personalization.reply_render import render_reply
+from web.care_router import router as care_router
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -57,8 +58,12 @@ STATIC = Path(__file__).parent / "static"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_BODY = 34 * 1024 * 1024
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="medix-chat")
+from storage.chat import store as chat_store, PersistentContexts
+from core.chat_runtime import ChatRuntime, runtime as chat_runtime, usage_summary
+from threading import Event
 jobs = {}
-contexts = {}
+controls = {}
+contexts = PersistentContexts()
 memory_edit_locks = {}
 memory_journal = CaseMemory()
 
@@ -129,6 +134,7 @@ def warmup():
 async def lifespan(app):
     # Upgrade once before serving; use a dedicated migration step for multi-process deployment.
     upgrade_database(app.state.auth_service.settings.database_url)
+    chat_store.recover()
     from reminders.service import get_service
     scheduler = get_service()
     scheduler.start()
@@ -160,6 +166,7 @@ app.include_router(profile_router)
 app.include_router(report_import_router)
 app.include_router(conversation_profile_router)
 app.include_router(preferences_router)
+app.include_router(care_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -303,6 +310,23 @@ def stage(job, name, label):
     job["stage"] = name
     job["label"] = label
     job["steps"].append({"name": name, "label": label})
+    active = chat_runtime.get()
+    if active:
+        active.stage=name
+        active.emit("stage", stage=name, label=label)
+
+
+def document_followup_text(previous, question, resolution, has_images):
+    """An explicitly selected document is data, not an inferred patient's history."""
+    document=previous.get('document_context') or {}
+    if has_images or not document.get('text'): return ''
+    if not re.search(r'(刚才|上一|前面|这张|第二).{0,16}(图|记录|报告)|(图|报告).{0,16}(刚才|上一|第二)',question): return ''
+    if re.search(r'另一|其他人|别人|换一',question): return ''
+    subject=resolution['subject']
+    if subject in {'multiple','other'}: return ''
+    if subject in {'self','father','mother'} and document.get('subject')!=subject: return ''
+    if subject in {'unknown','general'} and re.search(r'本人|我爸|我妈|父亲|母亲|爸爸|妈妈|孩子',question): return ''
+    return document['text']
 
 
 async def analyze(job, payload, session_id, memory_user_id):
@@ -357,6 +381,10 @@ async def analyze(job, payload, session_id, memory_user_id):
     if previous.get("patient") != patient or patient == "other":
         if not payload["images"]: observed = ""
     person_history = [row for row in previous.get("history", []) if row.get("patient", previous.get("patient")) == patient] if patient != "other" else []
+    document_text=document_followup_text(previous,question,patient_resolution,bool(payload['images']))
+    document_followup=bool(document_text)
+    if document_text: observed=document_text
+    document_context=({'text':new_observed,'subject':patient_resolution['subject']} if payload['images'] else previous.get('document_context'))
 
     if snapshot and patient != 'self':
         raise ValueError('本轮询问对象不是本人，请关闭本人档案授权后重新提交。')
@@ -371,6 +399,8 @@ async def analyze(job, payload, session_id, memory_user_id):
     if case["case_id"]:
         # Regenerate from current fact revisions; never reuse old OCR or assistant answers.
         observed = case["context"]
+        document_context=None
+        document_followup=False
         previous = {}
     limitations = list(dict.fromkeys([*image_check["warnings"], *case.get("warnings", [])]))
     retrieval=None
@@ -392,7 +422,7 @@ async def analyze(job, payload, session_id, memory_user_id):
                 'retrieval':retrieval['trace'],'retrieval_status':retrieval['status'],'generation':'not_called','invalid_citations':[],
                 'evidence_links':evidence_links(answer,sources)}
             history=previous.get('history',[])+[{'role':'user','content':evidence_query[:1200]},{'role':'assistant','content':answer[:1800]}]
-            contexts[session_id]={'image_observations':observed,'history':history[-6:],'updated':time.time()}
+            contexts[session_id]={'document_context':document_context,'image_observations':observed,'history':history[-6:],'updated':time.time()}
             return
     if not evidence_mode:
         direct = kb.search(retrieval_query(question, observed, None), top_k=10) if snapshot else []
@@ -425,6 +455,8 @@ async def analyze(job, payload, session_id, memory_user_id):
                      "聊天里口头说同意不等于开启档案开关，不得承诺凭口头授权读取档案；不得编造年龄、性别、疾病、过敏或用药。")
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
+        if document_followup:
+            enriched += "\n本轮只核对用户明确选中的上一张文档，不把图中数字归为当前用户或其他人物的病史。"
     if hits:
         enriched += "\n\n【本地检索参考；不相关的信息请忽略，不得将其当成用户病史】\n"
         enriched += "\n\n".join((f"[{i}] {hit['metadata']['title']}\n{hit['content']}" if evidence_mode else hit['content'][:750]) for i,hit in enumerate(hits,1))
@@ -518,7 +550,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         if not answer or result.get("error"):
             raise RuntimeError("Agent did not return a complete answer")
         answer, used_references = referenced(answer, references)
-        if patient_resolution["needs_confirmation"]:
+        if patient_resolution["needs_confirmation"] and not document_followup:
             clarification = "这次是在问你本人、父亲、母亲，还是其他人？" if patient_resolution["subject"] == "unknown" else "这次涉及多个人，想先讨论哪一位的情况？"
             answer = clarification + "\n\n" + answer
         saved_id = None
@@ -576,7 +608,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         if patient_resolution["corrects_previous"] or patient_resolution["confirms_previous"]:
             retained_history = retained_history[:-2] + person_history
         history = retained_history + [{"role":"user", "content":question[:1200], "patient":patient}, {"role":"assistant", "content":answer[:1800], "patient":patient}]
-        contexts[session_id] = {"image_observations": observed, "history": history[-6:], "patient":patient if patient != "other" else None, "last_saved_id":saved_id or (previous.get("last_saved_id") if previous.get("patient") == patient else None),
+        contexts[session_id] = {"document_context":document_context, "image_observations": observed, "history": history[-6:], "patient":patient if patient != "other" else None, "last_saved_id":saved_id or (previous.get("last_saved_id") if previous.get("patient") == patient else None),
                                 "last_saved_content":memory_question if saved_id else (previous.get("last_saved_content") if previous.get("patient") == patient else None), "awaiting_patient_confirmation":patient_resolution["subject"] == "unknown", "profile_scope":profile_scope(snapshot), "preference_scope":preference_scope, "updated":time.time()}
     finally:
         coordinator.short_term_memory.clear_session(session_id)
@@ -585,7 +617,7 @@ async def analyze(job, payload, session_id, memory_user_id):
             await client.client.close()
 
 
-def run_job(job, payload, session_id, memory_user_id):
+def _execute_job(job, payload, session_id, memory_user_id):
     job["status"] = "running"
     job["started"] = time.monotonic()
     try:
@@ -598,6 +630,11 @@ def run_job(job, payload, session_id, memory_user_id):
         if health["knowledge"] != "ready":
             raise ValueError("知识库尚未就绪，请检查服务日志后重试。")
         async def bounded():
+            control=controls.get(job.get('id'))
+            if control:
+                control['loop']=asyncio.get_running_loop()
+                control['task']=asyncio.current_task()
+                if control['cancel'].is_set(): raise asyncio.CancelledError()
             from reminders.context import bind_identity
             with bind_identity(job["owner_user_id"],session_id):
                 await asyncio.wait_for(analyze(job, payload, session_id, memory_user_id), timeout=180)
@@ -605,6 +642,7 @@ def run_job(job, payload, session_id, memory_user_id):
         job.update(status="completed", stage="completed", label="分析完成")
         try:
             from messenger import current_channel
+            if payload.get('channel','web') != 'web': return
             channel=current_channel(job['owner_user_id'])
             if channel=='qq':from qq.bridge import get_bridge
             else:from wechat.bridge import get_bridge
@@ -615,7 +653,8 @@ def run_job(job, payload, session_id, memory_user_id):
             logger.warning('Channel forwarding did not complete')
     except Exception as exc:
         logger.error("Web chat job failed ({})", type(exc).__name__)
-        message = str(exc) if isinstance(exc, ValueError) else "分析暂时未能完成，请重试；若持续失败，请检查服务端接口配置和网络。"
+        from storage.care_wallet import CarePointsError
+        message = str(exc) if isinstance(exc, (ValueError,CarePointsError)) else "分析暂时未能完成，请重试；若持续失败，请检查服务端接口配置和网络。"
         from openai import AuthenticationError, PermissionDeniedError, RateLimitError, APIConnectionError, APITimeoutError
         configuration = isinstance(exc, (AuthenticationError, PermissionDeniedError))
         if configuration:
@@ -623,6 +662,36 @@ def run_job(job, payload, session_id, memory_user_id):
         job.update(status="failed", stage="failed", label="分析未完成", error=message,
                    error_code="provider_configuration" if configuration else "analysis_failed",
                    retryable=isinstance(exc, (RateLimitError, APIConnectionError, APITimeoutError, TimeoutError)))
+
+
+def run_job(job, payload, session_id, memory_user_id):
+    if not job.get('_persistent'):
+        return _execute_job(job,payload,session_id,memory_user_id)
+    active=ChatRuntime(job['id'])
+    token=chat_runtime.set(active)
+    try:
+        chat_store.update(job['id'],'running')
+        if controls[job['id']]['cancel'].is_set(): raise asyncio.CancelledError()
+        _execute_job(job,payload,session_id,memory_user_id)
+    except asyncio.CancelledError:
+        job.update(status='cancelled',error='已停止生成；已发生的用量仍计入统计。')
+    except Exception as exc:
+        logger.error('Persistent chat job failed ({})',type(exc).__name__)
+        job.update(status='failed',error='分析未能完成，请稍后重试。')
+    finally:
+        try:
+            usage=usage_summary(job['id'])
+            from storage.care_wallet import view as wallet_view
+            usage['wallet']=wallet_view(job['owner_user_id'])
+            job['usage']=usage
+            if job.get('result') is not None: job['result']['usage']=usage
+            chat_store.finish(job['id'],job['status'],job.get('result'),job.get('error'),active.pending_contexts)
+            if job['status']=='completed':
+                contexts.cache.update(active.pending_contexts)
+            active.emit('done',status=job['status'],result=job.get('result'),error=job.get('error'),usage=usage)
+        finally:
+            controls.pop(job['id'],None)
+            chat_runtime.reset(token)
 
 
 @app.post("/api/chat", status_code=202)
@@ -672,9 +741,6 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     owner = user.id
     snapshot = ProfileStore(request.app.state.auth_service.sessions).snapshot(owner, revision) if use_profile else None
     if snapshot: snapshot=select_fields(snapshot,fields)
-    for key, old in list(contexts.items()):
-        if time.time() - old["updated"] > 3600:
-            contexts.pop(key, None)
     for key, old in list(jobs.items()):
         if time.time() - old["created"] > 3600 and old["status"] in {"completed", "failed"}:
             jobs.pop(key, None)
@@ -683,7 +749,15 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
     job_id = uuid.uuid4().hex
     job = {"id": job_id, "request_text": message.strip(), "owner_user_id": owner, "created": time.time(), "status": "queued", "stage": "queued",
            "label": "等待分析" if health["knowledge"] == "ready" else "知识库正在准备中", "steps": []}
+    try:
+        persisted_id, fresh = chat_store.create_turn(owner, chat_id, request_id, job_id,
+            {"message":message.strip(), "images":images, "case_id":case_id})
+    except ValueError as exc:
+        raise HTTPException(409,str(exc)) from exc
+    if not fresh: return {"job_id":persisted_id}
+    job['_persistent']=True
     jobs[job_id] = job
+    controls[job_id]={'cancel':Event()}
     executor.submit(run_job, job, {"message": message.strip(), "images": images, "remember": bool(__import__("config").MEM0_CONFIG.get("api_key")),
                                   "profile_snapshot": snapshot, "owner":owner, "chat_id":chat_id, "case_id":case_id, "request_id":request_id},
                     f"web-{owner}-{chat_id}", f"medix:{app.state.auth_service.settings.namespace}:user:{owner}")
@@ -693,9 +767,138 @@ async def chat(request: Request, user: CurrentUser = Depends(require_user)):
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str, user: CurrentUser = Depends(require_user)):
     job = jobs.get(job_id)
-    if not job or job["owner_user_id"] != user.id:
+    if job and job.get('_persistent'):
+        try: chat_store.turn(user.id,job_id)
+        except LookupError: raise HTTPException(404,'未找到这次分析。')
+    if not job:
+        try:
+            saved=chat_store.turn(user.id,job_id)
+            return {"id":job_id,"status":saved['status'],"result":saved['result'],"error":saved['error'],"usage":usage_summary(job_id)}
+        except LookupError: raise HTTPException(404,"未找到这次分析。")
+    if job["owner_user_id"] != user.id:
         raise HTTPException(404, "未找到这次分析，请重新提问。")
-    return {key: value for key, value in job.items() if key not in {"owner_user_id", "created", "started", "request_text"}}
+    return {key: value for key, value in job.items() if not key.startswith('_') and key not in {"owner_user_id", "created", "started", "request_text"}}
+
+
+@app.get('/api/conversations')
+def conversations(user: CurrentUser = Depends(require_user)):
+    return {'conversations':chat_store.list(user.id)}
+
+
+@app.get('/api/conversations/{chat_id}')
+def conversation(chat_id: str, user: CurrentUser = Depends(require_user)):
+    try:
+        value=chat_store.detail(user.id,chat_id)
+        for turn in value['turns']:
+            turn['usage']=usage_summary(turn['id'])
+            if turn.get('result') is not None: turn['result']['usage']=turn['usage']
+            # A bounded event page is sufficient for active reconnection; finished
+            # interrupted drafts are reconstructed without loading all events in one query.
+            events=[]; cursor=0
+            while True:
+                batch=chat_store.events(turn['id'],cursor)
+                if not batch: break
+                events.extend(data for _,data in batch); cursor=batch[-1][0]
+            draft=''; draft_call=''; label='正在恢复生成'
+            for event in events:
+                if event['type']=='stage': label=event['label']
+                if event['type']=='draft_start': draft=''; draft_call=event['call_id']
+                if event['type']=='draft_clear' and event['call_id']==draft_call: draft=''
+                if event['type']=='delta' and event['call_id']==draft_call: draft+=event['text']
+            turn['label']=label
+            turn['draft']=draft
+            turn['draft_call']=draft_call
+            turn['cursor']=cursor
+        return value
+    except LookupError: raise HTTPException(404,'未找到会话。')
+
+
+@app.get('/api/conversations/{chat_id}/usage')
+def conversation_usage(chat_id: str, user: CurrentUser = Depends(require_user)):
+    from core.chat_runtime import aggregate_usage
+    try: chat_store.require(user.id,chat_id)
+    except LookupError: raise HTTPException(404,'未找到会话。')
+    return aggregate_usage(user.id,chat_id)
+
+
+@app.get('/api/wallet')
+def account_wallet(user: CurrentUser = Depends(require_user)):
+    from storage.care_wallet import view
+    return view(user.id)
+
+
+@app.get('/api/wallet/history')
+def wallet_history(offset: int = 0, user: CurrentUser = Depends(require_user)):
+    from storage.care_wallet import history
+    if not 0 <= offset <= 1000000: raise HTTPException(400,'记录页码无效。')
+    return history(user.id,offset=offset)
+
+
+@app.get('/api/usage')
+def account_usage(user: CurrentUser = Depends(require_user)):
+    from core.chat_runtime import aggregate_usage
+    return aggregate_usage(user.id)
+
+
+@app.patch('/api/conversations/{chat_id}')
+async def rename_conversation(chat_id: str, request: Request, user: CurrentUser = Depends(require_user)):
+    try:
+        data=await request.json(); title=data.get('title')
+        if not isinstance(title,str) or not 1<=len(title.strip())<=80: raise ValueError('标题应为1至80字。')
+        chat_store.rename(user.id,chat_id,title.strip())
+        return {'ok':True}
+    except LookupError: raise HTTPException(404,'未找到会话。')
+    except (ValueError,AttributeError): raise HTTPException(400,'标题应为1至80字。')
+
+
+@app.delete('/api/conversations/{chat_id}')
+def delete_conversation(chat_id: str, user: CurrentUser = Depends(require_user)):
+    try:
+        chat_store.delete(user.id,chat_id)
+        contexts.cache.pop(f'web-{user.id}-{chat_id}',None)
+        return {'ok':True}
+    except LookupError: raise HTTPException(404,'未找到会话。')
+    except ValueError as exc: raise HTTPException(409,str(exc))
+
+
+@app.post('/api/jobs/{job_id}/cancel')
+def cancel_job(job_id: str, user: CurrentUser = Depends(require_user)):
+    try: saved=chat_store.turn(user.id,job_id)
+    except LookupError: raise HTTPException(404,'未找到这次分析。')
+    control=controls.get(job_id)
+    if control:
+        control['cancel'].set()
+        loop,task=control.get('loop'),control.get('task')
+        if loop and task and not loop.is_closed(): loop.call_soon_threadsafe(task.cancel)
+    return {'status':saved['status'],'cancel_requested':bool(control)}
+
+
+@app.get('/api/jobs/{job_id}/events')
+async def job_events(job_id: str, request: Request, after: int = 0, user: CurrentUser = Depends(require_user)):
+    try: chat_store.turn(user.id,job_id)
+    except LookupError: raise HTTPException(404,'未找到这次分析。')
+    try: cursor=max(0,after,int(request.headers.get('last-event-id','0')))
+    except ValueError: raise HTTPException(400,'事件编号无效。')
+    async def events():
+        nonlocal cursor
+        heartbeat=time.monotonic()
+        while not await request.is_disconnected():
+            # Re-check account/session revocation while a long SSE connection is open.
+            try:
+                app.state.auth_service.authenticate(request.cookies.get(app.state.auth_service.settings.cookie_name))
+                turn=chat_store.turn(user.id,job_id)
+            except (HTTPException,LookupError): return
+            batch=chat_store.events(job_id,cursor)
+            for seq,event in batch:
+                cursor=seq
+                yield f'id: {seq}\ndata: {json.dumps(event,ensure_ascii=False)}\n\n'
+            if not batch and turn['status'] not in ('queued','running'):
+                yield 'data: '+json.dumps({'type':'done','status':turn['status'],'result':turn['result'],'error':turn['error'],'usage':usage_summary(job_id)},ensure_ascii=False)+'\n\n'
+                return
+            if time.monotonic()-heartbeat>=10:
+                yield ': heartbeat\n\n'; heartbeat=time.monotonic()
+            await asyncio.sleep(0.15)
+    return StreamingResponse(events(),media_type='text/event-stream',headers={'Cache-Control':'no-store','X-Accel-Buffering':'no'})
 
 
 @app.get("/api/cases")
@@ -831,11 +1034,11 @@ async def memory_demo(request: Request, user: CurrentUser = Depends(memory_accou
 def answer_from_channel(channel):
     """Answer one phone message on the same worker as the web chat."""
 
-    def reply(user_id, session_id, message):
+    def reply(user_id, session_id, message, message_id=None):
         box = {}
 
         def work():
-            _answer_phone(box, channel, user_id, session_id, message)
+            _answer_phone(box, channel, user_id, session_id, message, message_id)
 
         executor.submit(work).result(timeout=200)
         if "error" in box:
@@ -845,25 +1048,44 @@ def answer_from_channel(channel):
     return reply
 
 
-def _answer_phone(box, channel, user_id, session_id, message):
-    job = {"steps": [], "started": time.monotonic(), "owner_user_id":user_id}
-    payload = {"message": message, "images": [], "remember": bool(__import__("config").MEM0_CONFIG.get("api_key")), "channel": channel, "owner":user_id, "chat_id":session_id, "request_id":str(uuid.uuid4()), "case_id":"", "profile_snapshot":None}
+def _answer_phone(box, channel, user_id, session_id, message, message_id=None):
+    """Bound channel messages share persistence, usage, reservations and settlement."""
     try:
+        if channel not in {'qq','wechat'}: raise ValueError('聊天渠道无效。')
         from auth.models import User
         with app.state.auth_service.sessions() as db:
             row=db.get(User,user_id)
             if not row or not row.is_active:raise ValueError("账号已停用或注销。")
-        if health["knowledge"] != "ready":
-            raise ValueError("知识库尚未就绪，请稍后再试。")
-        from reminders.context import bind_identity
-        with bind_identity(user_id, session_id):
-            async def bounded():
-                await asyncio.wait_for(analyze(job, payload, session_id, user_id), timeout=180)
-            asyncio.run(bounded())
-        answer = (job.get("result") or {}).get("answer")
+        from messenger import load_channel_state
+        binding=load_channel_state(channel)
+        if not binding or binding.get('owner_browser') != user_id:
+            raise ValueError('聊天渠道已断开，请回到 MediX 重新连接。')
+        chat_id=str(uuid.uuid5(uuid.NAMESPACE_URL,f'medix:{user_id}:{channel}'))
+        request_id=str(uuid.uuid5(uuid.NAMESPACE_URL,f'medix:{user_id}:{channel}:{message_id}')) if message_id else str(uuid.uuid4())
+        turn_id=uuid.uuid4().hex
+        turn_id,fresh=chat_store.create_turn(user_id,chat_id,request_id,turn_id,
+            {'message':message,'images':[],'case_id':'','channel':channel})
+        if fresh:
+            job={'id':turn_id,'created':time.time(),'status':'queued','steps':[],
+                 'owner_user_id':user_id,'_persistent':True}
+            payload={'message':message,'images':[],'remember':bool(__import__('config').MEM0_CONFIG.get('api_key')),
+                     'channel':channel,'owner':user_id,'chat_id':chat_id,'request_id':request_id,
+                     'case_id':'','profile_snapshot':None}
+            controls[turn_id]={'cancel':Event()}
+            # Existing phone context is read once when upgrading to managed turns.
+            key=f'web-{user_id}-{chat_id}'
+            if key not in contexts and session_id in contexts:
+                contexts[key]=contexts[session_id]
+                del contexts[session_id]
+            run_job(job,payload,key,user_id)
+        else:
+            job=chat_store.turn(user_id,turn_id)
+        if job['status'] != 'completed': raise ValueError(job.get('error') or '这条消息正在处理，请稍后查看。')
+        answer = (job.get('result') or {}).get('answer')
         if not answer:
             raise RuntimeError("empty answer")
-        box["answer"] = answer
+        box['answer']=answer
+        box['usage']=usage_summary(turn_id)
     except Exception as exc:
         box["error"] = exc
 

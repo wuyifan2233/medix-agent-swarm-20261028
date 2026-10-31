@@ -9,11 +9,12 @@ class Base(DeclarativeBase):
     pass
 
 
-def make_database(url):
+def make_database(url, *, poolclass=None):
     parsed = make_url(url)
     if parsed.drivername.startswith("sqlite") and parsed.database not in {None, "", ":memory:"}:
         Path(parsed.database).parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 15}
+    options = {"poolclass": poolclass} if poolclass is not None else {}
+    engine = create_engine(url, **options, connect_args={"check_same_thread": False, "timeout": 15}
                            if parsed.drivername.startswith("sqlite") else {})
     if parsed.drivername.startswith("sqlite"):
         @event.listens_for(engine, "connect")

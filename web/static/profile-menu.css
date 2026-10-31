@@ -31,3 +31,9 @@
 
 .profile-trigger:focus,.profile-trigger:focus-visible{outline:none;box-shadow:none}
 .profile-trigger[data-keyboard-focus="true"]:focus-visible{outline:2px solid #9aa9f6;outline-offset:2px}
+
+/* Account usage shares the existing compact menu row. */
+.profile-usage { min-width: 0; }
+.profile-usage > span { flex-shrink: 0; }
+.profile-usage > strong { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; color: #939db0; }
+.profile-usage svg { flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
