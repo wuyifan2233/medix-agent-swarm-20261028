@@ -7,6 +7,8 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
+from qq.snowluma import load_local_env
+load_local_env()
 os.environ.setdefault("HF_HOME", str(ROOT.parent / ".medix-model-cache"))
 os.chdir(ROOT)
 

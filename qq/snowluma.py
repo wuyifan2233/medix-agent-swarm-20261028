@@ -21,7 +21,24 @@ ROOT = Path(__file__).resolve().parents[1]
 WEBUI = "http://127.0.0.1:5099"
 
 
+def load_local_env(path=None):
+    """Load config/local.env without overriding variables already set in the process."""
+    env_file = Path(path) if path else ROOT / "config" / "local.env"
+    if not env_file.is_file():
+        return
+    for raw in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 def install_dir():
+    load_local_env()
     override = os.environ.get("MEDIX_SNOWLUMA_HOME")
     if override:
         return Path(override)

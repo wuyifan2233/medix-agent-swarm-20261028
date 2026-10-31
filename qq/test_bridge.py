@@ -12,7 +12,7 @@ os.environ["MEDIX_WECHAT_DISABLE"] = "1"
 from reminders.store import ReminderStore
 from qq.bridge import QQBridge, reset_bridge
 from qq.onebot import accept_event, fingerprint, loopback_url
-from qq.snowluma import read_endpoints
+from qq.snowluma import load_local_env, read_endpoints
 
 
 class FakeOneBot:
@@ -163,6 +163,30 @@ class OneBotAddressTests(unittest.TestCase):
             "httpServers": [{"host": "0.0.0.0", "port": 3000, "accessToken": "x"}],
             "wsServers": [{"host": "127.0.0.1", "port": 3001, "accessToken": "y"}],
         }}))
+
+    def test_local_env_does_not_override_the_process(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(folder, ignore_errors=True))
+        path = os.path.join(folder, "local.env")
+        with open(path, "w", encoding="utf-8") as env_file:
+            env_file.write("MEDIX_SNOWLUMA_HOME=C:/from-file\nMEDIX_QQ_EXE=C:/QQ.exe\n")
+        previous_home = os.environ.get("MEDIX_SNOWLUMA_HOME")
+        previous_exe = os.environ.get("MEDIX_QQ_EXE")
+        os.environ["MEDIX_SNOWLUMA_HOME"] = "C:/already-set"
+        os.environ.pop("MEDIX_QQ_EXE", None)
+        try:
+            load_local_env(path)
+            self.assertEqual(os.environ["MEDIX_SNOWLUMA_HOME"], "C:/already-set")
+            self.assertEqual(os.environ["MEDIX_QQ_EXE"], "C:/QQ.exe")
+        finally:
+            if previous_home is None:
+                os.environ.pop("MEDIX_SNOWLUMA_HOME", None)
+            else:
+                os.environ["MEDIX_SNOWLUMA_HOME"] = previous_home
+            if previous_exe is None:
+                os.environ.pop("MEDIX_QQ_EXE", None)
+            else:
+                os.environ["MEDIX_QQ_EXE"] = previous_exe
 
     def test_only_loopback_onebot_addresses_are_used(self):
         self.assertEqual(loopback_url("http://127.0.0.1:3000", {"http"}), "http://127.0.0.1:3000")

@@ -62,3 +62,4 @@ memory/agents/
 .medix-model-cache/
 .env.*
 !.env.example
+config/local.env
