@@ -1,76 +1,57 @@
-# 个性化技术流程 v4：注册时一次建档
+# 个性化技术流程 v4：注册基本信息
 
-更新日期：2026-10-31；分支feature/health-profile-evolution。
+更新日期：2026-10-31；分支 `feature/health-profile-evolution`。
 
 ## 用户流程
 
-注册账号时填写年龄、性别、身高、体重，可留空或选择不愿提供；用户勾选核对声明后注册。
-注册成功后再登录，点击“我的基本信息”只读查看注册记录。每轮主动选择是否参考及字段范围。
-不询问病史、过敏、用药，不再提供病历提取、聊天追加、编辑或恢复入口。
+注册时仅填写出生年月和性别，均可不提供。注册后登录，通过“我的基本信息”只读查看；问答默认参考已有信息，不再询问授权、追问或更新档案。回答偏好独立编辑与启用。
 
 ```mermaid
 flowchart TD
-  A[填写账号与身体基本信息] --> B[选择提供或不愿提供并核对确认]
-  B --> C[同事务创建用户和只读注册记录]
-  C --> D[登录后查看基本信息]
-  D --> E{本轮是否授权参考}
-  E -->|否| F[不注入注册记录]
-  E -->|是| G[校验账号与版本 裁剪字段]
-  G --> H[标记注册时间并注入历史背景]
-  F --> I[检索与Agent分析]
-  H --> I
-  I --> J[按启用的表达偏好整理回答]
-  J --> K[仅返回回答 不写回身体基本信息]
+  A[填写账号、出生年月和性别] --> B[校验格式及出生月份范围]
+  B --> C[同事务创建用户与注册记录]
+  C --> D[登录与发起提问]
+  D --> E{当前账号有注册记录}
+  E -->|有| F[仅读取出生年月和性别]
+  E -->|无| G[不注入基本信息]
+  F --> H[加入注册时间、当前日期与背景约束]
+  H --> I[检索和Agent分析]
+  G --> I
+  I --> J[按启用的称呼、语气及详略整理]
+  J --> K[直接回答，不写回档案]
 ```
 
-## 实现与边界
+## 实现
 
-- personalization/body_schema.py：注册输入校验，不依赖认证模块，避免循环导入。
-- auth/schemas.py、router.py：注册接口接收并要求basic_profile及主动确认。
-- auth/service.py：flush取得用户ID，同事务插入用户与注册记录；重复账号失败回滚。
-- personalization/models.py：RegistrationProfile独立模型，user_id为主键和外键，一账号一条记录。
-- 迁移20261031_05：仅创建registration_profiles，不迁入、删除或覆盖旧病情档案。
-- personalization/registration_profile.py：仅挂载GET /api/profile，提供只读存储适配、授权裁剪和上下文构造。
-- web/app.py：问答读取改为注册记录，停止挂载旧档案、提取及对话更新路由。
-- web/static/login.js：注册表单增加四项和核对声明，登录模式隐藏这些字段。
-- web/static/registration-profile.js：只读弹窗、记录日期和逐轮字段授权；替代原编辑脚本。
-- web/static/app.js：移除回答后的档案写入卡片。表达偏好仍独立可改。
+- `personalization/body_schema.py`：出生年月格式及范围校验、性别枚举，拒绝额外字段。
+- `auth/schemas.py`、`auth/router.py`：公开注册要求basic_profile对象，不要求核对勾选。
+- `auth/service.py`：flush取得用户ID，同事务写入用户与注册记录，失败回滚。
+- `personalization/models.py` 与迁移 `20261031_05`：独立registration_profiles表，一账号一条记录。
+- `personalization/registration_profile.py`：只读GET接口、按账号读取、白名单过滤、兼容字段裁剪、检索与上下文构造。
+- `web/app.py`：默认读取当前账号基本信息，停止挂载旧档案写入路由。
+- `personalization/answer_policy.py`、`reply_render.py`：统一直接回答约束，偏好整理不得重新添加追问。
+- `web/static/login.js`：仅在注册模式显示出生年月与性别，出生年月使用month输入控件。
+- `web/static/registration-profile.js`：两项只读展示；`web/static/app.js`：回答中显示引用信息，不提供档案更新入口。
 
-## 时间、隐私与旧账号
+## 边界与兼容
 
-年龄、身高、体重均为注册时自述，不代表当前数值，不能据此断言疾病或调整为当前状态。
-本轮明确描述优先，模型可以询问当下数值但不能保存更新；不提供字段视为未知。
-每轮授权默认关闭，未授权字段不进入检索及档案上下文；本人咨询限制和账号隔离保持生效。
-旧账号显示“未在注册时记录基本信息”，不自动从病史提取或增加登录后补填，旧数据保留在原表。
-如后续需要旧用户一次补录、纠错或删除流程，应另行明确需求，本次不自动扩展。
+出生年月不是注册时年龄；允许结合当前日期估算年龄，但缺少出生日，不编造具体生日。基本信息不能证明当前病情。本轮明确询问他人或假设场景时不得套用本人背景。
+
+旧记录只保留性别可读取，历史年龄、身高和体重被读取白名单排除，不从年龄反推出生年月；原始数据仍保留在数据库。不从旧病史迁入，不新增补填或更新接口。
+
+未提供信息视为未知；回答说明适用条件，不主动要求补充或确认。保留必要的风险及紧急就医提示。本轮自述不写入档案，也不声称已记录。
+
+接口保留use_profile=false及两字段裁剪兼容能力，页面默认使用。上下文按账号和范围隔离；有基本信息或启用偏好时暂停云端记忆。
 
 ## 验证
 
 ```powershell
-E:/xiaoyitraining/.medix-venv/Scripts/python.exe -m unittest personalization.test_registration_profile.RegistrationProfileTests -q
+E:/xiaoyitraining/.medix-venv/Scripts/python.exe -m unittest personalization.test_registration_profile.RegistrationProfileTests personalization.test_preferences.FinalPresentationTests -q
 node --check web/static/login.js
 node --check web/static/registration-profile.js
 node --check web/static/app.js
 ```
 
-覆盖注册原子性、重复账号、字段范围、拒绝病情字段、核对要求、全不提供、账号隔离、只读接口、旧账号不迁入及聊天授权字段裁剪。
-旧档案演进的写接口已退役，其测试预期与本版不兼容，不能把旧全量结果当成本版验收。
-页面验收：注册模式只含一般情况；登录模式不显示注册问题；注册成功后查看记录日期及四项只读值；问答结束无更新入口。
+覆盖原子注册、字段校验、旧字段拒绝、可全部不提供、账号隔离、只读接口、旧字段读取过滤、默认引用与范围裁剪，以及偏好整理。浏览器核对注册表单只含出生年月和性别、登录模式隐藏字段。
 
-
-## 默认参考更新
-
-注册表单已删除核对确认勾选及“不询问疾病或用药”文案；basic_profile不再接收acknowledged。
-已填写的注册基本信息默认用于个性化回答，页面不再提供逐轮开关或字段选择。POST /api/chat省略use_profile时默认为true，profile_revision默认1，profile_fields默认为四项。
-旧账号无注册记录时正常回答且不注入档案。接口兼容显式use_profile=false或字段裁剪；本轮明确询问他人或假设情况时，不得将本人背景套用其中。
-注册信息保持只读，回答偏好仍需要独立保存和启用。本节取代前文逐轮授权、主动确认相关描述。
-
-问答行为补充：默认直接参考当前账号已有注册基本信息，不询问是否授权或要求开启档案。旧账号无记录时按未知回答，不要求返回注册补填；不主动追问或要求补充情况。
-
-
-## 直接回答与档案冻结
-
-问答不主动追问、索取补充资料或重复确认；资料不足时说明未知项、判断范围和适用条件，不猜测缺失信息。必要风险及紧急就医提示保留。
-统一answer_policy约束同时用于问答上下文、请求内Worker系统提示及最终表达整理，防止偏好整理重新添加追问。
-本轮自述只参与回答，不新增、补全或更新注册档案，不声称已记录；注册后只读接口约束保持生效。
-用户明确要求生成问卷或题目属于完成用户任务，不视为主动追问。模型行为仍需实际验收，自动测试验证约束传递及写入接口隔离。
+旧档案演进写接口已退役，其测试预期与本版契约不兼容。模型实际输出仍需端到端验收，单元测试验证约束传递及数据隔离。

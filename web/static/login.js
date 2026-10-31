@@ -3,7 +3,8 @@
   const el = id => document.getElementById(id);
   const dialog = el('authDialog');
   const basics=document.createElement('fieldset');basics.id='registerBasics';basics.hidden=true;
-  basics.innerHTML='<legend>身体基本信息</legend><p>可留空或选择不愿提供。填写的信息默认用于个性化回答，保存后只读。</p><div class="register-basics-grid"><label>注册时年龄（岁）<input id="regAge" type="number" min="0" max="130" step="1" placeholder="不愿提供可留空"></label><label>性别<select id="regSex"><option value="undisclosed">不愿提供</option><option value="female">女</option><option value="male">男</option></select></label><label>注册时身高（cm）<input id="regHeight" type="number" min="30" max="250" step="0.1" placeholder="不愿提供可留空"></label><label>注册时体重（kg）<input id="regWeight" type="number" min="1" max="400" step="0.1" placeholder="不愿提供可留空"></label></div>';
+  basics.innerHTML='<legend>身体基本信息</legend><p>可留空或选择不愿提供。填写的信息默认用于个性化回答，保存后只读。</p><div class="register-basics-grid"><label>出生年月<input id="regBirthMonth" type="month"></label><label>性别<select id="regSex"><option value="undisclosed">不愿提供</option><option value="female">女</option><option value="male">男</option></select></label></div>';
+  const now=new Date();basics.querySelector('#regBirthMonth').max=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   el('authForm').insertBefore(basics,el('feedback'));
   let registering = false, busy = false, generation = 0, requestController = null;
   const updatePasswordHints = MedixPasswordPolicy.attachHints(el('password'), () => registering);
@@ -97,7 +98,7 @@
     el('submitButton').textContent = isRegister ? '创建中…' : '登录中…'; el('feedback').textContent = '';
     try {
       const payload = {username:el('username').value, password};
-      if(isRegister){const number=id=>el(id).value===''?null:Number(el(id).value);payload.basic_profile={age:number('regAge'),sex:el('regSex').value,height_cm:number('regHeight'),weight_kg:number('regWeight')};}
+      if(isRegister){payload.basic_profile={birth_month:el('regBirthMonth').value || null,sex:el('regSex').value};}
       const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/login', {
         method:'POST', body:JSON.stringify(payload), signal:requestController.signal
       });
