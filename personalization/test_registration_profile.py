@@ -28,6 +28,13 @@ class RegistrationProfileTests(unittest.TestCase):
         for change in [{'age':True},{'height_cm':999},{'weight_kg':0},{'weight_kg':True},{'conditions':[]}]:
             self.assertEqual(self.register(**change).status_code,422)
         self.assertEqual(self.register(age=None,sex='undisclosed',height_cm=None,weight_kg=None).status_code,201)
+    def test_question_generation_receives_no_followup_policy(self):
+        captured=ProfileTests.capture_analysis(self,self.a.id,None)
+        self.assertIn('不主动追问',captured['prompt'])
+        self.assertIn('不要求用户补充',captured['prompt'])
+        self.assertIn('不得主动新增、更新、补全用户档案',captured['prompt'])
+        self.assertEqual(self.client.get('/api/profile').json()['revision'],0)
+
     def test_legacy_records_not_reused(self):
         self.assertFalse(self.client.get('/api/profile').json()['usable'])
         self.assertEqual(self.client.get('/api/profile').json()['revision'],0)

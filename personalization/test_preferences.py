@@ -81,6 +81,8 @@ class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result[1],'applied');self.assertTrue(result[0].startswith('新昵称，'))
         self.assertIn('300字',request['messages'][0]['content'])
         self.assertIn('关键风险',request['messages'][0]['content'])
+        self.assertIn('不主动追问',request['messages'][0]['content'])
+        self.assertIn('不得主动新增、更新、补全用户档案',request['messages'][0]['content'])
         self.assertIn('原回答',request['messages'][1]['content'])
         _,long_request=await self.run_render('{"answer":"完整解释。"}',detail='detailed')
         self.assertIn('700—1000字',long_request['messages'][0]['content'])

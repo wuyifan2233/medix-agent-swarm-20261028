@@ -39,6 +39,7 @@ from personalization.registration_profile import profile_context, retrieval_quer
 from personalization.registration_profile import select_fields, FIELDS as PROFILE_FIELDS
 from personalization.preferences import router as preferences_router, load_preferences, preference_context
 from personalization.reply_render import render_reply
+from personalization.answer_policy import ANSWER_POLICY
 
 # Windows registry MIME mappings can mark .js as text/plain; nosniff blocks it.
 mimetypes.init()
@@ -248,7 +249,7 @@ async def analyze(job, payload, session_id, memory_user_id):
         enriched += ("\n\n【本轮没有可用的注册基本信息】不得声称已读取保存的档案。"
                      "根据用户本轮及允许的历史消息、附件回答；公共资料或助手推测不能当作用户病史。"
                      "注册基本信息默认参考，无须询问是否允许使用、是否开启档案或要求重复确认。"
-                     "缺少的基本信息视为未知，不要求用户返回注册页补填；仅在确实影响当前问题时询问必要信息。"
+                     "缺少的基本信息视为未知，不要求用户返回注册页补填；缺失信息直接视为未知，不再主动追问。"
                      "不得编造年龄、性别、身高、体重、疾病、过敏或用药。")
     if observed:
         enriched += "\n\n【附图的客观读取结果，包含不确定性】\n" + observed
@@ -257,6 +258,8 @@ async def analyze(job, payload, session_id, memory_user_id):
         enriched += "\n\n".join(hit["content"][:750] for hit in hits)
     enriched += "\n\n请优先直接回答用户问题。若只要求转录或总结图片，不主动展开诊断或治疗。不要编造诊断概率、缺失数值或图片中未显示的信息。"
     enriched += preference_context(preferences) if preferences_used else "\n回答总长尽量不超过600字。"
+
+    enriched += ANSWER_POLICY
 
     stage(job, "agents", "正在由专业助手分析与整合")
     # The coordinator saves its input in Mem0. Do not duplicate profile data there.
@@ -267,6 +270,9 @@ async def analyze(job, payload, session_id, memory_user_id):
     coordinator.short_term_memory.clear_session(session_id)
     trace = []
     for worker in coordinator.worker_pool:
+        system_prompt = getattr(worker, "get_system_prompt", None)
+        if system_prompt:
+            worker.get_system_prompt = lambda original=system_prompt: original() + ANSWER_POLICY
         original = worker.skill_registry.execute
         async def tracked(name, _original=original, **arguments):
             entry = {"name": name, "label": LABELS.get(name, name), "status": "running"}
