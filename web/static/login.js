@@ -3,7 +3,7 @@
   const el = id => document.getElementById(id);
   const dialog = el('authDialog');
   const basics=document.createElement('fieldset');basics.id='registerBasics';basics.hidden=true;
-  basics.innerHTML='<legend>身体基本信息</legend><p>可留空或选择不愿提供。填写的信息默认用于个性化回答，保存后只读。</p><div class="register-basics-grid"><label>出生年月<input id="regBirthMonth" type="month"></label><label>性别<select id="regSex"><option value="undisclosed">不愿提供</option><option value="female">女</option><option value="male">男</option></select></label></div>';
+  basics.innerHTML='<legend>身体基本信息</legend><p>可留空或选择不愿提供。填写的信息默认用于个性化回答，保存后只读。</p><div class="register-basics-grid"><label class="register-name">姓名<input id="regName" type="text" maxlength="50" autocomplete="name" placeholder="请输入姓名（可留空）"></label><label>出生年月<input id="regBirthMonth" type="month"></label><label>性别<select id="regSex"><option value="undisclosed">不愿提供</option><option value="female">女</option><option value="male">男</option></select></label></div>';
   const now=new Date();basics.querySelector('#regBirthMonth').max=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   el('authForm').insertBefore(basics,el('feedback'));
   let registering = false, busy = false, generation = 0, requestController = null;
@@ -98,7 +98,7 @@
     el('submitButton').textContent = isRegister ? '创建中…' : '登录中…'; el('feedback').textContent = '';
     try {
       const payload = {username:el('username').value, password};
-      if(isRegister){payload.basic_profile={birth_month:el('regBirthMonth').value || null,sex:el('regSex').value};}
+      if(isRegister){payload.basic_profile={name:el('regName').value.trim() || null,birth_month:el('regBirthMonth').value || null,sex:el('regSex').value};}
       const response = await MedixAuth.raw(isRegister ? '/api/auth/register' : '/api/auth/login', {
         method:'POST', body:JSON.stringify(payload), signal:requestController.signal
       });

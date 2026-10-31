@@ -5,6 +5,15 @@ from pydantic import Field,field_validator
 from personalization.schemas import StrictModel
 
 class BodyInfo(StrictModel):
+    name: str | None = Field(default=None,max_length=50,strict=True)
+
+    @field_validator('name')
+    @classmethod
+    def valid_name(cls,value):
+        if value is None:return None
+        if any(ord(c)<32 or ord(c)==127 for c in value):raise ValueError('姓名不能包含控制字符')
+        return value.strip() or None
+
     birth_month: str | None = Field(default=None,strict=True)
     sex: Literal['female','male','undisclosed'] = 'undisclosed'
 

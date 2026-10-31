@@ -2,7 +2,7 @@
  const tools=document.createElement('section');tools.className='health-profile-tools';
  tools.innerHTML='<button type="button" id="hpOpen">我的基本信息</button><small id="hpStatus">登录后查看基本信息</small>';
  document.querySelector('.composer-region').prepend(tools);
- const fields={birth_month:'出生年月',sex:'性别'};
+ const fields={name:'姓名',birth_month:'出生年月',sex:'性别'};
  const dialog=document.createElement('dialog');dialog.className='health-profile-dialog';dialog.id='registrationProfileDialog';dialog.setAttribute('aria-labelledby','baselineTitle');
  dialog.innerHTML='<div class="hp-heading"><h2 id="baselineTitle">注册时身体基本信息</h2><button type="button" id="baselineClose">关闭</button></div><p>仅记录注册时的一般情况，不包含病情、过敏或用药。保存后不再更新，不会因对话而改变。</p><p id="baselineStamp"></p><dl id="baselineValues"></dl><p id="baselineFeedback" role="status"></p>';document.body.append(dialog);
  const use={checked:true,disabled:false},status=tools.querySelector('#hpStatus');let record=null,actor=null,epoch=0,busy=false;

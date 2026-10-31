@@ -10,7 +10,7 @@ class RegistrationProfileTests(unittest.TestCase):
     tearDown=ProfileTests.tearDown
     client_for=ProfileTests.client_for
     def register(self,username='newperson',**changes):
-        return self.client.post('/api/auth/register',json={'username':username,'password':'Test-Password2026!','basic_profile':{'birth_month':'1995-06','sex':'female',**changes}})
+        return self.client.post('/api/auth/register',json={'username':username,'password':'Test-Password2026!','basic_profile':{'name':'测试甲','birth_month':'1995-06','sex':'female',**changes}})
     def test_registration_is_atomic_private_and_immutable(self):
         result=self.register();self.assertEqual(result.status_code,201,result.text)
         client=self.client_for('newperson')
@@ -25,7 +25,7 @@ class RegistrationProfileTests(unittest.TestCase):
         finally:client.close()
     def test_registration_fields_and_bounds(self):
         self.assertEqual(self.client.post('/api/auth/register',json={'username':'missing','password':'Test-Password2026!'}).status_code,422)
-        for change in [{'birth_month':'2999-01'},{'birth_month':'1995-13'},{'birth_month':'1995-06-01'},{'height_cm':165},{'weight_kg':55},{'age':30},{'conditions':[]}]:
+        for change in [{'name':'甲'*51},{'name':123},{'name':'甲\n乙'},{'birth_month':'2999-01'},{'birth_month':'1995-13'},{'birth_month':'1995-06-01'},{'height_cm':165},{'weight_kg':55},{'age':30},{'conditions':[]}]:
             self.assertEqual(self.register(**change).status_code,422)
         self.assertEqual(self.register(birth_month=None,sex='undisclosed').status_code,201)
     def test_question_generation_receives_no_followup_policy(self):
@@ -71,6 +71,29 @@ class RegistrationProfileTests(unittest.TestCase):
             row.data={'age':30,'sex':'female','height_cm':165,'weight_kg':55};db.commit()
             owner=row.user_id
         profile=BaselineStore(self.sessions).load(owner)
-        self.assertEqual(profile['data'],{'birth_month':None,'sex':'female'})
+        self.assertEqual(profile['data'],{'name':None,'birth_month':None,'sex':'female'})
         self.assertNotIn('height_cm',profile_context(profile)+retrieval_query('问题','',profile))
         self.assertNotIn('weight_kg',profile_context(profile)+retrieval_query('问题','',profile))
+
+    def test_account_profiles_persist_across_login_and_database_reopen(self):
+        from storage.database import make_database
+        first=self.register(username='personone',name='测试甲',birth_month='1990-01',sex='male').json()
+        second=self.register(username='persontwo',name='测试乙',birth_month='2000-02',sex='female').json()
+        expected={}
+        for username in ['personone','persontwo']:
+            client=self.client_for(username)
+            try:expected[username]=client.get('/api/profile').json()
+            finally:client.close()
+        engine,sessions=make_database(self.url)
+        try:
+            self.assertEqual(BaselineStore(sessions).load(first['id']),expected['personone'])
+            self.assertEqual(BaselineStore(sessions).load(second['id']),expected['persontwo'])
+        finally:engine.dispose()
+        for username,othername in [('personone','测试乙'),('persontwo','测试甲')]:
+            client=self.client_for(username)
+            try:
+                result=client.get('/api/profile',params={'user_id':second['id'] if username=='personone' else first['id']})
+                self.assertEqual(result.json(),expected[username])
+                self.assertNotIn(othername,result.text)
+            finally:client.close()
+        self.assertNotIn('测试甲',retrieval_query('问题','',expected['personone']))
