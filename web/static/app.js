@@ -978,7 +978,6 @@ async function runMemoryDemo(scenario) {
   } catch(error) { toast(error.message); }
   finally { state.busy = false; updateComposer(); }
 }
-$('memoryDemo').onclick = () => { closeSidebar(); runMemoryDemo('related'); };
 
 window.addEventListener("medix-signout",()=>{state.demo=false;state.editMemory=null;state.sourceRecord=null;["memoryEditDialog","sourceDialog","infoDialog"].forEach(id=>{if($(id).open)$(id).close();});});
 
