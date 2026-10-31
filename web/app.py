@@ -330,6 +330,14 @@ def document_followup_text(previous, question, resolution, has_images):
 
 
 async def analyze(job, payload, session_id, memory_user_id):
+    from web.social import social_reply
+    greeting = social_reply(payload.get('message', '')) if not payload.get('images') else None
+    if greeting:
+        job['result'] = {'answer': greeting, 'sources': [], 'tools': [], 'agents': [],
+                         'swarm_enabled': False, 'image_count': 0, 'image_context_used': False,
+                         'memory_enabled': False, 'elapsed': round(time.monotonic()-job['started'], 1),
+                         'partial': False, 'generation': 'local_social'}
+        return
     from config import LLM_CONFIG
     evidence_mode=os.environ.get('MEDIX_KB_MODE') == 'evidence'
     configured=LLM_CONFIG.get("api_key") not in {None, "", "not-configured"}

@@ -289,3 +289,5 @@ main_copy 后续补合：完整接入 feature/knowledge_db 的 1f8c777，包括�
 提醒分支完整补合：恢复 MiniKnowledgeBase 文本后备检索、统一 search_knowledge 入口和可见 backend 标识。MEDIX_KB_BACKEND 可选 auto/milvus/mini；证据模式始终禁止自动退回 mini。默认 auto 的文本后备不能冒称向量检索或3298篇证据库就绪。
 
 证据专用入口现在委托统一 run_web.main，包含 .env.local/.env.sms 加载、端口来源与业务库选择；保留 --prepare-only，防止知识库专用端口丢失已有账号/短信配置。新增目录分页接口与统一启动契约回归。
+
+2026-10-31 问候路由修复：网页在医学检索前精确识别纯问候、感谢及功能介绍，使用本地回复，不调用模型或记忆；不覆盖包含症状、用药等内容的混合问题。医学问题仍遵循证据覆盖、引用校验和缺资料提示。社交回答随原持久化任务保存，不计模型Token。

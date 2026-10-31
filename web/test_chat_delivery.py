@@ -100,6 +100,21 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(self.a.get('/api/jobs/'+self.turn).status_code,404)
         self.assertEqual(self.a.post('/api/profile/conversation-candidates',json=payload).status_code,404)
 
+    def test_greeting_skips_retrieval_model_and_memory_but_persists(self):
+        import time
+        from web.app import analyze
+        self.seed()
+        job={'id': self.turn, 'started': time.monotonic(), 'owner_user_id': self.owner}
+        with patch('knowledge.get_knowledge_base', side_effect=AssertionError('No KB for greetings')), patch('web.app.resolve_patient', side_effect=AssertionError('No model for greetings')):
+            asyncio.run(analyze(job, {'message':'你好！','images':[]}, 'social-test', self.owner))
+        self.assertIn('你好', job['result']['answer'])
+        self.assertEqual(job['result']['generation'], 'local_social')
+        self.assertFalse(job['result']['memory_enabled'])
+        store.finish(self.turn, 'completed', job['result'], None, {})
+        restored=ChatStore().detail(self.owner,self.chat)
+        self.assertEqual(restored['turns'][0]['result']['answer'], job['result']['answer'])
+        self.assertEqual(usage_summary(self.turn)['requests'],0)
+
     def test_active_delete_is_rejected(self):
         self.seed()
         self.assertEqual(self.a.delete('/api/conversations/'+self.chat,headers={'Content-Type':'application/json'}).status_code,409)
@@ -211,3 +226,15 @@ class PriceTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+
+class SocialIntentTests(unittest.TestCase):
+    def test_pure_social_intents(self):
+        from web.social import social_reply
+        for text in ('你好', '您好！', 'hello', '谢谢你', '你能做什么？'):
+            self.assertIsNotNone(social_reply(text),text)
+
+    def test_mixed_medical_questions_are_not_swallowed(self):
+        from web.social import social_reply
+        for text in ('你好，我头痛怎么办', '谢谢，阿司匹林怎么吃', '高血压怎么管理', '你好，请解读报告'):
+            self.assertIsNone(social_reply(text),text)
