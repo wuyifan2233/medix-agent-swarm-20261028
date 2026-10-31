@@ -1,5 +1,7 @@
 # QQ 外部 OneBot 接入
 
+同事拉取后如何使用，直接看 [QQ 使用指南](QQ-QUICKSTART.md)。本文件补充配置和实现边界。
+
 QQ 是消息渠道，不是 MediX 网站的登录方式。账号、会话和记忆仍按 MediX `user.id` 隔离。
 
 ## 推荐：自动准备并启动 NapCat（Windows x64）

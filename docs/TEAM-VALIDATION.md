@@ -2,7 +2,7 @@
 
 适用日期：2026-10-31。各模块负责人从本文开始；详细代码接入规则见 [AUTH-INTEGRATION.md](AUTH-INTEGRATION.md)，合并过程见 [INTEGRATION.md](INTEGRATION.md)。
 
-QQ 新入口：安装项目依赖后运行 `.\start_qq.ps1`，首次自动下载并校验 NapCat、生成本机配置及扫码页，不需要手填令牌或安装 Node。扫码后在 MediX 页面连接并绑定好友。每台电脑需登录自己的机器人 QQ；同账号电脑版 QQ 先退出。详见 [QQ-ONEBOT.md](QQ-ONEBOT.md)。
+QQ 新入口：安装项目依赖后运行 `.\start_qq.ps1`，首次自动下载并校验 NapCat、生成本机配置及扫码页，不需要手填令牌或安装 Node。扫码后在 MediX 页面连接并绑定好友。每台电脑需登录自己的机器人 QQ；同账号电脑版 QQ 先退出。逐步操作见 [QQ 使用指南](QQ-QUICKSTART.md)，实现说明见 [QQ-ONEBOT.md](QQ-ONEBOT.md)。
 
 ## 1. 代码现在合到哪里了
 
