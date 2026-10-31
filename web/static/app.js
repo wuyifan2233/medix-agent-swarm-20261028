@@ -1115,7 +1115,15 @@ async function refreshLink() {
     qr.alt = state.channel === 'qq' ? '用手机 QQ 扫描登录' : '用微信扫描，添加 MediX';
     if (nextQr !== state.linkQr) {
       state.linkQr = nextQr;
-      if (nextQr) { qr.src = nextQr; qr.hidden = false; qr.scrollIntoView({block: 'nearest'}); }
+      if (nextQr) {
+        const firstImage = qr.hidden;
+        qr.src = nextQr; qr.hidden = false;
+        const scroller = qr.closest('.sidebar-scroll');
+        if (firstImage && scroller) {
+          const below = qr.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom;
+          if (below > 0) scroller.scrollTop += below + 12;
+        }
+      }
       else { qr.hidden = true; qr.removeAttribute('src'); }
     }
     $('wechatCodeForm').hidden = state.channel !== 'wechat' || data.status !== 'need_code';

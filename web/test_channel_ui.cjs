@@ -1,7 +1,7 @@
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const source=fs.readFileSync('web/static/app.js','utf8');
 const elements=new Map();
-function $(id){if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',src:'',setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},scrollIntoView(){}});return elements.get(id);}
+function $(id){if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',src:'',setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},scrollIntoView(){},closest(){return null;}});return elements.get(id);}
 const requests=[];
 const state={channel:'wechat',cursors:{wechat:0,qq:0},linkQr:''};
 const context={state,$,MedixAuth:{ready:Promise.resolve(),user:{id:'account-a'},fetch:url=>new Promise(resolve=>requests.push({url,resolve}))},toast:()=>{}};
