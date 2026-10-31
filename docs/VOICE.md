@@ -20,11 +20,11 @@
 
 ## 默认声音和偏好
 
-默认 zh-CN-XiaoxiaoNeural（中文女声），语速 -5%，音高与音量不额外改变。以自然停顿、略慢语速提供亲切感；“温柔”是主观听感，需要人工试听，不能保证每位用户感受一致。Edge 不支持任意情绪提示词，不能把“温柔”当作生成模型指令。
+默认 zh-CN-YunxiaNeural（中文男童风格），语速 -5%，音高与音量不额外改变。2026-10-31 实际查询 Edge 云端目录，音色标注为 Male、Cute，适用 Cartoon / Novel。采用原生音色，不用提高成人音高来模拟童声；实际听感仍需人工试听。用户提供的视频“小麦”音源未知，因此这里只提供男童风格，未识别或克隆视频声音，不能宣称与参考音色完全相同。Edge 不支持任意情绪提示词。
 
 ```powershell
 $env:MEDIX_TTS_PROVIDER = 'edge'
-$env:MEDIX_TTS_VOICE = 'zh-CN-XiaoxiaoNeural'
+$env:MEDIX_TTS_VOICE = 'zh-CN-YunxiaNeural'
 $env:MEDIX_TTS_RATE = '-5%'
 $env:MEDIX_TTS_PITCH = '+0Hz'
 $env:MEDIX_TTS_VOLUME = '+0%'
@@ -34,19 +34,25 @@ $env:MEDIX_TTS_VOLUME = '+0%'
 
 ### 个性化语音包（2026-10-31）
 
-侧栏“个性化声音”或“回答偏好”打开同一个设置面板。默认选择“跟随沟通语气”，根据当前账号已保存且已启用的回答偏好选择声音，也可以固定选择语音包：
+仅保留侧栏“回答偏好”入口，打开完整偏好设置面板；健康档案工具区不再重复添加入口。“个性化声音”位于“怎么称呼、怎么说”表单中，使用与沟通语气等字段一致的下拉框，仅提供“默认”“柔和女声”“明亮男声”“平和女声”四个选项，并在同一区域保留试听按钮。
 
-| 沟通语气 | 自动语音包 | Edge 音色 | 语速 |
+“默认”对应 child 男童音色，新账号和缺少 voice_profile 的旧记录默认选择它；关闭回答偏好时仍使用服务配置的默认男童声音。已有 gentle/clear/steady 选择原样显示。服务端兼容旧版 auto 记录，打开表单时按其当前沟通语气映射为对应固定选项；仅保存后才改为固定声音，不会在打开或试听时写入。
+
+| 下拉选项 | 保存值 | Edge 音色 | 语速 |
 | --- | --- | --- | --- |
-| 温和鼓励 supportive | 温柔陪伴 gentle · 柔和女声，节奏稍慢 | zh-CN-XiaoxiaoNeural | -8% |
-| 直接清楚 direct | 清晰利落 clear · 明亮男声，节奏自然 | zh-CN-YunxiNeural | +0% |
-| 客观平和 neutral | 平和舒缓 steady · 平和女声，清晰舒缓 | zh-CN-XiaoyiNeural | -3% |
+| 默认（清亮男童声） | child | zh-CN-YunxiaNeural | -5% |
+| 柔和女声 | gentle | zh-CN-XiaoxiaoNeural | -8% |
+| 明亮男声 | clear | zh-CN-YunxiNeural | +0% |
+| 平和女声 | steady | zh-CN-XiaoyiNeural | -3% |
 
+旧版 auto 记录的语气映射：supportive → gentle、direct → clear、neutral → steady。
 固定选择优先于沟通语气。只依据明确的表达偏好，不用年龄、疾病或健康档案推断声音。音色和语速由服务端白名单控制，前端不能提交任意供应商地址、voice ID 或凭据。
 
 勾选“在后续问答中使用已保存的回答偏好”并保存后，下一次自动或手动播报使用新声音；文字偏好从下一次提问生效，已有回答不改写。关闭总偏好开关时仍使用服务默认声音（默认声音 -5%），不应用已保存的个性化语音包。自动朗读开关独立决定是否自动播放，不决定音色。
 
-“试听当前声音”按当前未保存的语音包及语气播放固定短句，不调用 DeepSeek，不提交聊天内容，也不保存偏好。试听与回答共用一个播放器，可随时停止；关闭设置、修改选择或切换账号会停止试听，保存设置会停止当前播放。选择与保存操作沿用现有账号偏好、revision 冲突检查和同一业务数据库，无需迁移；旧偏好记录缺少 voice_profile 时按 auto 处理。
+“试听当前声音”按当前未保存的语音包及语气播放固定短句，不调用 DeepSeek，不提交聊天内容，也不保存偏好。试听与回答共用一个播放器，可随时停止；关闭设置、修改选择或切换账号会停止试听，保存设置会停止当前播放。选择与保存操作沿用现有账号偏好、revision 冲突检查和同一业务数据库，无需迁移；旧偏好记录缺少 voice_profile 时按 child 处理，已保存的声音选择不被覆盖。
+
+POST /api/voice/speech/preview 未提供 profile_id 时默认试听 child 男童声音。
 
 GET /api/voice/voices 返回当前账号可用语音包目录、语气映射、有效音色及偏好版本。POST /api/voice/speech/preview 接受 {"profile_id":"auto","tone":"supportive"}，只生成固定短句的一次性播放地址。目录需登录，试听请求沿用 Origin/CSRF 校验；试听地址同样绑定账号及登录会话。正式播报的 /speech 和 /speech/prepare 均从服务器读取账号偏好，不信任客户端指定音色。prepare 快照当次 TTS 配置，后续其他请求或偏好修改不会改变这张票据的声音。
 

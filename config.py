@@ -66,7 +66,7 @@ SPEECH_CONFIG = {
     "transcription_model": os.environ.get("MEDIX_TRANSCRIBE_MODEL", "gpt-transcribe"),
     "transcription_language": os.environ.get("MEDIX_TRANSCRIBE_LANGUAGE", "zh"),
     "tts_provider": os.environ.get("MEDIX_TTS_PROVIDER", "edge").strip().lower(),
-    "tts_voice": os.environ.get("MEDIX_TTS_VOICE", "zh-CN-XiaoxiaoNeural"),
+    "tts_voice": os.environ.get("MEDIX_TTS_VOICE", "zh-CN-YunxiaNeural"),
     "tts_rate": os.environ.get("MEDIX_TTS_RATE", "-5%"),
     "tts_pitch": os.environ.get("MEDIX_TTS_PITCH", "+0Hz"),
     "tts_volume": os.environ.get("MEDIX_TTS_VOLUME", "+0%"),

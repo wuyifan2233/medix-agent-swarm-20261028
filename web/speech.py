@@ -18,6 +18,8 @@ MAX_TTS_AUDIO_BYTES = 16 * 1024 * 1024
 
 # Only these server-owned profiles can reach the provider. No health data is used.
 VOICE_PROFILES = {
+    "child": {"id": "child", "label": "元气童声", "description": "清亮男童声，亲切自然",
+              "voice": "zh-CN-YunxiaNeural", "rate": "-5%"},
     "gentle": {"id": "gentle", "label": "温柔陪伴", "description": "柔和女声，节奏稍慢",
                "voice": "zh-CN-XiaoxiaoNeural", "rate": "-8%"},
     "clear": {"id": "clear", "label": "清晰利落", "description": "明亮男声，节奏自然",
@@ -31,7 +33,7 @@ PREVIEW_TEXT = "你好，我是 MediX。我们慢慢说，一起把最重要的�
 
 class VoicePreview(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    profile_id: Literal["auto", "gentle", "clear", "steady"] = "auto"
+    profile_id: Literal["child", "auto", "gentle", "clear", "steady"] = "child"
     tone: Literal["supportive", "direct", "neutral"] = "neutral"
 
 
@@ -45,7 +47,7 @@ def resolve_voice(config, preferences):
     selected = {key: value for key, value in config.items() if key.startswith("tts_")}
     if not data.get("enabled"):
         return selected, {"id": "default", "label": "默认声音", "description": "未启用回答偏好，使用服务默认声音", "follows_tone": False}
-    profile_id = data.get("voice_profile", "auto")
+    profile_id = data.get("voice_profile", "child")
     automatic = profile_id == "auto"
     if automatic:
         profile_id = TONE_VOICES[data.get("tone", "neutral")]
@@ -66,7 +68,7 @@ def tts_status(config):
     return {
         "tts_configured": provider == "edge" and importlib.util.find_spec("edge_tts") is not None,
         "tts_provider": provider,
-        "tts_voice": config.get("tts_voice", "zh-CN-XiaoxiaoNeural"),
+        "tts_voice": config.get("tts_voice", "zh-CN-YunxiaNeural"),
         "tts_streaming": True,
     }
 
@@ -84,7 +86,7 @@ async def stream_audio(config, text):
     edge_tts = load_provider(config)
     try:
         speaker = edge_tts.Communicate(
-            text, voice=config.get("tts_voice", "zh-CN-XiaoxiaoNeural"),
+            text, voice=config.get("tts_voice", "zh-CN-YunxiaNeural"),
             rate=config.get("tts_rate", "-5%"), pitch=config.get("tts_pitch", "+0Hz"),
             volume=config.get("tts_volume", "+0%"), connect_timeout=10, receive_timeout=30,
         )

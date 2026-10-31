@@ -57,11 +57,11 @@ class ReplyPreferencesTests(unittest.TestCase):
         other=self.capture_analysis(self.b.id,None,session='other')
         self.assertNotIn('测试称呼',other['prompt'])
 
-    def test_voice_preference_persists_and_legacy_records_default_to_auto(self):
-        self.assertEqual(self.client.get(self.path).json()['data']['voice_profile'],'auto')
+    def test_voice_preference_persists_and_legacy_records_default_to_child(self):
+        self.assertEqual(self.client.get(self.path).json()['data']['voice_profile'],'child')
         saved=self.save(enabled=True,voice_profile='clear')
         self.assertEqual(saved.json()['data']['voice_profile'],'clear')
-        self.assertEqual(self.other.get(self.path).json()['data']['voice_profile'],'auto')
+        self.assertEqual(self.other.get(self.path).json()['data']['voice_profile'],'child')
         self.client.close();self.client=self.client_for('alice')
         self.assertEqual(self.client.get(self.path).json()['data']['voice_profile'],'clear')
         self.assertEqual(self.save(voice_profile='arbitrary').status_code,422)
@@ -69,7 +69,7 @@ class ReplyPreferencesTests(unittest.TestCase):
         with app.state.auth_service.sessions() as db:
             row=db.get(ReplyPreferences,self.a.id)
             legacy=dict(row.data);legacy.pop('voice_profile');row.data=legacy;db.commit()
-        self.assertEqual(self.client.get(self.path).json()['data']['voice_profile'],'auto')
+        self.assertEqual(self.client.get(self.path).json()['data']['voice_profile'],'child')
 
     def test_voice_pack_does_not_change_text_model_context(self):
         gentle=Preferences(enabled=True,tone='supportive',voice_profile='gentle').model_dump()
