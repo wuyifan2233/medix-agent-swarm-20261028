@@ -1212,6 +1212,13 @@ function draftArea(row) {
   if (!draft) {draft=document.createElement('div');draft.className='answer stream-answer';row.querySelector('.message-main').append(draft);}
   return draft;
 }
+function renderDraft(row, text, append = false) {
+  const draft = draftArea(row);
+  draft.streamMarkdown = (append ? draft.streamMarkdown || '' : '') + text;
+  // Use the same HTML-escaping renderer as final answers. Sources are decorated
+  // only after the completed answer has passed server-side citation validation.
+  draft.innerHTML = richText(draft.streamMarkdown);
+}
 function stoppedMessage(row,turn) {
   row.querySelector('.process')?.remove();
   const label=row.querySelector('.message-label small');if(label)label.textContent='生成已结束';
@@ -1236,11 +1243,11 @@ function streamTurn(jobId,row,message,epoch,after=0) {
       let data;try{data=JSON.parse(event.data);}catch{return;}
       if(data.type==='stage') {const label=row.querySelector('.phase-label');if(label)label.textContent=data.label;}
       if(data.type==='draft_start') {
-        row.dataset.streamCall=data.call_id;draftArea(row).textContent='';
+        row.dataset.streamCall=data.call_id;renderDraft(row,'');
         const label=row.querySelector('.phase-label');if(label)label.textContent=`${walletAgentName(data.agent)}正在生成草稿，完成后校验`;
       }
-      if(data.type==='draft_clear' && row.dataset.streamCall===data.call_id)draftArea(row).textContent='';
-      if(data.type==='delta' && row.dataset.streamCall===data.call_id){draftArea(row).textContent+=data.text;scrollDown();}
+      if(data.type==='draft_clear' && row.dataset.streamCall===data.call_id)renderDraft(row,'');
+      if(data.type==='delta' && row.dataset.streamCall===data.call_id){renderDraft(row,data.text,true);scrollDown();}
       if(data.type==='usage'){appendUsage(row.querySelector('.message-main'),data.usage);refreshWallet().catch(()=>{});}
       if(data.type==='done') {
         source.close();clearTimeout(outage);state.eventSource=null;
@@ -1309,7 +1316,7 @@ async function openConversation(id) {
     totalRequests+=turn.usage.requests;totalTokens+=turn.usage.input_tokens+turn.usage.output_tokens;
     if(turn.status==='completed' && turn.result)resultMessage(row,turn.result,turn.payload.message,turn.id,false);
     else {
-      if(turn.draft)draftArea(row).textContent=turn.draft;
+      if(turn.draft)renderDraft(row,turn.draft);
       row.dataset.streamCall=turn.draft_call || '';
       if(['queued','running'].includes(turn.status)){
         state.busy=true;updateComposer();
