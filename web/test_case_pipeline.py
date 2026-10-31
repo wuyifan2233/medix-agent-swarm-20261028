@@ -130,6 +130,9 @@ class PipelineTests(unittest.TestCase):
         import swarm
         from web.app import analyze, contexts
         async def close(): pass
+        self_test = self
+        repair_client = AsyncMock()
+        repair_client.chat.return_value = {'content': '已读取GLU 5.00，报告归属待确认。', 'finish_reason': 'stop'}
         captured = []
         reading = {'complete': True, 'visible_rows': 1, 'text': '', 'rows': [
             {'name': 'GLU', 'result': '5.00', 'unit': 'mmol/L', 'reference': '3.89-6.11',
@@ -144,8 +147,10 @@ class PipelineTests(unittest.TestCase):
             short_term_memory = SimpleNamespace(clear_session=lambda _:None)
             def __init__(self, **kwargs): pass
             async def process(self, question, **kwargs):
+                from core.chat_runtime import hold_visible_draft
+                self_test.assertTrue(hold_visible_draft.get())
                 captured.append(question)
-                return {'answer': 'synthetic answer'}
+                return {'answer': '没有收到图片或文字资料'}
         row = 'GLU【结果】5.00【单位】mmol/L【参考】3.89-6.11'
         proposal = {'operations': [operation('GLU', '5.00', 'image', row)]}
         job = {'steps': [], 'started': time.monotonic()}
@@ -155,8 +160,14 @@ class PipelineTests(unittest.TestCase):
             with patch.dict(config.LLM_CONFIG, {'api_key': 'synthetic-not-used'}), \
                  patch('core.LLMClient', Client), patch.object(swarm, 'SwarmCoordinator', Coordinator), \
                  patch.object(kb_module, 'MedicalKnowledgeBase', lambda: SimpleNamespace(search=lambda *a, **k: [])), \
+                 patch('web.report_answer.LLMClient', return_value=repair_client), \
                  patch('web.case_context.propose_changes', AsyncMock(return_value=proposal)):
                 asyncio.run(analyze(job, payload, 'synthetic-session', 'owner'))
+            self.assertEqual(job['result']['report_answer_status'], 'repaired')
+            self.assertIn('GLU 5.00', job['result']['answer'])
+            repair_client.chat.assert_awaited_once()
+            from core.chat_runtime import hold_visible_draft
+            self.assertFalse(hold_visible_draft.get())
             self.assertFalse(job['result']['case_index_ready'])
             self.assertTrue(job['result']['data_warnings'])
             self.assertEqual(job['result']['extraction_check']['unmatched_rows'], 0)

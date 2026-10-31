@@ -1398,7 +1398,7 @@ function walletElement(tag,className,text){
 }
 function walletAgentName(agent){
   return ({'stage:patient':'人物判断','stage:case':'病例整理','stage:agents':'任务路由','stage:vision':'图片读取','stage:presentation':'回答整理','stage:answer':'原文阅读','stage:memory':'记忆核对','stage:patient_resolve':'人物判断','stage:case_prepare':'病例整理','stage:route':'任务路由',
-    'reply_presentation':'回答排版','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
+    'reply_presentation':'回答排版','report_answer_repair':'报告解读校验','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
     'consultation_agent':'健康咨询助手','diagnostic_agent':'诊断分析助手','research_agent':'医学研究助手','lead_synthesis':'协作汇总助手','evidence_reader':'原文阅读助手','health_consultant':'健康咨询助手','general_practitioner':'健康咨询助手'})[agent] || (agent?.startsWith('stage:')?'流程处理':agent || '助手');
 }
 function participatingAssistants(calls,fallback=[]){

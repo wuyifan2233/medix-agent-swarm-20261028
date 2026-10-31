@@ -229,6 +229,7 @@ def status():
     return {**health, **tts_status(SPEECH_CONFIG), "model": LLM_CONFIG["model_name"],
             "model_configured": LLM_CONFIG.get("api_key") not in {None, "", "not-configured"},
             "memory_configured": bool(MEM0_CONFIG.get("api_key")),
+            "exchange_memory_enabled": os.environ.get("MEDIX_EXCHANGE_MEMORY")=="1",
             "speech_api_configured": SPEECH_CONFIG["remote_enabled"]}
 
 
@@ -729,6 +730,14 @@ async def analyze(job, payload, session_id, memory_user_id):
                        "memory_references": references, "patient": patient_resolution["label"],
                        "patient_resolution": patient_resolution,
                        "patient_clarification": "人物不明确，请先确认本次是在询问谁，不能认作本人的病史。" if patient_resolution["needs_confirmation"] else ""}
+    from web.report_answer import report_state, ensure_report_answer, contradicts_report
+    from core.chat_runtime import hold_visible_draft
+    report_available = bool(observed) and (bool(case.get("sources")) or
+        any(item.get("readable_rows", 0) > 0 for item in image_check["images"]) or document_followup)
+    if report_available:
+        enriched += "\n\n" + report_state(patient_resolution["subject"])
+        request_context["report_available"] = True
+        request_context["patient_clarification"] += " 人物归属待确认不影响先解读已读取的报告；不得声称未收到图片或资料。"
     stage(job, "agents", "正在由专业助手分析与整合")
     from runtime_settings import load_setting
     if strict_evidence and not snapshot and not preferences_used and not case["case_id"] and not observed and not payload['remember'] and load_setting('MEDIX_EVIDENCE_GENERATOR','direct')=='direct':
@@ -768,16 +777,24 @@ async def analyze(job, payload, session_id, memory_user_id):
         worker.skill_registry.execute = tracked
     try:
         analysis_session = f"{session_id}-case-{case['case_id']}" if case["case_id"] else session_id
-        result = await coordinator.process(enriched, context=request_context, session_id=analysis_session)
+        draft_token = hold_visible_draft.set(report_available)
+        try:
+            result = await coordinator.process(enriched, context=request_context, session_id=analysis_session)
+        finally:
+            hold_visible_draft.reset(draft_token)
         answer = result.get("answer")
         if not answer or result.get("error"):
             raise RuntimeError("Agent did not return a complete answer")
+        report_answer_status = "not_applicable"
+        if report_available:
+            answer, report_answer_status = await ensure_report_answer(answer, enriched)
         answer, used_references = referenced(answer, references)
         if patient_resolution["needs_confirmation"] and not document_followup:
             clarification = "这次是在问你本人、父亲、母亲，还是其他人？" if patient_resolution["subject"] == "unknown" else "这次涉及多个人，想先讨论哪一位的情况？"
             answer = clarification + "\n\n" + answer
         saved_id = None
-        if memory_allowed and patient != "other" and patient_resolution.get('should_store',False):
+        from memory.exchange_mem0 import enabled as exchange_memory_enabled
+        if not exchange_memory_enabled() and memory_allowed and patient != "other" and patient_resolution.get('should_store',False):
             try:
                 saved_id = await asyncio.to_thread(memory_service.save, memory_user_id, session_id, memory_question, patient,
                                                   observed if payload["images"] else "")
@@ -787,7 +804,14 @@ async def analyze(job, payload, session_id, memory_user_id):
         presentation_status='off'
         if preferences_used:
             stage(job, "presentation", "正在按称呼、详略和呈现偏好整理回答")
-            answer,presentation_status=await render_reply(answer,question,preferences)
+            verified_answer = answer
+            draft_token = hold_visible_draft.set(report_available)
+            try:
+                answer,presentation_status=await render_reply(answer,question,preferences)
+            finally:
+                hold_visible_draft.reset(draft_token)
+            if report_available and contradicts_report(answer):
+                answer, presentation_status = verified_answer, "report_guard_fallback"
         invalid=[]
         if use_evidence or sources:
             from knowledge.evidence import validate_citations
@@ -820,6 +844,7 @@ async def analyze(job, payload, session_id, memory_user_id):
                          "elapsed": round(time.monotonic() - job["started"], 1),
                          "partial": bool(result.get("timeout_occurred"))}
         job["result"]["request_kind"] = route["kind"]
+        job["result"]["report_answer_status"] = report_answer_status
         job["result"].update(case_id=case["case_id"], case_sources=case["sources"],
                              case_changes=case["outcome"]["changes"], case_questions=case["outcome"]["questions"],
                              case_index_ready=case["index_ready"], case_switched=case["outcome"]["switched"])
@@ -918,6 +943,9 @@ def run_job(job, payload, session_id, memory_user_id):
             if job['status']=='completed':
                 contexts.cache.update(active.pending_contexts)
             active.emit('done',status=job['status'],result=job.get('result'),error=job.get('error'),usage=usage)
+            if job['status']=='completed':
+                from memory.exchange_mem0 import submit_exchange
+                submit_exchange(payload,job.get('result') or {})
         finally:
             controls.pop(job['id'],None)
             chat_runtime.reset(token)

@@ -12,6 +12,7 @@ from storage.business import connect
 from storage.chat import store, dumps
 
 runtime = ContextVar('chat_runtime', default=None)
+hold_visible_draft = ContextVar('hold_visible_draft', default=False)
 
 
 from core.token_pricing import price_for
@@ -88,6 +89,7 @@ async def completion(client, params, *, visible=False, agent='system', transform
     In a web job every HTTP attempt is explicit (SDK retries disabled), stream chunks
     are assembled by tool-call index, and reasoning stays exclusively in memory.
     """
+    visible = visible and not hold_visible_draft.get()
     active=runtime.get()
     if active is None: return await client.chat.completions.create(**params)
     call_id=uuid.uuid4().hex
