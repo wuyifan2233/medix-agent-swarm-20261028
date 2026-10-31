@@ -412,23 +412,10 @@ function pendingMessage() {
   $('messages').append(row); scrollDown(); return row;
 }
 window.addEventListener('resize', () => document.querySelectorAll('.citation-preview:popover-open').forEach(card => card.hidePopover()));
-function citationPreview(trigger, source, quote = '') {
-  document.querySelectorAll('.citation-preview').forEach(node => node.remove());
-  const card = document.createElement('div'); card.className = 'citation-preview'; card.setAttribute('popover', 'auto'); card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', '引用来源预览');
-  const heading = document.createElement('strong'); heading.textContent = source.title;
-  const provenance = document.createElement('p'); provenance.className = 'preview-provenance'; provenance.textContent = `${source.publisher || '来源未注明'} · ${source.published_at || '日期未注明'}`;
-  const scope = document.createElement('p'); scope.textContent = `${evidenceKindLabels[source.evidence_kind] || '类型未注明'} · ${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}`;
-  const text = document.createElement('blockquote'); text.textContent = quote || source.excerpt || '暂无可定位的原文摘录';
-  const note = document.createElement('small'); note.textContent = quote ? '摘录已在本地原文中定位；请核对是否支持这句话。' : '尚未定位到本句的直接摘录，请展开全文核对。';
-  const actions = document.createElement('div'); actions.className = 'preview-actions';
-  const full = document.createElement('button'); full.type = 'button'; full.textContent = '查看完整片段'; full.onclick = () => { card.hidePopover(); showEvidence(source, quote); }; actions.append(full);
-  try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) { const link = document.createElement('a'); link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '发布机构网页 ↗'; actions.append(link); } } catch {}
-  const close = document.createElement('button'); close.type = 'button'; close.textContent = '关闭'; close.onclick = () => { card.hidePopover(); trigger.focus(); }; actions.append(close);
-  card.append(heading, provenance, scope, text, note, actions); document.body.append(card); card.showPopover();
-  const rect = trigger.getBoundingClientRect(), width = card.offsetWidth, height = card.offsetHeight;
-  card.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - width - 12))}px`;
-  card.style.top = `${Math.max(12, Math.min(rect.bottom + 8, innerHeight - height - 12))}px`;
+function citationPreview(trigger, source) {
+  showEvidence(source);
 }
+
 function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   if (result.case_id) {state.caseId=result.case_id; refreshCases().catch(()=>{});}
   if (result.case_changes?.length) {
@@ -461,6 +448,7 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   }
   if (result.case_switched) {const notice=document.createElement('p');notice.className='case-update-note';notice.textContent='已按你的说明开始新的病例，本次不引用上一位的记录。';main.append(notice);}
   (result.data_warnings || []).forEach(message => {
+    if (message === '本次历史语义检索暂不可用，已按项目和日期查找本机记录，可能存在遗漏。') return;
     const notice=document.createElement('p'); notice.className='case-update-note';
     notice.setAttribute('role', 'status'); notice.textContent=message; main.append(notice);
   });
@@ -494,14 +482,10 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   }
   if (result.sources.length) {
     const block = document.createElement('details'); block.className = 'sources'; block.open = false;
-    const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个（含可能未引用的片段）`;
+    const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个`;
     const grid = document.createElement('div'); grid.className = 'source-grid';
     result.sources.forEach(source => {
-      const card = document.createElement(source.content ? 'button' : 'div'); card.className = 'source-card';
-      if (source.content) { card.type = 'button'; card.onclick = () => showEvidence(source); }
-      const title = document.createElement('strong'); title.textContent = source.title.trim().length < 3 ? '本地医学资料片段' : source.title;
-      const file = document.createElement('small'); file.textContent = source.publisher ? `[${source.citation}] ${source.publisher} · ${source.published_at || '日期未注明'} · 查看原文 ↗` : source.file;
-      const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt; card.append(title, file, excerpt); grid.append(card);
+      grid.append(createSourceCard(source));
     }); block.append(summary, grid); main.append(block);
   }
   if (result.tools.length) {
@@ -657,27 +641,37 @@ $('questionChips').onclick = event => {
 
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
 const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）',local_reference:'本地参考资料，机构来源未核验',medical_encyclopedia:'专业平台疾病资料，非政府发布',drug_reference:'专业平台药物资料，非具体制剂核准说明书'};
-function showEvidence(source, quote = '') {
-  if (!source) return;
-  $('dialogTitle').textContent = source.title;
-  const content = $('dialogContent'); content.replaceChildren();
-  const provenance = document.createElement('p'); provenance.textContent = `${source.publisher || '本地参考资料'} · ${source.published_at || '日期未注明'}\n${source.source_checked ? '来源已核对（机构、链接与原文），未作临床审核。' : '机构与网页来源尚未核验，请核对原文。'}`;
-  const section = document.createElement('p'); section.textContent = `章节：${source.section} · 本地原文字符位置：${source.start_char}`;
-  const audience = document.createElement('p'); audience.textContent = `资料类型：${evidenceKindLabels[source.evidence_kind] || source.evidence_kind || '未注明'}。适用范围：${(source.audiences || ['unspecified']).map(a => audienceLabels[a] || a).join('、')}。${source.applicability === 'needs_confirmation' ? '当前未确认提问者是否属于该人群，请核对后使用。' : '范围标签仅说明原文主题，不代表个人适用性确认。'}`;
-  const excerpt = document.createElement('pre'); excerpt.className = 'evidence-text';
-  const terms = (quote ? [quote] : source.highlight_terms || []).filter(t => t.length >= 2);
-  if (terms.length) {
-    const pattern = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
-    String(source.content).split(pattern).forEach(part => { const node = document.createElement(terms.includes(part) ? 'mark' : 'span'); node.textContent = part; excerpt.append(node); });
-  } else excerpt.textContent = source.content;
-  const link = document.createElement('a'); link.textContent = '查看机构发布页面 ↗';
-  try { const url = new URL(source.url); if (['https:', 'http:'].includes(url.protocol)) link.href = url.href; } catch {}
-  if (!link.hasAttribute('href')) link.textContent = '本地资料，未提供可核验网页链接';
-  link.target = '_blank'; link.rel = 'noopener noreferrer';
-  const version = document.createElement('small'); version.textContent = source.content_sha256 ? `来源快照 SHA-256：${source.content_sha256}` : '本地参考资料，暂无网页快照哈希。';
-  content.append(provenance, audience, section, excerpt, link, document.createElement('hr'), version);
-  if (!$('infoDialog').open) $('infoDialog').showModal();
-  if (quote) requestAnimationFrame(() => excerpt.querySelector('mark')?.scrollIntoView({block:'center'}));
+function sourceUrl(source) {
+  try {
+    const url = new URL(source.url);
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
+  } catch { return ''; }
+}
+function showEvidence(source) {
+  const url = source && sourceUrl(source);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  else toast('这份资料暂无可访问的原文链接。');
+}
+function createSourceCard(source) {
+  const url = sourceUrl(source);
+  const card = document.createElement(url ? 'a' : 'article');
+  card.className = 'source-card';
+  if (url) {
+    card.href = url; card.target = '_blank'; card.rel = 'noopener noreferrer';
+    card.setAttribute('aria-label', `查看原文：${source.title || '医学资料'}（新标签页）`);
+  } else card.classList.add('source-card-unavailable');
+  const title = document.createElement('strong'); title.className = 'source-title';
+  title.textContent = (source.title || '').trim().length < 3 ? '本地医学资料片段' : source.title;
+  const publisher = document.createElement('span'); publisher.className = 'source-publisher';
+  publisher.textContent = source.publisher || '本地参考资料';
+  const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt || '';
+  const footer = document.createElement('div'); footer.className = 'source-card-footer';
+  const number = document.createElement('span'); number.className = 'source-number';
+  number.textContent = source.citation ? `来源 [${source.citation}]` : '参考来源';
+  const action = document.createElement('span'); action.className = 'source-open';
+  action.textContent = url ? '查看原文 ↗' : '暂无原文链接';
+  footer.append(number, action); card.append(title, publisher, excerpt, footer);
+  return card;
 }
 async function openKnowledge() {
   $('dialogTitle').textContent = '医学证据库';
@@ -690,10 +684,9 @@ async function openKnowledge() {
       const response = await fetch('/api/knowledge/retrieve?q=' + encodeURIComponent($('evidenceQuery').value));
       const data = await response.json(); if (!response.ok) throw new Error(data.detail || '检索失败');
       results.replaceChildren(); if (data.message) { const p = document.createElement('p'); p.textContent = data.message; results.append(p); }
-      data.sources.forEach(source => { const card = document.createElement('button'); card.type = 'button'; card.className = 'source-card evidence-hit';
-        const title = document.createElement('strong'); title.textContent = `[${source.citation}] ${source.title}`;
-        const excerpt = document.createElement('p'); excerpt.textContent = source.excerpt;
-        card.append(title, excerpt); card.onclick = () => showEvidence(source); results.append(card); });
+      data.sources.forEach(source => {
+        const card = createSourceCard(source); card.classList.add('evidence-hit'); results.append(card);
+      });
     } catch (error) { results.textContent = error.message; } finally { button.disabled = false; }
   };
   try {
@@ -1417,7 +1410,7 @@ function walletElement(tag,className,text){
 }
 function walletAgentName(agent){
   return ({'stage:patient':'人物判断','stage:case':'病例整理','stage:agents':'任务路由','stage:vision':'图片读取','stage:presentation':'回答整理','stage:answer':'原文阅读','stage:memory':'记忆核对','stage:patient_resolve':'人物判断','stage:case_prepare':'病例整理','stage:route':'任务路由',
-    'stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
+    'reply_presentation':'回答排版','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
     'consultation_agent':'健康咨询助手','diagnostic_agent':'诊断分析助手','research_agent':'医学研究助手','lead_synthesis':'协作汇总助手','evidence_reader':'原文阅读助手','health_consultant':'健康咨询助手','general_practitioner':'健康咨询助手'})[agent] || (agent?.startsWith('stage:')?'流程处理':agent || '助手');
 }
 function participatingAssistants(calls,fallback=[]){

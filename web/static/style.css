@@ -166,3 +166,15 @@ html,body{height:100%;overflow:hidden}
 .app-shell{overflow:hidden}
 .sidebar-scroll{position:relative;overscroll-behavior:contain}
 main{min-height:0;overflow:hidden}
+
+/* Direct source cards: one accessible link, with a prominent visual action. */
+.source-card{display:flex;flex-direction:column;gap:10px;text-decoration:none;padding:20px;border-radius:16px;background:#f7f8ff;transition:border-color .18s,box-shadow .18s,background .18s}
+.source-card .source-title{font-size:15px;font-weight:650;color:var(--ink)}
+.source-card .source-publisher{font-size:12px;line-height:1.6;font-weight:700;color:#5964c9;overflow-wrap:anywhere}
+.source-card p{margin:0;font-size:12px;line-height:1.8;-webkit-line-clamp:3}
+.source-card-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:8px}
+.source-number{font-size:11px;color:#8591aa}
+.source-open{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 15px;border-radius:10px;background:#6566e8;color:#fff;font-size:12px;font-weight:650;white-space:nowrap;box-shadow:0 3px 8px #6566e820;transition:background .18s}
+.source-card:hover,.source-card:focus-visible{border-color:#7976e9;background:#f4f3ff;box-shadow:0 5px 18px #6266bd16}
+.source-card:hover .source-open,.source-card:focus-visible .source-open{background:#514ecb}
+.source-card-unavailable{cursor:default}.source-card-unavailable .source-open{background:#e7eaf1;color:#647088;box-shadow:none}

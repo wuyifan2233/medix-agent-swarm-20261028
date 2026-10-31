@@ -34,7 +34,6 @@
           anchor.type = 'button'; anchor.className = 'citation-anchor'; anchor.textContent = '[' + id + ']';
           anchor.dataset.citation = String(id); anchor.title = source.title || '查看参考依据';
           anchor.setAttribute('aria-label', '查看参考依据 ' + id + '：' + (source.title || '本地资料'));
-          anchor.setAttribute('aria-haspopup', 'dialog');
           anchor.onclick = () => openPreview(anchor, source, quote);
           fragment.append(anchor); count++;
         }
