@@ -1,7 +1,7 @@
 /* Account preferences: explicit save, no browser persistence or clinical profile writes. */
 (() => {
-  const open=document.createElement('button');open.type='button';open.id='rpOpen';open.textContent='回答偏好';
-  document.querySelector('.health-profile-tools').append(open);
+  const open=document.createElement('button');open.type='button';open.id='rpOpen';open.className='attach-btn';open.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>回答偏好</span>';
+  document.getElementById('attachButton').insertAdjacentElement('afterend',open);
   const dialog=document.createElement('dialog');dialog.id='replyPreferencesDialog';dialog.setAttribute('aria-labelledby','rpTitle');
   dialog.innerHTML=`<header><div><small>让回答更适合你</small><h2 id="rpTitle">回答偏好</h2></div><button type="button" id="rpClose">关闭</button></header>
   <p class="rp-intro">设置称呼、语气与阅读方式。注册基本信息默认用于相关回答，表达偏好可在这里单独设置。</p>
