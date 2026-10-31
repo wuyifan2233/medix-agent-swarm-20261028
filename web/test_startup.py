@@ -13,7 +13,7 @@ class StartupDatabaseTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True), patch('sys.argv',['run_kb_demo.py','--port','8999']), \
              patch('dotenv.load_dotenv') as load, patch('uvicorn.run') as run:
             main(default_port=8766,evidence=True)
-            self.assertEqual([call.args[0].name for call in load.call_args_list],['.env.local','.env.sms'])
+            self.assertEqual([call.args[0].name for call in load.call_args_list],['medix.env','.env.local','.env.sms'])
             self.assertEqual(os.environ['MEDIX_KB_MODE'],'evidence')
             self.assertIn('http://127.0.0.1:8999',os.environ['MEDIX_ALLOWED_ORIGINS'])
             self.assertEqual(run.call_args.kwargs['port'],8999)

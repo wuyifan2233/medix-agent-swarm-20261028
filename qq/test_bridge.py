@@ -109,6 +109,30 @@ class QQBridgeTests(unittest.TestCase):
         self.assertEqual(view['qr'],'')
         self.assertNotIn('扫码',view['hint'])
 
+    def test_external_onebot_failure_never_loads_snowluma(self):
+        self.bridge.owner = self.browser
+        self.bridge._phase = 'login'
+        self.fake.fail = True
+        with patch.dict(os.environ, {'MEDIX_QQ_BACKEND': 'onebot'}), patch('qq.bridge.SnowLumaHost') as host:
+            self.bridge._prepare_login(self.browser)
+            host.assert_not_called()
+        self.assertEqual(self.bridge.view(self.browser)['status'], 'error')
+
+    def test_external_onebot_resumes_without_snowluma(self):
+        self.bridge.owner = self.browser
+        self.bridge._phase = 'online'
+        with patch.dict(os.environ, {'MEDIX_QQ_BACKEND': 'onebot'}), patch('qq.bridge.SnowLumaHost') as host:
+            self.bridge._resume_host()
+            host.assert_not_called()
+        self.assertEqual(self.bridge.view(self.browser)['status'], 'connected')
+
+    def test_websocket_uses_its_own_token_after_disconnect(self):
+        self.bridge._ws_token = ''
+        self.bridge.client.token = 'http-only-token'
+        with patch.dict(os.environ, {'MEDIX_QQ_DISABLE': '0', 'MEDIX_QQ_WS_TOKEN': 'ws-only-token'}), patch('qq.bridge.threading.Thread') as thread:
+            self.bridge._ensure_ws()
+        self.assertEqual(thread.call_args.kwargs['args'][1], 'ws-only-token')
+
     def test_private_text_is_answered_and_echoes_are_ignored(self):
         self._connect()
         added = self.bridge.add_friend(self.browser, "20002")

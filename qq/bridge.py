@@ -62,7 +62,7 @@ class QQBridge:
         self._detail = ""
         self._prepare = None
         self._ws_url = ""
-        self._ws_token = ""
+        self._ws_token = os.environ.get("MEDIX_QQ_WS_TOKEN") or ""
         self._ws_stop = threading.Event()
 
     def set_reply(self, reply):
@@ -83,6 +83,9 @@ class QQBridge:
             threading.Thread(target=self._resume_host, name="medix-qq-resume", daemon=True).start()
 
     def _resume_host(self):
+        if os.environ.get("MEDIX_QQ_BACKEND", "snowluma").lower() == "onebot":
+            self._finish_client_login(retries=3)
+            return
         try:
             result = SnowLumaHost().resume()
         except Exception:
@@ -142,6 +145,10 @@ class QQBridge:
             if action_ok(status, body):
                 if not cancelled():
                     self._finish_client_login()
+                return
+            if os.environ.get("MEDIX_QQ_BACKEND", "snowluma").lower() == "onebot":
+                if not cancelled():
+                    self._fail_login("本机 OneBot 服务未就绪，请检查 QQ 登录状态、HTTP 地址和令牌。")
                 return
             result = SnowLumaHost().resume()
             if cancelled():
@@ -449,7 +456,7 @@ class QQBridge:
         url = self._ws_url or default_ws()
         if not url:
             return
-        token = self._ws_token or self.client.token
+        token = os.environ.get("MEDIX_QQ_WS_TOKEN", self._ws_token or self.client.token)
         self._ws = threading.Thread(
             target=run_ws, args=(url, token, stopper, self.handle_event),
             name="medix-qq-ws", daemon=True)
