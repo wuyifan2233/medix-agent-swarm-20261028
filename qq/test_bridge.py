@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 os.environ["MEDIX_QQ_DISABLE"] = "1"
@@ -69,6 +70,44 @@ class QQBridgeTests(unittest.TestCase):
         self.assertEqual(view["status"], "connected")
         self.assertNotIn("secret-token", json.dumps(view))
         return view
+
+    def test_connect_existing_onebot_never_starts_qq_login(self):
+        self.bridge.owner=self.browser
+        self.bridge._phase='login'
+        with patch('qq.bridge.SnowLumaHost') as host:
+            self.bridge._prepare_login(self.browser)
+            host.assert_not_called()
+        self.assertEqual(self.bridge.view(self.browser)['status'],'connected')
+        self.assertEqual(self.bridge.view(self.browser)['qr'],'')
+
+    def test_resume_existing_account_without_qr_or_qq_launcher(self):
+        self.bridge.owner=self.browser
+        self.bridge._phase='login'
+        self.fake.fail=True
+        def resume():
+            self.fake.fail=False
+            return {'http':'http://127.0.0.1:3000','http_token':'synthetic','ws':'ws://127.0.0.1:3001','ws_token':'synthetic'}
+        with patch('qq.bridge.SnowLumaHost') as host:
+            host.return_value.resume.side_effect=resume
+            self.bridge._prepare_login(self.browser)
+            host.return_value.resume.assert_called_once()
+            host.return_value.prepare.assert_not_called()
+        self.assertEqual(self.bridge.view(self.browser)['status'],'connected')
+        self.assertEqual(self.bridge.view(self.browser)['qr'],'')
+
+    def test_unavailable_existing_account_shows_connection_error_not_scan(self):
+        self.bridge.owner=self.browser
+        self.bridge._phase='login'
+        self.bridge._qr_image='stale-login-image'
+        self.fake.fail=True
+        with patch('qq.bridge.SnowLumaHost') as host:
+            host.return_value.resume.return_value=None
+            self.bridge._prepare_login(self.browser)
+            host.return_value.prepare.assert_not_called()
+        view=self.bridge.view(self.browser)
+        self.assertEqual(view['status'],'error')
+        self.assertEqual(view['qr'],'')
+        self.assertNotIn('扫码',view['hint'])
 
     def test_private_text_is_answered_and_echoes_are_ignored(self):
         self._connect()

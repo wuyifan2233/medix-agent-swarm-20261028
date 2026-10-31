@@ -1,5 +1,4 @@
 """Bridge MediX conversations with a QQ account logged in through local OneBot."""
-import base64
 import secrets
 import hashlib
 import json
@@ -123,37 +122,37 @@ class QQBridge:
                     return self._view_locked(browser_id, 0)
                 self._phase = "login"
                 self._status = "connecting"
-                self._detail = "正在连接本机 QQ，二维码就绪后会显示在这里。"
+                self._detail = "正在连接本机已登录的 QQ…"
                 self._qr_image = ""
-                self._prepare = threading.Thread(target=self._prepare_login, name="medix-qq-login", daemon=True)
+                self._prepare = threading.Thread(target=self._prepare_login, args=(browser_id,), name="medix-qq-connect", daemon=True)
                 self._prepare.start()
                 return self._view_locked(browser_id, 0)
             self._status = "connecting"
         return self._finish_client_login()
 
-    def _prepare_login(self):
+    def _prepare_login(self, expected_owner):
         def cancelled():
             with self._lock:
-                return self._phase != "login"
-
-        def on_qr(png):
-            if cancelled():
-                return
-            with self._lock:
-                self._qr_image = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-                self._detail = "请用手机 QQ 扫描二维码登录。"
-                self._status = "waiting"
+                return self._phase != "login" or self.owner != expected_owner
 
         try:
-            result = SnowLumaHost().prepare(cancelled, on_qr)
-        except RuntimeError as exc:
-            if str(exc) == "已取消" or cancelled():
+            # Attach to a local account that the operator has already logged in.
+            # Never launch QQ, capture a QR, or start a QQ sign-in flow here.
+            status, body = self.client.get_login_info()
+            if action_ok(status, body):
+                if not cancelled():
+                    self._finish_client_login()
                 return
-            self._fail_login(str(exc))
-            return
+            result = SnowLumaHost().resume()
+            if cancelled():
+                return
+            if not result:
+                self._fail_login("尚未连接本机 QQ。请先在电脑版 QQ 登录机器人账号，并确认 SnowLuma 的 OneBot 服务已就绪。")
+                return
         except Exception:
-            logger.exception("QQ login prepare failed")
-            self._fail_login("打开 QQ 登录失败，请稍后重试。")
+            logger.warning("QQ existing-account connection failed")
+            if not cancelled():
+                self._fail_login("暂时无法连接本机 QQ，请检查 SnowLuma 和 OneBot 服务。")
             return
         if cancelled():
             return
@@ -188,7 +187,7 @@ class QQBridge:
             if not action_ok(status, body):
                 self._phase = "idle"
                 self._status = "error"
-                self._error = "QQ 已打开，但 OneBot 还没有就绪。请再点一次扫码登录。"
+                self._error = "本机 QQ 的 OneBot 服务还没有就绪，请检查后重试连接。"
                 self._detail = ""
                 self._self_id = ""
                 return self._view_locked(self.owner, 0)
@@ -486,8 +485,8 @@ class QQBridge:
             hint = f"转发对象是 {who}（{self._peer_user}）。在 QQ 里打开和这个好友的私聊，那就是 MediX 的对话。"
         elif status == "connected":
             hint = f"本机 QQ 已登录 {self._who_locked()}。在下面输入好友 QQ 号，回复和提醒会发到这个好友。"
-        elif status == "waiting":
-            hint = self._detail or "正在打开 QQ 登录…"
+        elif status in {"waiting", "connecting"}:
+            hint = self._detail or "正在连接本机已登录的 QQ…"
         elif status == "error":
             hint = self._error or "暂时连不上本机 QQ。"
         elif status == "taken":
@@ -501,7 +500,7 @@ class QQBridge:
             "hint": hint,
             "linked": status == "connected",
             "can_push": can_push,
-            "qr": self._qr_image if mine and status == "waiting" else "",
+            "qr": "",
             "peer": {"user_id": self._peer_user, "name": self._peer_name} if mine and self._peer_user else None,
             "events": events,
             "cursor": self._events[-1]["id"] if mine and self._events else 0,

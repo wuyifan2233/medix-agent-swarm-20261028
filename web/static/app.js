@@ -1111,8 +1111,8 @@ async function refreshLink() {
     $('wechatState').textContent = linkLabels[data.status] || '未连接';
     $('wechatHint').textContent = data.hint || '';
     const qr = $('wechatQr');
-    const nextQr = data.qr || '';
-    qr.alt = state.channel === 'qq' ? '用手机 QQ 扫描登录' : '用微信扫描，添加 MediX';
+    const nextQr = channel === 'qq' ? '' : data.qr || '';
+    qr.alt = '用微信扫描，添加 MediX';
     if (nextQr !== state.linkQr) {
       state.linkQr = nextQr;
       if (nextQr) {
@@ -1131,7 +1131,7 @@ async function refreshLink() {
     const linked = data.status === 'connected';
     $('wechatLogout').hidden = !linked;
     $('wechatLogin').hidden = linked || data.status === 'taken';
-    if (state.channel === 'qq') $('wechatLogin').textContent = data.status === 'waiting' ? '刷新二维码' : '扫码登录';
+    if (state.channel === 'qq') $('wechatLogin').textContent = data.status === 'connecting' ? '正在连接…' : '连接本机 QQ';
     else $('wechatLogin').textContent = data.status === 'waiting' || data.status === 'scanned' ? '刷新二维码' : '扫码添加';
     (data.events || []).forEach(showPhoneMessage);
     if (Number.isInteger(data.cursor)) state.cursors[state.channel] = data.cursor;
