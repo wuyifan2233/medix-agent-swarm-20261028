@@ -1,9 +1,12 @@
 const $ = (id) => document.getElementById(id);
-const state = {demo:false, chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0};
+const state = {demo:false, chatId: crypto.randomUUID(), images: [], busy: false, health: null, count: 0,
+  voice: {mode:null, recognition:null, recorder:null, stream:null, chunks:[], startedAt:0, timer:null, stopping:false, abortController:null},
+  audio:null, speechAbort:null, speakingButton:null, speechToken:0
+};
 let authEpoch = 0;
 window.addEventListener('medix-signout', () => {
   state.eventSource?.close(); state.eventSource=null; state.jobId=null; $('conversationList').replaceChildren();
-  authEpoch++; state.busy = false; state.images = []; state.chatId = crypto.randomUUID(); state.count = 0;
+  authEpoch++; cancelVoiceInput(); stopSpeaking(); state.busy = false; state.images = []; state.chatId = crypto.randomUUID(); state.count = 0;
   $('messages').replaceChildren(); $('attachments').replaceChildren(); $('message').value = ''; $('remember').checked = false;
   $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话';
   document.body.classList.remove('chatting'); updateComposer();
@@ -45,6 +48,8 @@ function updateComposer() {
   document.querySelectorAll('.session-more,.session-menu-panel button').forEach(button=>button.disabled=blocked);
   document.querySelectorAll('[data-action="upload"], [data-prompt], [data-example], #refreshPrompts').forEach(button => { button.disabled = blocked; });
   $('remember').disabled = blocked || !MedixAuth.user || !state.health?.memory_configured;
+  $('voiceButton').disabled = blocked || Boolean(state.voice.mode);
+  $('autoSpeak').disabled = blocked;
   $('message').style.height = 'auto';
   $('message').style.height = Math.min($('message').scrollHeight, 155) + 'px';
 }
@@ -73,9 +78,212 @@ async function addFiles(files) {
   }
   renderAttachments(); $('message').focus();
 }
+function voiceSupported() {
+  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition ||
+    (state.health?.speech_api_configured && navigator.mediaDevices && window.MediaRecorder));
+}
+function getAutoSpeakPreference() {
+  try {
+    const preference = localStorage.getItem(`medix-auto-speak-${MedixAuth.user?.id || 'guest'}`);
+    return Boolean(MedixAuth.user) && preference === 'true';
+  } catch { return false; }
+}
+function setAutoSpeakPreference(enabled) {
+  try { localStorage.setItem(`medix-auto-speak-${MedixAuth.user?.id || 'guest'}`, String(enabled)); } catch { /* Storage may be disabled in private contexts. */ }
+}
+function setVoicePanel(open) {
+  $('voicePanel').hidden = !open;
+  $('voiceButton').setAttribute('aria-pressed', String(open));
+  if (!open) {
+    $('voiceRecordActions').hidden = false;
+    $('voiceWave').hidden = false;
+  }
+}
+function stopVoiceTracks() {
+  if (state.voice.stream) state.voice.stream.getTracks().forEach(track => track.stop());
+  state.voice.stream = null;
+}
+function clearVoiceTimer() {
+  if (state.voice.timer) clearInterval(state.voice.timer);
+  state.voice.timer = null;
+}
+function resetVoiceState() {
+  const previousVoice = state.voice;
+  if (previousVoice.abortController) previousVoice.abortController.abort();
+  clearVoiceTimer();
+  stopVoiceTracks();
+  state.voice = {mode: null, recognition: null, recorder: null, stream: null, chunks: [], startedAt: 0, timer: null, stopping: false, cancelled: false, finalText: '', interimText: '', abortController: null};
+  setVoicePanel(false);
+  updateComposer();
+}
+function updateVoiceElapsed() {
+  if (!state.voice.startedAt) return;
+  const seconds = Math.max(0, Math.floor((Date.now() - state.voice.startedAt) / 1000));
+  $('voiceElapsed').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  if (seconds >= 90 && ['browser', 'recorder'].includes(state.voice.mode)) {
+    $('voiceStatus').textContent = '已达到 90 秒时长上限，正在整理文字…';
+    stopVoiceInput();
+  }
+}
+function beginVoiceUi(title, status) {
+  setVoicePanel(true);
+  $('voiceTitle').textContent = title;
+  $('voiceStatus').textContent = status;
+  $('voiceRecordActions').hidden = false;
+  $('voiceWave').hidden = false;
+  state.voice.startedAt = Date.now();
+  updateVoiceElapsed();
+  clearVoiceTimer();
+  state.voice.timer = setInterval(updateVoiceElapsed, 500);
+  updateComposer();
+}
+function insertVoiceTranscript(text) {
+  const transcript = String(text || '').trim();
+  if (!transcript) return;
+  clearVoiceTimer();
+  stopVoiceTracks();
+  const input = $('message');
+  const draft = input.value;
+  const separator = draft && !/\s$/.test(draft) ? '\n' : '';
+  input.value = `${draft}${separator}${transcript}`.slice(0, 8000);
+  resetVoiceState();
+  updateComposer();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.classList.remove('transcript-added');
+  void input.offsetWidth;
+  input.classList.add('transcript-added');
+  setTimeout(() => input.classList.remove('transcript-added'), 1100);
+}
+function startBrowserRecognition() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new Recognition();
+  state.voice.mode = 'browser';
+  state.voice.recognition = recognition;
+  setVoicePanel(true);
+  $('voiceTitle').textContent = '准备听写';
+  $('voiceStatus').textContent = '等待浏览器麦克风权限';
+  updateComposer();
+  state.voice.finalText = '';
+  const session = state.voice;
+  recognition.lang = 'zh-CN';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onstart = () => { if (state.voice === session) beginVoiceUi('正在听你说', '说完后点击结束录音'); };
+  recognition.onresult = event => {
+    if (state.voice !== session) return;
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const chunk = event.results[i][0]?.transcript || '';
+      if (event.results[i].isFinal) session.finalText += chunk;
+      else interim += chunk;
+    }
+    $('voiceStatus').textContent = '正在识别';
+    session.interimText = interim;
+  };
+  recognition.onerror = event => {
+    if (state.voice !== session || event.error === 'aborted' || session.stopping || session.cancelled) return;
+    const canUseAudioApi = state.health?.speech_api_configured && ['network', 'service-not-allowed'].includes(event.error);
+    resetVoiceState();
+    if (canUseAudioApi) { toast('浏览器听写暂不可用，已切换到录音识别。'); startRecorderFallback(); }
+    else toast(event.error === 'not-allowed' ? '麦克风权限被拒绝，请允许浏览器使用麦克风。' : '浏览器听写没有完成，请重试或改用文字输入。');
+  };
+  recognition.onend = () => {
+    if (state.voice !== session) return;
+    const text = `${session.finalText || ''} ${session.interimText || ''}`.trim();
+    if (session.cancelled) return resetVoiceState();
+    if (!session.stopping) session.stopping = true;
+    if (text) insertVoiceTranscript(text);
+    else { resetVoiceState(); toast('没有识别到清晰语音，请再试一次。'); }
+  };
+  try { recognition.start(); }
+  catch { resetVoiceState(); toast('语音输入暂时无法启动，请重试。'); }
+}
+async function startRecorderFallback() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    toast('当前浏览器不支持语音输入，请使用 Chrome 或 Edge，或直接输入文字。');
+    return;
+  }
+  if (!state.health?.speech_api_configured) {
+    toast('当前浏览器不支持原生听写，且服务端 ASR 未配置；请使用 Chrome/Edge 或直接输入文字。');
+    return;
+  }
+  const recordingSession = state.voice;
+  recordingSession.mode = 'requesting-mic';
+  beginVoiceUi('等待麦克风权限', '请允许使用麦克风');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    if (state.voice !== recordingSession || recordingSession.cancelled) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type)) || '';
+    const recorder = new MediaRecorder(stream, mime ? {mimeType: mime} : undefined);
+    recordingSession.mode = 'recorder'; recordingSession.recorder = recorder; recordingSession.stream = stream; recordingSession.chunks = [];
+    recorder.ondataavailable = event => { if (event.data.size && state.voice === recordingSession) recordingSession.chunks.push(event.data); };
+    recorder.onstop = async () => {
+      if (state.voice !== recordingSession) return;
+      const cancelled = recordingSession.cancelled;
+      const blob = new Blob(recordingSession.chunks, {type: recorder.mimeType || 'audio/webm'});
+      recordingSession.chunks = [];
+      stopVoiceTracks(); clearVoiceTimer();
+      if (cancelled) return resetVoiceState();
+      recordingSession.mode = 'uploading'; $('voiceTitle').textContent = '正在转成文字'; $('voiceStatus').textContent = '音频发送至已配置的识别服务；不会保存在 MediX'; $('voiceRecordActions').hidden = true;
+      try {
+        const abortController = new AbortController();
+        recordingSession.abortController = abortController;
+        const encoded = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(blob); });
+        if (state.voice !== recordingSession) return;
+        const response = await MedixAuth.fetch('/api/voice/transcribe', {method:'POST', body:JSON.stringify({audio:encoded, content_type:blob.type || 'audio/webm'}), signal:abortController.signal});
+        const data = await response.json();
+        if (state.voice !== recordingSession) return;
+        recordingSession.abortController = null;
+        if (!response.ok) throw new Error(data.detail || '语音识别暂时不可用。');
+        if (!data.text?.trim()) throw new Error('没有识别出清晰语音，请重试。');
+        insertVoiceTranscript(data.text);
+      } catch (error) { if (state.voice === recordingSession) { resetVoiceState(); if (error.name !== 'AbortError') toast(error.message); } }
+    };
+    recorder.start(250);
+    beginVoiceUi('正在录音', '说完后点击结束录音');
+  } catch { if (state.voice === recordingSession) resetVoiceState(); toast('无法访问麦克风，请检查浏览器权限。'); }
+}
+function startVoiceInput() {
+  if (state.busy || state.voice.mode) return;
+  if (!voiceSupported()) { toast('当前浏览器不支持语音输入，请使用 Chrome 或 Edge，或直接输入文字。'); return; }
+  if (window.SpeechRecognition || window.webkitSpeechRecognition) startBrowserRecognition();
+  else startRecorderFallback();
+}
+function stopVoiceInput() {
+  if (state.voice.mode === 'requesting-mic') {
+    state.voice.cancelled = true; resetVoiceState(); return;
+  }
+  if (state.voice.mode === 'browser' && state.voice.recognition) {
+    if (state.voice.stopping) return;
+    state.voice.stopping = true; $('voiceStatus').textContent = '正在整理文字…'; state.voice.recognition.stop();
+  } else if (state.voice.mode === 'recorder' && state.voice.recorder) {
+    if (state.voice.stopping) return;
+    state.voice.stopping = true; $('voiceStatus').textContent = '正在整理录音…'; state.voice.recorder.stop();
+  }
+}
+function cancelVoiceInput() {
+  const voice = state.voice;
+  voice.cancelled = true;
+  if (voice.abortController) { voice.abortController.abort(); resetVoiceState(); return; }
+  if (voice.recognition) { try { voice.recognition.abort(); } catch {} resetVoiceState(); return; }
+  if (voice.recorder && voice.recorder.state !== 'inactive') { try { voice.recorder.stop(); return; } catch {} }
+  resetVoiceState();
+}
+function retryVoiceInput() { cancelVoiceInput(); setTimeout(startVoiceInput, 80); }
 $('attachButton').onclick = () => $('fileInput').click();
 $('fileInput').onchange = (event) => { addFiles(event.target.files); event.target.value = ''; };
+$('voiceButton').onclick = startVoiceInput;
+$('stopVoice').onclick = stopVoiceInput;
+$('cancelVoice').onclick = cancelVoiceInput;
 $('message').oninput = updateComposer;
+$('autoSpeak').checked = getAutoSpeakPreference();
+$('autoSpeak').onchange = () => { setAutoSpeakPreference($('autoSpeak').checked); };
+
 $('message').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!$('sendButton').disabled) $('chatForm').requestSubmit(); } };
 document.addEventListener('paste', event => {
   if (state.busy) return;
@@ -113,6 +321,82 @@ function richText(value) {
   return output.join('');
 }
 
+function speechSafeText(value) {
+  return String(value || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^\s*\|.*\|\s*$/gm, ' ')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[>*_`#]/g, '')
+    .replace(/\[([^\]]+\.pdf)\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function stopSpeaking() {
+  state.speechToken++;
+  state.speechAbort?.abort(); state.speechAbort = null;
+  if (state.audio) {
+    const audio = state.audio; state.audio = null;
+    audio.onended = null; audio.onerror = null; audio.onplaying = null; audio.onwaiting = null;
+    audio.pause(); audio.removeAttribute('src'); audio.load();
+  }
+  if (state.speakingButton) {
+    state.speakingButton.classList.remove('speaking');
+    state.speakingButton.setAttribute('aria-pressed', 'false');
+    state.speakingButton.innerHTML = `${icon('volume')}<span>${state.speakingIdleLabel || '朗读'}</span>`;
+    state.speakingButton = null;
+  }
+}
+async function speakAnswer(answer, button, preview = null) {
+  if (state.speakingButton) { const sameButton = state.speakingButton === button; stopSpeaking(); if (sameButton) return; }
+  const text = speechSafeText(answer);
+  if (!text) return;
+  const token = ++state.speechToken;
+  const controller = new AbortController(); state.speechAbort = controller;
+  state.speakingIdleLabel = preview ? '试听当前声音' : '朗读';
+  state.speakingButton = button; button.classList.add('speaking'); button.setAttribute('aria-pressed', 'true');
+  button.innerHTML = `${icon('stop')}<span>连接中 · 停止</span>`;
+  try {
+    const response = await MedixAuth.fetch(preview ? '/api/voice/speech/preview' : '/api/voice/speech/prepare', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(preview || {text}), signal: controller.signal
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || '云端语音生成失败，请重新朗读。');
+    }
+    const prepared = await response.json();
+    if (state.speechToken !== token) return;
+    if (!/^\/api\/voice\/speech\/stream\/[a-f0-9]{32}$/.test(prepared.url || '')) throw new Error('音频地址无效，请重新朗读。');
+    if (prepared.voice?.label) button.title = `当前声音：${prepared.voice.label}`;
+    state.speechAbort = null;
+    // Native Audio progressively decodes the HTTP MP3 stream; no response.blob().
+    const audio = new Audio(); state.audio = audio;
+    audio.preload = 'auto';
+    audio.onplaying = () => {
+      if (state.speechToken === token) button.innerHTML = `${icon('stop')}<span>停止</span>`;
+    };
+    audio.onwaiting = () => {
+      if (state.speechToken === token) button.innerHTML = `${icon('stop')}<span>缓冲中 · 停止</span>`;
+    };
+    audio.onended = () => { if (state.speechToken === token) stopSpeaking(); };
+    audio.onerror = () => {
+      if (state.speechToken !== token) return;
+      stopSpeaking(); toast('云端语音连接中断或音频不可用，请重新朗读。');
+    };
+    audio.src = prepared.url;
+    button.innerHTML = `${icon('stop')}<span>生成中 · 停止</span>`;
+    await audio.play();
+  } catch (error) {
+    if (state.speechToken !== token) return;
+    stopSpeaking();
+    if (error.name !== 'AbortError') toast(error.name === 'NotAllowedError'
+      ? '浏览器暂未允许自动播放，请点击回答下的朗读按钮。'
+      : (error.message || '云端语音暂时不可用，请重新朗读。'));
+  }
+}
+
 function userMessage(message, images) {
   const row = document.createElement('article'); row.className = 'message user';
   if (images.length) {
@@ -145,7 +429,7 @@ function citationPreview(trigger, source, quote = '') {
   card.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - width - 12))}px`;
   card.style.top = `${Math.max(12, Math.min(rect.bottom + 8, innerHeight - height - 12))}px`;
 }
-function resultMessage(row, result, userText, jobId) {
+function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   if (result.case_id) {state.caseId=result.case_id; refreshCases().catch(()=>{});}
   if (result.case_changes?.length) {
     document.querySelectorAll('.message.assistant').forEach(previous => {
@@ -209,6 +493,10 @@ function resultMessage(row, result, userText, jobId) {
       answer.querySelectorAll('[data-citation]').forEach(button => button.onclick = () => citationPreview(button, result.sources.find(s => s.citation === Number(button.dataset.citation))));
     }
   }
+  const answerActions = document.createElement('div'); answerActions.className = 'answer-actions';
+  const speak = document.createElement('button'); speak.type = 'button'; speak.className = 'speak-button'; speak.setAttribute('aria-label', '朗读回答'); speak.setAttribute('aria-pressed', 'false'); speak.innerHTML = `${icon('volume')}<span>朗读</span>`; speak.onclick = () => speakAnswer(result.answer, speak);
+  const copyAnswer = document.createElement('button'); copyAnswer.type = 'button'; copyAnswer.className = 'answer-tool'; copyAnswer.innerHTML = `${icon('check')}<span>复制文字</span>`; copyAnswer.onclick = async () => { try { await navigator.clipboard.writeText(result.answer); toast('回答文字已复制。'); } catch { toast('复制失败，请手动选择文字。'); } };
+  answerActions.append(speak, copyAnswer); main.append(answerActions);
   const meta = document.createElement('div'); meta.className = 'message-meta';
   const tags = [...(result.generation === 'not_called' ? ['仅检索原文'] : []), ...(result.image_context_used ? ['沿用本轮图片信息'] : []), ...(result.memory_enabled ? ['长期记忆已启用'] : []), ...(result.partial ? ['部分任务超时'] : [])];
   tags.forEach(text => { const tag = document.createElement('span'); tag.className = 'meta-pill'; tag.textContent = text; meta.append(tag); });
@@ -247,6 +535,10 @@ function resultMessage(row, result, userText, jobId) {
   const referenceTitle=document.createElement('summary');referenceTitle.textContent=[result.profile_used?'本轮已参考健康档案':'本轮未使用健康档案',result.reply_preferences_used?(result.reply_preferences_status==='applied'?'回答偏好已应用':'回答偏好整理未完成'):''].filter(Boolean).join(' · ')+' · 查看说明';
   reference.open=Boolean(result.reply_preferences_used && result.reply_preferences_status!=='applied');
   reference.append(referenceTitle,profileNote);actions.append(reference);main.append(actions);
+  const playbackEpoch = authEpoch, playbackToken = state.speechToken;
+  if (autoPlayback && $('autoSpeak').checked) setTimeout(() => {
+    if (authEpoch === playbackEpoch && state.speechToken === playbackToken && speak.isConnected && $('autoSpeak').checked) speakAnswer(result.answer, speak);
+  }, 80);
   scrollDown();
 }
 async function submit(message, images, retryRow, requestId = crypto.randomUUID()) {
@@ -280,7 +572,7 @@ async function submit(message, images, retryRow, requestId = crypto.randomUUID()
   } finally { if (epoch === authEpoch) { state.busy = false; state.jobId=null; updateComposer(); $('message').focus(); } }
 }
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
-$('newChat').onclick = () => { if (state.busy) return; state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
+$('newChat').onclick = () => { if (state.busy) return; cancelVoiceInput(); stopSpeaking(); state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
 const resetChat = $('newChat').onclick;
 $('newChat').onclick = () => {if(state.busy)return; resetChat();state.caseId='';$('caseContext').value='';};
 $('caseContext').onchange = () => {const selected=$('caseContext').value;resetChat();state.caseId=selected;$('caseContext').value=selected;};
@@ -908,7 +1200,6 @@ setInterval(refreshLink, 2000);
 window.addEventListener('medix-auth-change',()=>{refreshReminders();refreshLink();});
 window.addEventListener('medix-signout',()=>{state.seenReminders.clear();state.cursors={wechat:0,qq:0};state.linkQr='';state.channel='wechat';$('wechatQr').hidden=true;$('wechatQr').removeAttribute('src');$('wechatState').textContent='未连接';$('wechatHint').textContent='请登录后连接微信或 QQ。';renderUpcoming([]);});
 
-
 // Durable conversations and resumable, server-originated model chunks.
 function rememberActiveChat() {
   if (MedixAuth.user) localStorage.setItem(`medix-active-${MedixAuth.user.id}`,state.chatId);
@@ -1030,7 +1321,7 @@ async function openConversation(id) {
     const row=pendingMessage();
     if(turn.label)row.querySelector('.phase-label').textContent=turn.label;
     totalRequests+=turn.usage.requests;totalTokens+=turn.usage.input_tokens+turn.usage.output_tokens;
-    if(turn.status==='completed' && turn.result)resultMessage(row,turn.result,turn.payload.message,turn.id);
+    if(turn.status==='completed' && turn.result)resultMessage(row,turn.result,turn.payload.message,turn.id,false);
     else {
       if(turn.draft)draftArea(row).textContent=turn.draft;
       row.dataset.streamCall=turn.draft_call || '';
@@ -1280,3 +1571,12 @@ $('rechargeCreate').onclick=async()=>{
   }catch(error){if(epoch===rechargeEpoch && owner===MedixAuth.user?.id)$('rechargeFeedback').textContent=typeof error.message==='string'?error.message:'订单未能创建，请稍后重试。';}
   finally{if(epoch===rechargeEpoch)$('rechargeCreate').disabled=!selectedRecharge;}
 };
+// Settings previews share the answer player, including stop and stale-response guards.
+window.MedixVoice = Object.freeze({
+  preview: (profile_id, tone, button) => speakAnswer('试听', button, {profile_id, tone}),
+  stop: stopSpeaking,
+  stopPreview: () => { if (state.speakingButton?.id === 'rpVoicePreview') stopSpeaking(); }
+});
+
+window.addEventListener('medix-auth-change',()=>{$('autoSpeak').checked=getAutoSpeakPreference();});
+window.addEventListener('medix-signout',()=>{$('autoSpeak').checked=false;});

@@ -18,6 +18,7 @@ class Preferences(StrictModel):
     enabled: bool = Field(default=False,strict=True)
     nickname: str = Field(default='',max_length=20)
     tone: Literal['supportive','direct','neutral'] = 'neutral'
+    voice_profile: Literal['auto','gentle','clear','steady'] = 'auto'
     detail: Literal['brief','standard','detailed'] = 'standard'
     format: Literal['summary_first','steps','explanation'] = 'summary_first'
     terminology: Literal['plain','professional'] = 'plain'

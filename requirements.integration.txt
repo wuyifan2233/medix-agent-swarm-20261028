@@ -28,3 +28,6 @@ SQLAlchemy==2.0.36
 alembic==1.14.0
 pwdlib[argon2]==0.3.1
 alibabacloud_dypnsapi20170525==2.0.0
+
+# Cloud streaming voice output
+edge-tts==7.3.1

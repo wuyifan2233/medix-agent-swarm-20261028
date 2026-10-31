@@ -6,6 +6,9 @@ if (-not (Test-Path -LiteralPath $python)) { throw 'Missing isolated Python envi
 $previousKey = $env:OPENAI_API_KEY
 $previousDeepSeekKey = $env:DEEPSEEK_API_KEY
 $previousMem0Key = $env:MEM0_API_KEY
+$previousConfigPath = $env:MEDIX_CONFIG_PATH
+$localConfig = Join-Path $PSScriptRoot 'local.config.py'
+if (Test-Path -LiteralPath $localConfig) { $env:MEDIX_CONFIG_PATH = $localConfig }
 $hasConfigKey = & $python -c "import sys; sys.path.insert(0,sys.argv[1]); from config import LLM_CONFIG; print(LLM_CONFIG.get('api_key') not in ('',None,'not-configured'))" $PSScriptRoot
 if ($Provider -eq 'DeepSeek' -and -not $env:DEEPSEEK_API_KEY) {
     $secret = Read-Host 'DeepSeek API Key (not saved)' -AsSecureString
@@ -40,4 +43,5 @@ try {
     $env:OPENAI_API_KEY = $previousKey
     $env:DEEPSEEK_API_KEY = $previousDeepSeekKey
     $env:MEM0_API_KEY = $previousMem0Key
+    $env:MEDIX_CONFIG_PATH = $previousConfigPath
 }
