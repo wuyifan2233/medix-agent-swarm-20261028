@@ -47,8 +47,11 @@ def validate_resolution(data, question, previous, observations=''):
     if data.get('should_store') is True and not should_store:
         reason = '待保存信息缺少可核对的用户原话，本次暂不保存'
     if not isinstance(reason,str) or not reason.strip(): reason = '包含后续咨询可参考的个人健康信息' if should_store else '本次没有需要长期保存的个人健康信息'
-    return resolution(subject,confidence,evidence,corrects_previous=correction,confirms_previous=confirmation,
+    result = resolution(subject,confidence,evidence,corrects_previous=correction,confirms_previous=confirmation,
                       should_store=should_store,memory_reason=reason[:160])
+    result['long_term_value'] = should_store and data.get('long_term_value') is True
+    result['memory_evidence'] = memory_evidence if should_store else ''
+    return result
 
 
 async def resolve_patient(question, previous=None, override='auto', client=None, observations=''):
@@ -73,7 +76,8 @@ async def resolve_patient(question, previous=None, override='auto', client=None,
 8. 另外返回should_store(bool)、memory_evidence(值得保存的健康事实的原话片段)、memory_reason(不超过40字的中文判断原因)。只有人物明确且有后续咨询价值的用户自述事实才保存，例如症状及变化、病史、过敏、用药、检查结果、健康习惯或人物更正。短期不适也可保存用于后续追踪。
 本人、父亲、母亲三个分组同等支持长期记忆：用户直接叙述妈妈或爸爸的真实健康状况也属于可保存事实，不能以「不是用户本人」为理由拒绝保存。例如「我妈妈鼻塞两天，今天开始咳嗽」应识别mother并保存到母亲分组。
 9. 寒暄、纯科普、假设、引用别人的案例、重复追问但未增加事实、单纯要求建议或解释、助手推测，均should_store=false。用户明确说不要保存或不要记住本次信息，也返回false。人物未知、多人、其他亲友不保存。不能把「我妈妈应该吃什么」这类提问当成已发生的病史。
-10. memory_evidence须逐字出自本次用户描述或current_image_observations；补充确认/更正人物时可引用前文用户的健康事实，不能引用助手的回答。图片读取不清晰不确定的内容不作为确定事实保存。只输出JSON。"""
+10. 额外返回long_term_value(bool)：只在用户自述含有未来多次咨询仍有价值的长期病史、手术史、过敏、长期用药、持续健康习惯、持续或反复需追踪的健康问题时为true。单次短期感冒、临时提醒、一般建议请求、寒暄、假设、否定未患病、无新事实的追问均为false。明确要求不保存时为false；判断不确定时为false。不能因为助手回答很详细或提到疾病就认为有长期价值。重复已有事实但未补充或更正，也为false。
+11. memory_evidence须逐字出自本次用户描述或current_image_observations；补充确认/更正人物时可引用前文用户的健康事实，不能引用助手的回答。图片读取不清晰不确定的内容不作为确定事实保存。只输出JSON。"""
         data = {"question":question, "previous_patient":previous.get('patient'), "awaiting_patient_confirmation":previous.get('awaiting_patient_confirmation',False),
                 "recent_user_messages":[row.get('content','') for row in previous.get('history',[])[-6:] if row.get('role')=='user'],
                 "current_image_observations":observations[:6000]}

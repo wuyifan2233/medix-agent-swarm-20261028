@@ -22,7 +22,7 @@ def database():
     try:
         if DB_PATH is not None:
             db.executescript("""
-            CREATE TABLE IF NOT EXISTS cases(id TEXT PRIMARY KEY,owner TEXT NOT NULL,name TEXT NOT NULL,created TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS cases(id TEXT PRIMARY KEY,owner TEXT NOT NULL,name TEXT NOT NULL,created TEXT NOT NULL,subject TEXT NOT NULL DEFAULT 'unknown');
             CREATE TABLE IF NOT EXISTS bindings(owner TEXT,chat_id TEXT,case_id TEXT,PRIMARY KEY(owner,chat_id));
             CREATE TABLE IF NOT EXISTS facts(id TEXT PRIMARY KEY,owner TEXT NOT NULL,case_id TEXT NOT NULL,revision INTEGER NOT NULL,
               data TEXT NOT NULL,source TEXT NOT NULL,quote TEXT NOT NULL,updated TEXT NOT NULL,dirty INTEGER NOT NULL DEFAULT 1);
@@ -160,18 +160,47 @@ def case_title(facts):
 
 def require_case(owner, case_id):
     with database() as db:
-        row = db.execute("SELECT id,name,created FROM cases WHERE id=? AND owner=?", (case_id, owner)).fetchone()
+        row = db.execute("SELECT id,name,created,subject FROM cases WHERE id=? AND owner=?", (case_id, owner)).fetchone()
         if row is None:
             raise LookupError("当前浏览器无法访问此病例，请重新选择。")
         return dict(row)
 
 
-def bound_case(owner, chat_id, selected=""):
+def bound_case(owner, chat_id, selected="", subject=None):
+    """A known person may reuse history across chats; unknown people never do."""
     if selected:
-        return require_case(owner, selected)["id"]
+        row = require_case(owner, selected)
+        if subject is None or row['subject'] == subject and subject in {'self', 'father', 'mother'}:
+            return row['id']
     with database() as db:
-        row = db.execute("SELECT case_id FROM bindings WHERE owner=? AND chat_id=?", (owner, chat_id)).fetchone()
-        return row["case_id"] if row else ""
+        row = db.execute("SELECT c.id,c.subject FROM cases c JOIN bindings b ON b.case_id=c.id AND b.owner=c.owner WHERE b.owner=? AND b.chat_id=?", (owner, chat_id)).fetchone()
+        if row and (subject is None or subject in {'self', 'father', 'mother'} and row['subject'] == subject):
+            return row['id']
+        if subject in {'self', 'father', 'mother'}:
+            row = db.execute("SELECT id FROM cases WHERE owner=? AND subject=? ORDER BY created DESC,id LIMIT 1", (owner, subject)).fetchone()
+            return row['id'] if row else ''
+    return ''
+
+
+def confirm_case_subject(owner, chat_id, subject):
+    """Only a current-chat unknown case can be classified after explicit confirmation."""
+    if subject not in {'self', 'father', 'mother'}: return False
+    with database() as db:
+        cursor = db.execute("UPDATE cases SET subject=? WHERE owner=? AND subject='unknown' AND id=(SELECT case_id FROM bindings WHERE owner=? AND chat_id=?)", (subject, owner, owner, chat_id))
+        return cursor.rowcount == 1
+
+
+def history_case_ids(owner, case_id, subject=None):
+    if subject not in {'self', 'father', 'mother'}:
+        return [require_case(owner, case_id)['id']] if case_id else []
+    with database() as db:
+        return [row['id'] for row in db.execute("SELECT id FROM cases WHERE owner=? AND subject=? ORDER BY created DESC,id", (owner, subject))]
+
+
+def history_facts(owner, case_id, subject=None):
+    ids = history_case_ids(owner, case_id, subject)
+    facts = [fact for cid in ids for fact in current_facts(owner, cid)]
+    return sorted(facts, key=lambda f: (f['updated'], f['id']), reverse=True)
 
 
 def fact_pages(owner, case_id, page_size=200):
@@ -224,12 +253,12 @@ def previous_turn(owner, request_id):
         return json.loads(row["outcome"]) if row else None
 
 
-def apply_changes(owner, chat_id, selected, request_id, proposal, message, observed):
+def apply_changes(owner, chat_id, selected, request_id, proposal, message, observed, subject=None):
     """Atomic edits + revision audit. An extractor proposal never grants data access."""
     old_turn = previous_turn(owner, request_id)
     if old_turn:
         return old_turn
-    case_id = bound_case(owner, chat_id, selected)
+    case_id = bound_case(owner, chat_id, selected, subject)
     operations = proposal.get("operations", [])
     if not isinstance(operations, list) or len(operations) > 2000:
         raise ValueError("本次病例记录过多，请拆分资料。")
@@ -238,13 +267,15 @@ def apply_changes(owner, chat_id, selected, request_id, proposal, message, obser
     switching = proposal.get("new_patient") is True
     if switching:
         case_id = ""
+    allowed_cases = history_case_ids(owner, case_id, subject) if not switching else []
+    case_subject = subject if subject in {'self', 'father', 'mother'} else 'unknown'
     changes = []
     with database() as db:
         if db.execute("SELECT 1 FROM turns WHERE owner=? AND request_id=?", (owner, request_id)).fetchone():
             return previous_turn(owner, request_id)
         if switching:
             case_id = uuid.uuid4().hex
-            db.execute("INSERT INTO cases VALUES (?,?,?,?)", (case_id, owner, "新病例 " + now()[:16].replace("T", " ") + " UTC", now()))
+            db.execute("INSERT INTO cases(id,owner,name,created,subject) VALUES (?,?,?,?,?)", (case_id, owner, "新病例 " + now()[:16].replace("T", " ") + " UTC", now(), case_subject))
         for operation in operations:
             if not isinstance(operation, dict):
                 continue
@@ -264,9 +295,9 @@ def apply_changes(owner, chat_id, selected, request_id, proposal, message, obser
                 questions.append("有一项图片结果与结果列不一致，未入库；请提供该项目的清晰图片。")
                 continue
             if action in {"correct", "supplement"}:
-                target = db.execute("SELECT * FROM facts WHERE id=? AND owner=? AND case_id=?",
-                                    (operation.get("target_id", ""), owner, case_id)).fetchone()
-                if target is None or target["revision"] != operation.get("expected_revision"):
+                target = db.execute("SELECT * FROM facts WHERE id=? AND owner=?",
+                                    (operation.get("target_id", ""), owner)).fetchone()
+                if target is None or target['case_id'] not in allowed_cases or target["revision"] != operation.get("expected_revision"):
                     questions.append("需要确认你要修改的是哪一次记录，请补充项目或检查日期。")
                     continue
                 before = json.loads(target["data"])
@@ -293,7 +324,8 @@ def apply_changes(owner, chat_id, selected, request_id, proposal, message, obser
                 duplicate = db.execute("SELECT 1 FROM facts WHERE owner=? AND case_id=? AND data=?",
                                        (owner, case_id, json.dumps(data, ensure_ascii=False))).fetchone()
                 if source == "image" and data.get("report_id"):
-                    existing = db.execute("SELECT data,revision FROM facts WHERE owner=? AND case_id=?", (owner,case_id)).fetchall()
+                    existing = db.execute("SELECT data,revision,case_id FROM facts WHERE owner=?", (owner,)).fetchall()
+                    existing = [r for r in existing if r['case_id'] in allowed_cases or r['case_id'] == case_id]
                     duplicate = duplicate or any(
                         json.loads(r["data"]).get("report_id") == data["report_id"]
                         and item_key(json.loads(r["data"])["name"]) == item_key(data["name"])
@@ -306,12 +338,13 @@ def apply_changes(owner, chat_id, selected, request_id, proposal, message, obser
                 continue
             if not case_id:
                 case_id = uuid.uuid4().hex
-                db.execute("INSERT INTO cases VALUES (?,?,?,?)", (case_id, owner, "病例 " + now()[:16].replace("T", " ") + " UTC", now()))
+                db.execute("INSERT INTO cases(id,owner,name,created,subject) VALUES (?,?,?,?,?)", (case_id, owner, "病例 " + now()[:16].replace("T", " ") + " UTC", now(), case_subject))
+            fact_case_id = target['case_id'] if action in {'correct', 'supplement'} else case_id
             stamp = now()
             encoded = json.dumps(data, ensure_ascii=False)
             db.execute("INSERT INTO facts VALUES (?,?,?,?,?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET "
                        "revision=excluded.revision,data=excluded.data,source=excluded.source,quote=excluded.quote,updated=excluded.updated,dirty=1",
-                       (fact_id, owner, case_id, revision, encoded, source, quote, stamp))
+                       (fact_id, owner, fact_case_id, revision, encoded, source, quote, stamp))
             db.execute("INSERT INTO versions VALUES (?,?,?,?,?,?)", (fact_id, revision, encoded, source, quote, stamp))
             changes.append({"id": fact_id, "revision": revision, "action": action, "name": data["name"]})
         if case_id:

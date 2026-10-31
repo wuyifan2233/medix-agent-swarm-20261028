@@ -10,10 +10,10 @@ MODULES = '''auth.test_auth auth.test_sms_provider
 personalization.test_registration_profile personalization.test_preferences
 core.test_deepseek tests.test_deepseek_config
 knowledge.test_mini knowledge.test_bulk knowledge.test_initialize knowledge.test_bootstrap knowledge.test_embeddings knowledge.test_reranking knowledge.test_evidence knowledge.test_answering knowledge.test_query_policy
-web.test_request_routing web.test_channel_wallet web.test_care_wallet web.test_chat_delivery web.test_case_memory web.test_case_pipeline web.test_web web.test_speech web.test_startup web.test_provider_errors web.test_report_integrity web.test_report_answer web.test_vision
+web.test_local_source web.test_request_routing web.test_channel_wallet web.test_care_wallet web.test_chat_delivery web.test_case_memory web.test_case_pipeline web.test_case_history web.test_web web.test_speech web.test_startup web.test_provider_errors web.test_report_integrity web.test_report_answer web.test_vision
 
 memory.test_case_memory memory.test_patient_resolver memory.test_web_mem0 memory.test_exchange_mem0
-storage.test_integration web.test_reminders qq.test_bridge qq.test_snowluma_capture wechat.test_bridge'''.split()
+storage.test_integration web.test_reminders qq.test_bridge qq.test_snowluma_capture qq.test_napcat_runtime wechat.test_bridge'''.split()
 
 if __name__ == '__main__':
     # Even imports and legacy fixture cleanup must never touch the preview DB.

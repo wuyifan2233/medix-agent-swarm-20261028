@@ -24,8 +24,9 @@ def view(owner):
         ensure(db,owner)
         row=db.execute('SELECT * FROM care_wallets WHERE owner=?',(owner,)).fetchone()
         held=db.execute('SELECT COALESCE(SUM(reserved),0) FROM care_ledger WHERE owner=?',(owner,)).fetchone()[0]
+        spent=db.execute("SELECT COALESCE(SUM(amount),0) FROM care_ledger WHERE owner=? AND kind='debit'",(owner,)).fetchone()[0]
         return {'name':'关怀点','balance':row['balance']/1000,'available':max(0,row['balance']-held)/1000,
-                'held':held/1000,'initial':row['initial']/1000,'points_per_cny':row['units_per_cny']/1000}
+                'spent':spent/1000,'held':held/1000,'initial':row['initial']/1000,'points_per_cny':row['units_per_cny']/1000}
 
 def reserve(call_id,turn_id,params,price=None):
     with connect() as db:

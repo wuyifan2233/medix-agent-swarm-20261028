@@ -25,12 +25,16 @@
   <p class="rp-hint">保存后自动启用，文字偏好从下次提问生效，声音从下次播报生效；已有回答不会自动改写。温和表达不会省略必要的风险提示，偏好也不代表疾病诊断。启用时，本轮暂停云端记忆。</p>
   <footer><button type="submit" id="rpSave">保存回答偏好</button><button type="button" id="rpReset">恢复默认并关闭偏好</button></footer></form><p id="rpStatus" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
+  const autoRead=document.getElementById("autoReadPreference");
+  dialog.querySelector(".rp-voice-options").before(autoRead);
+  autoRead.hidden=false;
+
   const form=dialog.querySelector('form'),status=dialog.querySelector('#rpStatus');
   let revision=0,epoch=0,actor=null,busy=false,loaded=false,catalog=null,catalogRequest=0;
   const preview=dialog.querySelector('#rpVoicePreview'),summary=document.getElementById('voicePreferenceSummary');
   const defaults={enabled:false,nickname:'',tone:'neutral',detail:'standard',format:'summary_first',terminology:'plain',communication_note:'',daily_context:'',voice_profile:'auto'};
   function render(data){for(const [key,value] of Object.entries({...defaults,...data})){const node=form.elements.namedItem(key);if(!node)continue;if(node.type==='checkbox')node.checked=value;else node.value=value;}updateVoiceHint();}
-  function lock(value){busy=value;form.querySelectorAll('input,select,textarea,button').forEach(node=>{node.disabled=value;});}
+  function lock(value){busy=value;form.querySelectorAll('input:not(#autoSpeak),select,textarea,button').forEach(node=>{node.disabled=value;});}
   function updateVoiceHint(){
     const selected=form.elements.namedItem('voice_profile').value || 'auto';
     const tone=form.elements.namedItem('tone').value;
@@ -88,6 +92,6 @@
   window.addEventListener('medix-signout',reset);
   window.addEventListener('medix-auth-change',event=>{if((event.detail?.id || null)!==actor)reset();refreshVoices();});
   render(defaults);
-  document.getElementById('voicePreferencesOpen').onclick=()=>open.click();
+
   Promise.resolve(MedixAuth.ready).then(refreshVoices);
 })();

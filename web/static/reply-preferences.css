@@ -24,3 +24,10 @@
 /* Preserve scrolling on short screens without a persistent scrollbar. */
 #replyPreferencesDialog { scrollbar-width: none; -ms-overflow-style: none; }
 #replyPreferencesDialog::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+#replyPreferencesDialog .audio-option{margin:0 0 18px;padding:14px 16px;border:1px solid #dfe8e4;border-radius:12px;background:#f6faf8}
+#replyPreferencesDialog .audio-option label{flex-direction:row;align-items:center;gap:12px}
+#replyPreferencesDialog .audio-option label>span:first-child{font-size:13px;color:#496267}
+#replyPreferencesDialog .audio-option input{width:32px;height:20px}
+#replyPreferencesDialog .audio-option .switch-track{flex-shrink:0}
+#replyPreferencesDialog .audio-option p{font-size:11px;color:#657b7e;margin-top:8px}

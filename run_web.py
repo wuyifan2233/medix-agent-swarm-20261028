@@ -22,6 +22,8 @@ def main(default_port=8765, evidence=False):
     if evidence:
         os.environ['MEDIX_KB_MODE'] = 'evidence'
     from dotenv import load_dotenv
+    # Explicit process env wins; running start_qq.ps1 selects its generated local service.
+    load_dotenv(ROOT / 'data' / 'napcat' / 'medix.env', override=False)
     load_dotenv(ROOT / '.env.local', override=False)
     load_dotenv(ROOT / '.env.sms', override=False)
     parser = argparse.ArgumentParser(description='MediX local integration')
