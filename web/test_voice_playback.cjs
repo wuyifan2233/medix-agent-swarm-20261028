@@ -107,6 +107,31 @@ async function main() {
     vm.runInContext(listener, ctx); handlers['medix-signout']();
     assert.deepEqual(calls,['recording','playback']); assert.equal(ctx.authEpoch,1); passed++;
   }
+  {
+    const f = fixture(), preview = f.button(), answer = f.button(); let endpoint, payload;
+    f.ctx.fetch = async (url, options) => {
+      endpoint = url; payload = JSON.parse(options.body);
+      return {ok:true, json:async()=>({url:'/api/voice/speech/stream/'+'b'.repeat(32),voice:{label:'清晰利落'}})};
+    };
+    await f.ctx.speakAnswer('试听', preview, {profile_id:'auto',tone:'direct'});
+    assert.equal(endpoint, '/api/voice/speech/preview');
+    assert.deepEqual(payload, {profile_id:'auto',tone:'direct'});
+    assert.equal(preview.title, '当前声音：清晰利落');
+    await f.ctx.speakAnswer('文字回答', answer);
+    assert(f.played[0].paused); assert(preview.innerHTML.includes('试听当前声音'));
+    assert.equal(endpoint, '/api/voice/speech/prepare');
+    assert.deepEqual(payload, {text:'文字回答'});
+    f.ctx.stopSpeaking(); assert(answer.innerHTML.includes('朗读')); passed++;
+  }
+  {
+    const f = fixture(), b = f.button(); let finish;
+    f.ctx.fetch = () => new Promise(resolve=>{finish=resolve;});
+    const pending = f.ctx.speakAnswer('试听', b, {profile_id:'gentle',tone:'neutral'});
+    f.ctx.stopSpeaking();
+    finish({ok:true,json:async()=>({url:'/api/voice/speech/stream/'+'a'.repeat(32)})});
+    await pending;
+    assert.equal(f.played.length,0); assert(b.innerHTML.includes('试听当前声音')); passed++;
+  }
   console.log(JSON.stringify({passed, failed: 0, browser_tts_fallback: false, native_streaming: true}));
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

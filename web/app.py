@@ -323,20 +323,26 @@ async def speech_text(request):
     return text
 
 
-@app.post("/api/voice/speech")
-async def synthesize_speech(request: Request, user: CurrentUser = Depends(require_user)):
-    """Stream MP3 chunks immediately; kept for API clients and regression tests."""
+async def user_voice(request, user):
     from config import SPEECH_CONFIG
-    from web.speech import speech_response
-    return await speech_response(request, SPEECH_CONFIG, await speech_text(request))
+    from web.speech import resolve_voice
+    from starlette.concurrency import run_in_threadpool
+    preferences = await run_in_threadpool(load_preferences, request.app.state.auth_service.sessions, user.id)
+    return resolve_voice(SPEECH_CONFIG, preferences)
 
 
-@app.post("/api/voice/speech/prepare")
-async def prepare_speech(request: Request, user: CurrentUser = Depends(require_user)):
+@app.get("/api/voice/voices")
+async def available_voices(request: Request, user: CurrentUser = Depends(require_user)):
     from config import SPEECH_CONFIG
+    from web.speech import voice_catalog
+    from starlette.concurrency import run_in_threadpool
+    preferences = await run_in_threadpool(load_preferences, request.app.state.auth_service.sessions, user.id)
+    return voice_catalog(SPEECH_CONFIG, preferences)
+
+
+def prepare_voice_ticket(request, user, text, config, voice):
     from web.speech import load_provider
-    text = await speech_text(request)
-    load_provider(SPEECH_CONFIG)
+    load_provider(config)
     now = time.monotonic()
     for key, ticket in list(speech_tickets.items()):
         if now - ticket["created"] >= SPEECH_TICKET_TTL:
@@ -344,13 +350,43 @@ async def prepare_speech(request: Request, user: CurrentUser = Depends(require_u
     if len(speech_tickets) >= MAX_SPEECH_TICKETS:
         raise HTTPException(429, "语音请求较多，请稍后重试。")
     token = uuid.uuid4().hex
-    speech_tickets[token] = {"text": text, "owner": (user.id, request.state.auth_session_id), "created": now}
-    return {"url": f"/api/voice/speech/stream/{token}"}
+    # Freeze the voice at prepare time, keeping other accounts/requests independent.
+    speech_tickets[token] = {"text": text, "config": config, "owner": (user.id, request.state.auth_session_id), "created": now}
+    return {"url": f"/api/voice/speech/stream/{token}", "voice": voice}
+
+
+@app.post("/api/voice/speech")
+async def synthesize_speech(request: Request, user: CurrentUser = Depends(require_user)):
+    """Stream MP3 chunks immediately; kept for API clients and regression tests."""
+    from web.speech import speech_response
+    text = await speech_text(request)
+    config, _ = await user_voice(request, user)
+    return await speech_response(request, config, text)
+
+
+@app.post("/api/voice/speech/prepare")
+async def prepare_speech(request: Request, user: CurrentUser = Depends(require_user)):
+    text = await speech_text(request)
+    config, voice = await user_voice(request, user)
+    return prepare_voice_ticket(request, user, text, config, voice)
+
+
+@app.post("/api/voice/speech/preview")
+async def preview_speech(request: Request, user: CurrentUser = Depends(require_user)):
+    from config import SPEECH_CONFIG
+    from pydantic import ValidationError
+    from web.speech import VoicePreview, PREVIEW_TEXT, resolve_voice
+    try:
+        preview = VoicePreview.model_validate(await request.json())
+    except (ValueError, ValidationError) as exc:
+        raise HTTPException(422, "请选择可用的语音包和沟通语气。") from exc
+    config, voice = resolve_voice(SPEECH_CONFIG, {"data": {
+        "enabled": True, "voice_profile": preview.profile_id, "tone": preview.tone}})
+    return prepare_voice_ticket(request, user, PREVIEW_TEXT, config, voice)
 
 
 @app.get("/api/voice/speech/stream/{token}")
 async def play_speech_stream(token: str, request: Request, user: CurrentUser = Depends(require_user)):
-    from config import SPEECH_CONFIG
     from web.speech import speech_response
     ticket = speech_tickets.get(token)
     if not ticket or ticket["owner"] != (user.id, request.state.auth_session_id):
@@ -360,7 +396,7 @@ async def play_speech_stream(token: str, request: Request, user: CurrentUser = D
         raise HTTPException(404, "语音播放已失效，请重新朗读。")
     # Consume the empty GET body before monitoring transport disconnects.
     await request.body()
-    return await speech_response(request, SPEECH_CONFIG, ticket["text"])
+    return await speech_response(request, ticket["config"], ticket["text"])
 
 
 @app.get('/api/knowledge/catalog')

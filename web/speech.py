@@ -3,6 +3,9 @@ import asyncio
 from contextlib import aclosing, suppress
 import importlib
 import importlib.util
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
 
 import anyio
 from fastapi import HTTPException
@@ -11,6 +14,51 @@ from loguru import logger
 
 TTS_TIMEOUT_SECONDS = 60
 MAX_TTS_AUDIO_BYTES = 16 * 1024 * 1024
+
+
+# Only these server-owned profiles can reach the provider. No health data is used.
+VOICE_PROFILES = {
+    "gentle": {"id": "gentle", "label": "温柔陪伴", "description": "柔和女声，节奏稍慢",
+               "voice": "zh-CN-XiaoxiaoNeural", "rate": "-8%"},
+    "clear": {"id": "clear", "label": "清晰利落", "description": "明亮男声，节奏自然",
+              "voice": "zh-CN-YunxiNeural", "rate": "+0%"},
+    "steady": {"id": "steady", "label": "平和舒缓", "description": "平和女声，清晰舒缓",
+               "voice": "zh-CN-XiaoyiNeural", "rate": "-3%"},
+}
+TONE_VOICES = {"supportive": "gentle", "direct": "clear", "neutral": "steady"}
+PREVIEW_TEXT = "你好，我是 MediX。我们慢慢说，一起把最重要的事情理清楚。"
+
+
+class VoicePreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile_id: Literal["auto", "gentle", "clear", "steady"] = "auto"
+    tone: Literal["supportive", "direct", "neutral"] = "neutral"
+
+
+def public_voice(profile):
+    return {key: profile[key] for key in ("id", "label", "description")}
+
+
+def resolve_voice(config, preferences):
+    """Return a request-local configuration; never modify global SPEECH_CONFIG."""
+    data = preferences["data"]
+    selected = {key: value for key, value in config.items() if key.startswith("tts_")}
+    if not data.get("enabled"):
+        return selected, {"id": "default", "label": "默认声音", "description": "未启用回答偏好，使用服务默认声音", "follows_tone": False}
+    profile_id = data.get("voice_profile", "auto")
+    automatic = profile_id == "auto"
+    if automatic:
+        profile_id = TONE_VOICES[data.get("tone", "neutral")]
+    profile = VOICE_PROFILES[profile_id]
+    selected.update(tts_voice=profile["voice"], tts_rate=profile["rate"], tts_pitch="+0Hz")
+    return selected, {**public_voice(profile), "follows_tone": automatic}
+
+
+def voice_catalog(config, preferences):
+    _, effective = resolve_voice(config, preferences)
+    return {"profiles": [public_voice(profile) for profile in VOICE_PROFILES.values()],
+            "auto_for_tone": dict(TONE_VOICES), "effective": effective,
+            "enabled": preferences["data"]["enabled"], "revision": preferences["revision"]}
 
 
 def tts_status(config):

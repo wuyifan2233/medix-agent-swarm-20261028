@@ -1,6 +1,6 @@
 # MediX 语音偏好与语音包配置方案
 
-> 本文仅为实现方案，不包含代码或运行配置变更。方案以当前 MediX 的 Web Speech API 回退和 `/api/voice/speech` 服务端合成为基础。
+> 历史设计草案，保留用于背景参考；下文的浏览器 TTS、OpenAI 兼容 TTS、设备回退及 localStorage 设想均不是当前实现，不应据此配置运行。当前已实现云端 Edge TTS、按账号沟通偏好自动切换或固定语音包、试听和 MP3 流式播放，详见 [VOICE.md](VOICE.md#默认声音和偏好) 与 [PERSONALIZATION-API.md](PERSONALIZATION-API.md#回答偏好)。
 
 ## 目标
 

@@ -339,22 +339,23 @@ function stopSpeaking() {
   if (state.speakingButton) {
     state.speakingButton.classList.remove('speaking');
     state.speakingButton.setAttribute('aria-pressed', 'false');
-    state.speakingButton.innerHTML = `${icon('volume')}<span>朗读</span>`;
+    state.speakingButton.innerHTML = `${icon('volume')}<span>${state.speakingIdleLabel || '朗读'}</span>`;
     state.speakingButton = null;
   }
 }
-async function speakAnswer(answer, button) {
+async function speakAnswer(answer, button, preview = null) {
   if (state.speakingButton) { const sameButton = state.speakingButton === button; stopSpeaking(); if (sameButton) return; }
   const text = speechSafeText(answer);
   if (!text) return;
   const token = ++state.speechToken;
   const controller = new AbortController(); state.speechAbort = controller;
+  state.speakingIdleLabel = preview ? '试听当前声音' : '朗读';
   state.speakingButton = button; button.classList.add('speaking'); button.setAttribute('aria-pressed', 'true');
   button.innerHTML = `${icon('stop')}<span>连接中 · 停止</span>`;
   try {
-    const response = await MedixAuth.fetch('/api/voice/speech/prepare', {
+    const response = await MedixAuth.fetch(preview ? '/api/voice/speech/preview' : '/api/voice/speech/prepare', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text}), signal: controller.signal
+      body: JSON.stringify(preview || {text}), signal: controller.signal
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -363,6 +364,7 @@ async function speakAnswer(answer, button) {
     const prepared = await response.json();
     if (state.speechToken !== token) return;
     if (!/^\/api\/voice\/speech\/stream\/[a-f0-9]{32}$/.test(prepared.url || '')) throw new Error('音频地址无效，请重新朗读。');
+    if (prepared.voice?.label) button.title = `当前声音：${prepared.voice.label}`;
     state.speechAbort = null;
     // Native Audio progressively decodes the HTTP MP3 stream; no response.blob().
     const audio = new Audio(); state.audio = audio;
@@ -1203,3 +1205,10 @@ setInterval(refreshLink, 2000);
 
 window.addEventListener('medix-auth-change',()=>{refreshReminders();refreshLink();});
 window.addEventListener('medix-signout',()=>{state.seenReminders.clear();state.cursors={wechat:0,qq:0};state.linkQr='';state.channel='wechat';$('wechatQr').hidden=true;$('wechatQr').removeAttribute('src');$('wechatState').textContent='未连接';$('wechatHint').textContent='请登录后连接微信或 QQ。';renderUpcoming([]);});
+
+// Settings previews share the answer player, including stop and stale-response guards.
+window.MedixVoice = Object.freeze({
+  preview: (profile_id, tone, button) => speakAnswer('试听', button, {profile_id, tone}),
+  stop: stopSpeaking,
+  stopPreview: () => { if (state.speakingButton?.id === 'rpVoicePreview') stopSpeaking(); }
+});

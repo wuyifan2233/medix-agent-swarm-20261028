@@ -119,7 +119,7 @@ use_profile默认false。开启时需有效已确认版本；profile_fields省�
 GET `/api/profile/reply-preferences`返回`{data,revision,updated_at}`；PUT同路径提交`{expected_revision,data}`。
 
 ```json
-{"expected_revision":0,"data":{"enabled":true,"nickname":"小王","tone":"supportive","detail":"brief","format":"summary_first","terminology":"plain","communication_note":"先说重点","daily_context":"希望建议拆成小步骤"}}
+{"expected_revision":0,"data":{"enabled":true,"nickname":"小王","tone":"supportive","voice_profile":"auto","detail":"brief","format":"summary_first","terminology":"plain","communication_note":"先说重点","daily_context":"希望建议拆成小步骤"}}
 ```
 
 | 字段 | 值/限制 |
@@ -127,12 +127,15 @@ GET `/api/profile/reply-preferences`返回`{data,revision,updated_at}`；PUT同�
 | enabled | 严格布尔，默认false；**已保存不等于已启用** |
 | nickname | 最多20字，可空 |
 | tone | neutral / supportive / direct |
+| voice_profile | auto / gentle / clear / steady，默认auto；关闭enabled时不应用 |
 | detail | brief / standard / detailed |
 | format | summary_first / steps / explanation |
 | terminology | plain / professional |
 | communication_note / daily_context | 各最多200字，仅作表达与日常安排偏好，不是健康事实 |
 
 必须勾选启用并保存；下一次新提问生效，旧回答不改写。本轮明确要求优先。
+语音包随账号偏好保存；auto按tone映射为supportive→gentle（柔和女声、节奏稍慢）、direct→clear（明亮男声、节奏自然）、neutral→steady（平和女声、清晰舒缓）。固定选择覆盖语气映射。启用并保存后从下次播报生效；关闭enabled则使用服务默认声音，不自动推断健康档案。试听未保存选项不改变偏好版本，也不调用文字模型。详见[语音实现说明](VOICE.md#个性化语音包2026-10-31)。
+
 恢复默认通过保存默认值、清空文本并关闭enabled实现，版本继续递增。偏好独立于健康档案，不改变档案确认状态。
 最终呈现增加一次模型调用，要求保留关键风险、就医提示和不确定性，不能机械截断；简短目标120–220字，详细在问题需要时目标700–1000字，不是精确字数保证。
 整理失败或输出截断时保留完整原回答并明确提示，不能声称已完整应用。

@@ -124,7 +124,7 @@ class SpeechTests(unittest.TestCase):
     def test_voice_routes_require_login_and_csrf_before_provider(self):
         anonymous = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
         self.addCleanup(anonymous.close)
-        for endpoint in ("/api/voice/speech", "/api/voice/speech/prepare", "/api/voice/transcribe"):
+        for endpoint in ("/api/voice/speech", "/api/voice/speech/prepare", "/api/voice/speech/preview", "/api/voice/transcribe"):
             with self.subTest(endpoint=endpoint):
                 self.assertEqual(anonymous.post(endpoint, json={"text":"你好"}).status_code, 401)
                 self.assertEqual(self.client.post(endpoint, json={"text":"你好"}, headers={"X-CSRF-Token":""}).status_code, 403)
@@ -147,6 +147,91 @@ class SpeechTests(unittest.TestCase):
             self.assertEqual(self.client.get(url).status_code, 404)
             self.assertEqual(self.client.post("/api/voice/speech/prepare", json={"text": "你好"}).status_code, 200)
         self.assertEqual(StubSpeaker.calls, [])
+
+    def save_preferences(self, client=None, **changes):
+        client = client or self.client
+        record = client.get("/api/profile/reply-preferences").json()
+        response = client.put("/api/profile/reply-preferences", json={
+            "expected_revision": record["revision"], "data": {**record["data"], **changes}})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def test_automatic_voice_follows_saved_tone_on_both_audio_routes(self):
+        from config import SPEECH_CONFIG
+        original = dict(SPEECH_CONFIG)
+        for tone, profile_id, voice, rate in (
+            ("supportive", "gentle", "zh-CN-XiaoxiaoNeural", "-8%"),
+            ("direct", "clear", "zh-CN-YunxiNeural", "+0%"),
+            ("neutral", "steady", "zh-CN-XiaoyiNeural", "-3%"),
+        ):
+            with self.subTest(tone=tone):
+                self.save_preferences(enabled=True, tone=tone, voice_profile="auto")
+                catalog = self.client.get("/api/voice/voices").json()
+                self.assertEqual(catalog["effective"]["id"], profile_id)
+                self.assertTrue(catalog["effective"]["follows_tone"])
+                for endpoint in ("/api/voice/speech", "/api/voice/speech/prepare"):
+                    response = self.client.post(endpoint, json={"text": "固定测试内容"})
+                    self.assertEqual(response.status_code, 200, response.text)
+                    if endpoint.endswith("prepare"):
+                        self.assertEqual(self.client.get(response.json()["url"]).status_code, 200)
+                    options = StubSpeaker.calls[-1][1]
+                    self.assertEqual((options["voice"], options["rate"]), (voice, rate))
+        self.assertEqual(SPEECH_CONFIG, original)
+
+    def test_manual_voice_and_disabled_switch_respect_account_boundaries(self):
+        saved = self.save_preferences(enabled=True, tone="direct", voice_profile="gentle")
+        self.assertEqual(saved["data"]["voice_profile"], "gentle")
+        self.save_preferences(self.other_client, enabled=True, tone="direct")
+        own = self.client.post("/api/voice/speech/prepare", json={"text":"自己的回答"}).json()
+        other = self.other_client.post("/api/voice/speech/prepare", json={"text":"另一账号的回答"}).json()
+        self.assertEqual((own["voice"]["id"], other["voice"]["id"]), ("gentle", "clear"))
+        self.assertFalse(own["voice"]["follows_tone"])
+        self.client.get(own["url"])
+        self.assertEqual(StubSpeaker.calls[-1][1]["voice"], "zh-CN-XiaoxiaoNeural")
+        self.other_client.get(other["url"])
+        self.assertEqual(StubSpeaker.calls[-1][1]["voice"], "zh-CN-YunxiNeural")
+        self.save_preferences(enabled=False)
+        self.client.post("/api/voice/speech", json={"text":"服务默认声音"})
+        self.assertEqual(StubSpeaker.calls[-1][1]["rate"], "-5%")
+        self.assertEqual(self.client.get("/api/voice/voices").json()["effective"]["id"], "default")
+
+    def test_prepared_voice_is_a_snapshot_and_new_playback_uses_new_preference(self):
+        self.save_preferences(enabled=True, tone="supportive")
+        first = self.client.post("/api/voice/speech/prepare", json={"text":"旧音色"}).json()
+        self.save_preferences(tone="direct")
+        second = self.client.post("/api/voice/speech/prepare", json={"text":"新音色"}).json()
+        self.client.get(second["url"])
+        self.assertEqual(StubSpeaker.calls[-1][1]["voice"], "zh-CN-YunxiNeural")
+        self.client.get(first["url"])
+        self.assertEqual(StubSpeaker.calls[-1][1]["voice"], "zh-CN-XiaoxiaoNeural")
+
+    def test_preview_is_fixed_text_owned_stream_without_saving_preferences(self):
+        before = self.client.get("/api/profile/reply-preferences").json()
+        prepared = self.client.post("/api/voice/speech/preview", json={"profile_id":"auto", "tone":"direct"})
+        self.assertEqual(prepared.status_code, 200, prepared.text)
+        self.assertEqual(StubSpeaker.calls, [])
+        body = prepared.json()
+        self.assertEqual(body["voice"]["id"], "clear")
+        self.assertEqual(self.other_client.get(body["url"]).status_code, 404)
+        self.assertEqual(self.client.get(body["url"]).status_code, 200)
+        self.assertEqual(StubSpeaker.calls[-1][0], speech.PREVIEW_TEXT)
+        self.assertEqual(StubSpeaker.calls[-1][1]["voice"], "zh-CN-YunxiNeural")
+        self.assertEqual(self.client.get("/api/profile/reply-preferences").json(), before)
+        self.assertEqual(self.client.get(body["url"]).status_code, 404)
+
+    def test_catalog_is_private_and_preview_rejects_arbitrary_provider_parameters(self):
+        anonymous = TestClient(app, headers={"Origin":"http://testserver", "X-Medix-Request":"1"})
+        self.addCleanup(anonymous.close)
+        self.assertEqual(anonymous.get("/api/voice/voices").status_code, 401)
+        self.assertEqual(anonymous.post("/api/voice/speech/preview", json={}).status_code, 401)
+        self.assertEqual(self.client.post("/api/voice/speech/preview", json={}, headers={"X-CSRF-Token":""}).status_code, 403)
+        for payload in ({"profile_id":"not-a-voice"}, {"tone":"doctor"}, {"voice":"arbitrary"}, {"text":"私有内容"}, [], {"profile_id":None}):
+            self.assertEqual(self.client.post("/api/voice/speech/preview", json=payload).status_code, 422)
+        self.assertEqual(StubSpeaker.calls, [])
+        catalog = self.client.get("/api/voice/voices").json()
+        self.assertEqual(len(catalog["profiles"]), 3)
+        self.assertNotIn("api_key", str(catalog))
+        self.assertNotIn("base_url", str(catalog))
 
     def test_default_voice_needs_no_llm_or_audio_credentials(self):
         root = Path(__file__).resolve().parents[1]
