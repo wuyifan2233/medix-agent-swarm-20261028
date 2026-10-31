@@ -8,10 +8,11 @@ from pathlib import Path
 import re
 import sqlite3
 import uuid
+from web.report_identity import item_key, dates_in, normalized
 
 DB_PATH = None  # Explicit path overrides are used only by standalone synthetic tests.
 TABLES = {name: "report_" + name for name in ("cases", "bindings", "facts", "versions", "turns", "analyses")}
-FACT_FIELDS = ("name", "value", "unit", "reference", "method", "date", "conditions", "certainty")
+FACT_FIELDS = ("name", "value", "unit", "reference", "method", "date", "conditions", "certainty", "report_id")
 
 
 @contextmanager
@@ -203,13 +204,13 @@ def related_facts(facts, query, limit=64):
     aliases = (("血糖", "葡萄糖", "GLU"), ("肌酐", "CR"), ("尿酸", "UA"),
                ("总胆红素", "TBIL"), ("直接胆红素", "DBIL"))
     query_key = normalized_evidence(query)
-    dates = set(re.findall(r"\d{4}-\d{2}-\d{2}", query))
+    dates = dates_in(query)
     def score(fact):
         data = fact["data"]
-        name = normalized_evidence(data["name"])
+        name = item_key(data["name"])
         matched = bool(name and name in query_key)
         matched |= any(any(normalized_evidence(alias) in query_key for alias in group)
-                       and any(normalized_evidence(alias) == name for alias in group) for group in aliases)
+                       and any(item_key(alias) == name for alias in group) for group in aliases)
         date_match = bool(data["date"] and data["date"] in dates)
         return int(matched) * 8 + int(date_match) * 4
     ranked = sorted(facts, key=score, reverse=True)  # preserves recent-first ordering for ties
@@ -291,6 +292,13 @@ def apply_changes(owner, chat_id, selected, request_id, proposal, message, obser
                 # Re-uploading exactly the same known observation does not create duplicates.
                 duplicate = db.execute("SELECT 1 FROM facts WHERE owner=? AND case_id=? AND data=?",
                                        (owner, case_id, json.dumps(data, ensure_ascii=False))).fetchone()
+                if source == "image" and data.get("report_id"):
+                    existing = db.execute("SELECT data,revision FROM facts WHERE owner=? AND case_id=?", (owner,case_id)).fetchall()
+                    duplicate = duplicate or any(
+                        json.loads(r["data"]).get("report_id") == data["report_id"]
+                        and item_key(json.loads(r["data"])["name"]) == item_key(data["name"])
+                        and (r["revision"] > 1 or normalized(json.loads(r["data"])["value"]) == normalized(data["value"]))
+                        for r in existing)
                 if duplicate and source == "image":
                     continue
                 fact_id, revision = uuid.uuid4().hex, 1
