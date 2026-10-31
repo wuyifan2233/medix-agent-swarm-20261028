@@ -133,7 +133,7 @@ class SnowLumaHost:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
             self._process = subprocess.Popen(
-                ["node", str(self.install / "index.mjs")],
+                [os.environ.get("MEDIX_SNOWLUMA_NODE") or "node", str(self.install / "index.mjs")],
                 cwd=str(self.runtime),
                 env=env,
                 stdout=log_file,
@@ -142,6 +142,8 @@ class SnowLumaHost:
             )
         except FileNotFoundError as exc:
             raise RuntimeError("没有找到 Node.js，无法启动 SnowLuma。") from exc
+        finally:
+            log_file.close()
         deadline = time.monotonic() + 40
         while time.monotonic() < deadline:
             if self._process.poll() is not None:
@@ -314,6 +316,30 @@ def capture_qq_png():
         return None
 
 
+def _is_qq_window(hwnd):
+    import ctypes
+    from ctypes import wintypes
+    user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    process = kernel32.OpenProcess(0x1000, False, pid.value)
+    if not process:
+        return False
+    try:
+        size = wintypes.DWORD(32768)
+        path = ctypes.create_unicode_buffer(size.value)
+        if not kernel32.QueryFullProcessImageNameW(process, 0, path, ctypes.byref(size)):
+            return False
+        expected = find_qq_exe()
+        return os.path.normcase(path.value) == os.path.normcase(expected) if expected else Path(path.value).name.lower() == 'qq.exe'
+    finally:
+        kernel32.CloseHandle(process)
+
+
 def _capture_qq_png():
     import ctypes
     from ctypes import wintypes
@@ -328,7 +354,7 @@ def _capture_qq_png():
 
     @ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HWND, wintypes.LPARAM)
     def visit(hwnd, _lparam):
-        if not user32.IsWindowVisible(hwnd):
+        if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
             return 1
         length = user32.GetWindowTextLengthW(hwnd)
         if length <= 0:
@@ -336,25 +362,30 @@ def _capture_qq_png():
         buffer = ctypes.create_unicode_buffer(length + 1)
         user32.GetWindowTextW(hwnd, buffer, length + 1)
         title = buffer.value
-        if "QQ" not in title or "MediX" in title:
+        if "QQ" not in title or "MediX" in title or not _is_qq_window(hwnd):
             return 1
         rect = wintypes.RECT()
         if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
             return 1
         width = rect.right - rect.left
         height = rect.bottom - rect.top
-        if width < 180 or height < 180:
+        # The QQ main chat window is not a QR login window. Do not expose
+        # its private conversations as a supposed login image.
+        if width < 180 or height < 180 or width > 650:
             return 1
         score = width * height + (500000 if "登录" in title else 0)
-        found.append((score, rect.left, rect.top, rect.right, rect.bottom, width, height))
+        found.append((score, hwnd, width, height))
         return 1
 
     user32.EnumWindows(visit, 0)
     if not found:
         return None
-    _score, left, top, right, bottom, width, height = max(found)
+    _score, hwnd, width, height = max(found)
     try:
-        image = ImageGrab.grab(bbox=(left, top, right, bottom))
+        # Capture the QQ window itself, even when another app covers its screen area.
+        # Never fall back to a desktop rectangle, which could expose other apps.
+        image = ImageGrab.grab(window=hwnd)
+        width, height = image.size
     except Exception:
         logger.warning("QQ window capture failed")
         return None
