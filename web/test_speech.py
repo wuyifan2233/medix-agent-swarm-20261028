@@ -255,6 +255,21 @@ class SpeechTests(unittest.TestCase):
         self.assertEqual(config["tts_provider"], "edge")
         self.assertEqual(config["tts_voice"], "zh-CN-YunxiaNeural")
         self.assertFalse(config["remote_enabled"])
+        from dotenv import dotenv_values
+        example = dotenv_values(root / ".env.example")
+        self.assertEqual(example["MEDIX_TTS_VOICE"], config["tts_voice"])
+        self.assertEqual(speech.VOICE_PROFILES["child"]["voice"], config["tts_voice"])
+        self.assertEqual(speech.tts_status({})["tts_voice"], config["tts_voice"])
+
+    def test_explicit_service_voice_override_is_preserved(self):
+        root = Path(__file__).resolve().parents[1]
+        with patch.dict(os.environ, {"MEDIX_CONFIG_PATH": str(root / "missing-test-config.py"),
+                                    "MEDIX_TTS_VOICE": "zh-CN-XiaoxiaoNeural"}, clear=True):
+            config = runpy.run_path(str(root / "config.py"))["SPEECH_CONFIG"]
+        selected, _ = speech.resolve_voice(config, {"data": {"enabled": False}})
+        self.assertEqual(selected["tts_voice"], "zh-CN-XiaoxiaoNeural")
+        selected, _ = speech.resolve_voice(config, {"data": {"enabled": True, "voice_profile": "child"}})
+        self.assertEqual(selected["tts_voice"], "zh-CN-YunxiaNeural")
 
 
 class StreamTimingTests(unittest.IsolatedAsyncioTestCase):

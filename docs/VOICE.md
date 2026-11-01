@@ -30,7 +30,7 @@ $env:MEDIX_TTS_PITCH = '+0Hz'
 $env:MEDIX_TTS_VOLUME = '+0%'
 ```
 
-这些变量在启动服务之前设置；未启用账号回答偏好时使用服务配置的默认声音。实际可用列表可用 Python 模块 edge_tts --list-voices 查看。
+config.py 与 .env.example 的默认音色统一为 zh-CN-YunxiaNeural，避免复制模板后切回晓晓女声。这些变量在启动服务之前设置；显式设置 MEDIX_TTS_VOICE 仍优先于默认值，未启用账号回答偏好时使用服务配置的默认声音。实际可用列表可用 Python 模块 edge_tts --list-voices 查看。
 
 ### 个性化语音包（2026-10-31）
 
