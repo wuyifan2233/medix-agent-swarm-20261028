@@ -12,6 +12,13 @@ from knowledge.evidence import validate_citations
 
 
 class QueryPolicyTests(unittest.TestCase):
+    def test_sleep_relevance_and_topic_switch(self):
+        from knowledge.query_policy import directly_relevant
+        query='最近总是睡不好，应该先观察和记录哪些情况？'
+        self.assertFalse(directly_relevant(query,{'metadata':{'title':'细菌性痢疾'},'content':'体格检查、血常规、粪便常规'}))
+        self.assertTrue(directly_relevant(query,{'metadata':{'title':'一有动静就睡不着，怎样才能睡个好觉？'},'content':'记录睡眠时间'}))
+        self.assertEqual(contextualize_query('那睡不好怎么办',[{'role':'user','content':'高血压'}]),('那睡不好怎么办',False))
+
     def test_food_questions_are_not_personal_drug_dosing(self):
         for q in ['高血压患者水果能不能吃','糖尿病可以吃水果吗','饮食用多少盐','布洛芬有哪些剂型']:
             self.assertFalse(insufficient_medication(q),q)

@@ -81,7 +81,7 @@ class ReplyPreferencesTests(unittest.TestCase):
 
 
 class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
-    async def run_render(self,content,finish='stop',**changes):
+    async def run_render(self,content,finish='stop',draft='原回答：若胸痛持续，请立即就医。',**changes):
         import json
         from types import SimpleNamespace
         from unittest.mock import AsyncMock,patch
@@ -91,7 +91,7 @@ class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
         client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)),close=AsyncMock())
         prefs={'data':Preferences(enabled=True,nickname='新昵称',**changes).model_dump(),'revision':2}
         with patch.dict(LLM_CONFIG,{'api_key':'test-only-placeholder'}),patch('openai.AsyncOpenAI',return_value=client):
-            result=await render_reply('原回答：若胸痛持续，请立即就医。','本次问题',prefs)
+            result=await render_reply(draft,'本次问题',prefs)
         client.close.assert_awaited_once()
         return result,create.call_args.kwargs
 
@@ -128,3 +128,23 @@ class FinalPresentationTests(unittest.IsolatedAsyncioTestCase):
         from personalization.reply_render import address
         self.assertEqual(address('原回答','小林','本轮不要称呼我'),'原回答')
         self.assertEqual(address('小林，原回答','小林','测试'),'小林，原回答')
+
+    async def test_presentation_preserves_original_emphasis(self):
+        import json
+        draft='建议 **记录时间**，并关注 **变化趋势**。[1]'
+        rewrite='先 **记录时间**，再观察 **变化趋势**。[1]'
+        result,request=await self.run_render(json.dumps({'answer':rewrite}),draft=draft)
+        self.assertEqual(result[1],'applied')
+        self.assertIn('**记录时间**',result[0])
+        self.assertIn('**变化趋势**',result[0])
+        self.assertIn('Markdown 加粗标记',request['messages'][0]['content'])
+
+    async def test_lost_or_partially_lost_emphasis_keeps_original(self):
+        import json
+        draft='建议 **记录时间**，并关注 **变化趋势**。[1]'
+        for rewrite in ('建议记录时间，并关注变化趋势。[1]',
+                        '建议 **记录时间**，并关注变化趋势。[1]',
+                        '建议记录时间，并关注 **其他文字**。[1]'):
+            result,_=await self.run_render(json.dumps({'answer':rewrite}),draft=draft)
+            self.assertEqual(result[1],'fallback')
+            self.assertEqual(result[0],'新昵称，'+draft)

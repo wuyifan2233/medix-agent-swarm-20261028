@@ -84,8 +84,8 @@ class MiniKnowledgeBase:
             if not overlap:
                 continue
             score = len(overlap) / len(query_terms)
-            if any(term in document["content"].lower() for term in query_terms if len(term) >= 2):
-                score = max(score, 0.45)
+            if score < 0.4:
+                continue
             scored.append({
                 "id": document["id"],
                 "content": document["content"],
@@ -97,20 +97,14 @@ class MiniKnowledgeBase:
 
 
 def get_knowledge_base():
-    """Resolve one public KB backend; explicit evidence mode never silently degrades."""
+    """Resolve one public KB backend; initialization failures never silently degrade."""
     evidence=os.environ.get('MEDIX_KB_MODE') == 'evidence'
     backend=os.environ.get('MEDIX_KB_BACKEND','auto').strip().lower()
     if backend not in {'auto','milvus','mini'}:
         raise ValueError('MEDIX_KB_BACKEND must be auto, milvus or mini')
     if backend == 'mini' and not evidence:
         return MiniKnowledgeBase()
-    try:
-        from knowledge.milvus_kb import MedicalKnowledgeBase
-        kb=MedicalKnowledgeBase()
-        kb.backend='evidence' if evidence else 'milvus'
-        return kb
-    except Exception as exc:
-        if evidence or backend == 'milvus':
-            raise
-        logger.warning('Milvus unavailable ({}); using explicit mini backend status',type(exc).__name__)
-        return MiniKnowledgeBase()
+    from knowledge.milvus_kb import MedicalKnowledgeBase
+    kb=MedicalKnowledgeBase()
+    kb.backend='evidence' if evidence else 'milvus'
+    return kb

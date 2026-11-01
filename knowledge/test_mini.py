@@ -29,9 +29,14 @@ class MiniBackendTests(unittest.TestCase):
             self.assertTrue(kb.search('高血压 用药'))
             self.assertEqual(kb.search('高血压',filter_type='other'),[])
 
-    def test_auto_falls_back_but_explicit_milvus_reports_failure(self):
+    def test_vague_intake_returns_no_documents(self):
+        kb=MiniKnowledgeBase()
+        query='我最近有些不舒服。请先问我症状、持续时间和相关情况，帮我一起梳理需要关注的信息。'
+        self.assertEqual(kb.search(query),[])
+
+    def test_auto_and_explicit_milvus_report_failure(self):
         with patch('knowledge.milvus_kb.MedicalKnowledgeBase',side_effect=RuntimeError('synthetic unavailable')):
-            self.assertEqual(get_knowledge_base().backend,'mini')
+            with self.assertRaises(RuntimeError):get_knowledge_base()
             with patch.dict(os.environ,{'MEDIX_KB_BACKEND':'milvus'}):
                 with self.assertRaises(RuntimeError):get_knowledge_base()
 
@@ -40,14 +45,26 @@ class MiniBackendTests(unittest.TestCase):
              patch('knowledge.milvus_kb.MedicalKnowledgeBase',side_effect=RuntimeError('synthetic evidence failure')):
             with self.assertRaises(RuntimeError):get_knowledge_base()
 
-    def test_warmup_labels_fallback_backend(self):
+    def test_default_warmup_uses_local_evidence_and_reports_failure(self):
+        from web.app import warmup, health
+        with patch.dict(os.environ), patch.dict(health):
+            os.environ.pop('MEDIX_KB_MODE',None)
+            os.environ.pop('MEDIX_EMBEDDING_PROVIDER',None)
+            with patch('knowledge.initialize.ensure_sources',side_effect=RuntimeError('synthetic missing corpus')), patch('knowledge.mini_kb.MiniKnowledgeBase') as mini:
+                warmup()
+                self.assertEqual(os.environ['MEDIX_KB_MODE'],'evidence')
+                self.assertEqual(os.environ['MEDIX_EMBEDDING_PROVIDER'],'local')
+                self.assertEqual(health['knowledge'],'error')
+                mini.assert_not_called()
+
+    def test_warmup_reports_failure_without_fallback(self):
         from web.app import warmup, health
         with patch.dict(health),patch('knowledge.scripts.migrate_legacy_db.migrate',side_effect=RuntimeError('synthetic lock')), \
              patch('knowledge.milvus_kb.MedicalKnowledgeBase',side_effect=RuntimeError('synthetic unavailable')):
             warmup()
-            self.assertEqual(health['knowledge'],'ready')
-            self.assertEqual(health['knowledge_backend'],'mini')
-            self.assertGreater(health['documents'],0)
+            self.assertEqual(health['knowledge'],'error')
+            self.assertEqual(health['documents'],0)
+            self.assertIn('未切换',health['error'])
 
 
 class ReminderToolSelectionTests(unittest.TestCase):

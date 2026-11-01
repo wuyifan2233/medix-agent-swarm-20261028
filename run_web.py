@@ -26,6 +26,8 @@ def main(default_port=8765, evidence=False):
     load_dotenv(ROOT / 'data' / 'napcat' / 'medix.env', override=False)
     load_dotenv(ROOT / '.env.local', override=False)
     load_dotenv(ROOT / '.env.sms', override=False)
+    os.environ.setdefault('MEDIX_KB_MODE', 'evidence')
+    os.environ.setdefault('MEDIX_EMBEDDING_PROVIDER', 'local')
     parser = argparse.ArgumentParser(description='MediX local integration')
     parser.add_argument('--port', type=int, default=default_port)
     parser.add_argument('--data-dir', help='Shared account and business data directory')

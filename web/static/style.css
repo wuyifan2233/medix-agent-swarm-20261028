@@ -178,3 +178,76 @@ main{min-height:0;overflow:hidden}
 .source-card:hover,.source-card:focus-visible{border-color:#7976e9;background:#f4f3ff;box-shadow:0 5px 18px #6266bd16}
 .source-card:hover .source-open,.source-card:focus-visible .source-open{background:#514ecb}
 .source-card-unavailable{cursor:default}.source-card-unavailable .source-open{background:#e7eaf1;color:#647088;box-shadow:none}
+
+.exchange-memory-card{border:1px solid #dfe5f2;border-radius:16px;padding:20px;margin:20px 0;background:#fafbff;box-shadow:0 3px 12px #394c7910;overflow-wrap:anywhere}.exchange-memory-card h3{font-size:16px;line-height:1.7;color:#425780;white-space:pre-wrap}.exchange-memory-card>p{white-space:pre-wrap}.exchange-memory-card small{color:#8290aa}.exchange-memory-card strong{font-size:13px;color:#6175a4}.exchange-memory-form label{display:block;margin:14px 0;color:#52648a}.exchange-memory-form textarea{display:block;box-sizing:border-box;width:100%;margin-top:8px;padding:12px;border:1px solid #cbd5ea;border-radius:10px;resize:vertical;font:inherit;line-height:1.7;background:white;color:#344565}.exchange-memory-error{color:#b54e4e!important}.exchange-memory-card [hidden]{display:none!important}
+
+.memory-nav>summary{list-style:none;cursor:pointer}.memory-nav>summary::-webkit-details-marker{display:none}.memory-nav-chevron{margin-left:auto;transition:transform .15s}.memory-nav[open]>summary .memory-nav-chevron{transform:rotate(90deg)}.memory-nav-children{margin-left:19px;padding-left:7px;border-left:1px solid #dfe4f1}.memory-nav-children .nav-item{padding:10px 9px;font-size:12px}.memory-nav-family .memory-nav-children{margin-left:9px}
+
+.source-card.source-card-highlight{border-color:#6863ed;background:#efedff;box-shadow:0 0 0 3px #7976e94d;scroll-margin-block:24px}
+
+/* Unified home entry points. */
+.channel-panel.memory-nav{margin:0;border:0;padding:0;background:transparent}
+.channel-panel.memory-nav>summary.nav-item{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:400;color:#737e96;padding:12px 13px;border:0;list-style:none}
+.channel-panel.memory-nav>summary.nav-item::-webkit-details-marker{display:none}
+.channel-panel.reminder-highlight>summary.nav-item{background:#e9edff;color:#596bcd;box-shadow:inset 0 0 0 2px #9ca8ef;border-radius:10px}
+
+/* Transparent mascot from the supplied logo. */
+.brand-mark.mascot-mark{background:transparent;box-shadow:none}
+.mascot-mark img{display:block;width:100%;height:100%;object-fit:contain}
+.hero-art .companion{object-fit:contain;transform:none}
+
+/* Let conversation history fill the available sidebar height. */
+.sidebar-scroll{display:flex;flex-direction:column}
+.sidebar-scroll>*{flex-shrink:0}
+.sidebar-scroll>.conversation-list{flex:1 0 180px;max-height:none;min-height:180px;align-content:start;overflow-y:auto;overscroll-behavior:contain;padding-right:5px;scrollbar-width:thin;scrollbar-color:#c5cce1 transparent}
+.conversation-list:hover{scrollbar-color:#a7b2d1 transparent}
+@supports selector(::-webkit-scrollbar){
+  .sidebar-scroll>.conversation-list{scrollbar-width:auto;scrollbar-color:auto}
+  .conversation-list::-webkit-scrollbar{width:5px}
+  .conversation-list::-webkit-scrollbar-track{background:transparent;margin:5px 0}
+  .conversation-list::-webkit-scrollbar-thumb{background:#c5cce1;border-radius:20px}
+  .conversation-list::-webkit-scrollbar-thumb:hover{background:#a7b2d1}
+  .conversation-list::-webkit-scrollbar-button{display:none;width:0;height:0}
+}
+
+.conversation-list .conversation-item{font-size:14px;line-height:1.6}
+
+.exchange-memory-card.case-evidence{padding:0;margin:10px 0;border-radius:10px;background:#f8f9ff;border:1px solid #e8ebf5;box-shadow:none}.exchange-memory-card>summary{padding:12px 14px;cursor:pointer;color:#8496c4;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.exchange-memory-card>summary:hover{background:#f0f3ff;border-radius:10px}.exchange-memory-card[open]>summary{border-bottom:1px solid #e8ebf5}.exchange-memory-content{padding:14px}.exchange-memory-content>small{display:block;margin-bottom:16px}.exchange-memory-content>.exchange-memory-preview{white-space:pre-wrap;color:#425370;font-size:14px;line-height:1.8;margin:12px 0}.exchange-memory-content>.exchange-memory-error:empty{display:none}
+
+.memory-evidence>.exchange-memory-full{margin:12px 0;padding:14px;background:#fff;box-shadow:none;border-radius:10px}.memory-evidence>.exchange-memory-full>h3{margin:0 0 12px;font-size:14px;line-height:1.7}.memory-evidence .exchange-memory-content{padding:0}
+
+/* Unified navigation, composer and viewport-fit welcome. */
+:root{--sidebar-muted:#99a2b7}
+.service-heading{color:var(--sidebar-muted)}
+
+
+.primary-nav{margin-top:18px}
+.top-brand-note{position:relative;display:flex;align-items:center;color:#8290aa;font-size:12px;line-height:1.5}
+.top-brand-note small{position:absolute;right:0;top:calc(100% + 2px);white-space:nowrap;font-size:11px;color:#99a2b7}
+.compose-left #voiceButton,.compose-left #attachButton,.compose-left #rpOpen{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:6px 10px;border:1px solid #e3e8f6;border-radius:9px;background:#f7f9ff;color:#7e8eb5;font-size:12px;font-weight:400;white-space:nowrap}
+.compose-left #voiceButton svg,.compose-left #attachButton svg,.compose-left #rpOpen svg{width:17px;height:17px;stroke-width:1.65}
+.compose-left #voiceButton:hover,.compose-left #attachButton:hover,.compose-left #rpOpen:hover{background:#eef1ff;border-color:#cdd6f8;color:#6875d9}
+.compose-left #voiceButton.recording{color:#b65e78;background:#fff0f4}
+html,body{height:100%;overflow:hidden}
+.app-shell{min-height:0;height:100dvh}
+@media(max-width:1000px){#attachHint{display:none}.top-brand-note{font-size:10px;max-width:300px}.topbar{gap:10px}}
+@media(max-width:700px){.top-brand-note{max-width:210px;font-size:9px}.top-brand-note small{font-size:9px}.topbar-right{gap:8px}.compose-left{gap:5px}.compose-left #voiceButton,.compose-left #attachButton,.compose-left #rpOpen{font-size:10px;padding:5px 7px;height:32px}}
+
+/* Keep the original welcome proportions; do not stretch empty space above the composer. */
+@media(min-width:701px){
+ .conversation:has(#welcome:not([hidden])){flex:0 1 auto;min-height:0;overflow:hidden}
+ .conversation:has(#welcome:not([hidden])) .welcome{padding-top:0;padding-bottom:10px}
+ .conversation:has(#welcome:not([hidden])) .messages:empty{display:none}
+ main:has(#welcome:not([hidden])) .composer-region{padding-top:10px}
+}
+
+.sidebar-scroll .conversation-history-heading{font-family:inherit;font-size:13px;font-weight:500;color:#79668f;line-height:normal;padding-left:15px;letter-spacing:normal;justify-content:flex-start;align-items:center;gap:10px}
+
+.conversation-history-heading svg{width:17px;height:17px;flex-shrink:0;stroke-width:1.7}
+
+.sidebar-scroll .conversation-history-heading>span{font:inherit;color:inherit;letter-spacing:inherit}
+
+/* Use the same type size for saved questions and their chat bubbles. */
+:root{--question-font-size:14px}
+.conversation-list .conversation-item,.user-bubble{font-size:var(--question-font-size)}
+@media(max-width:700px){:root{--question-font-size:12px}}

@@ -34,6 +34,8 @@ class WalletTests(unittest.TestCase):
         wallet.settle('call-a','0.0012345')
         wallet.settle('call-a','0.0012345')
         self.assertEqual(wallet.view(self.owner)['balance'],9998.765)
+        self.assertEqual(wallet.view(self.owner)['spent'],1.235)
+        self.assertEqual(wallet.view(self.accounts.users[1].id)['spent'],0)
         self.assertEqual(wallet.view(self.accounts.users[1].id)['balance'],10000)
         self.assertEqual(wallet.turn_charge(self.turn)['points'],1.235)
     def test_pending_reservation_and_delete_does_not_refund(self):
@@ -46,6 +48,7 @@ class WalletTests(unittest.TestCase):
         wallet.settle('unknown','0.002')
         self.assertEqual(wallet.view(self.owner)['held'],0)
         self.assertEqual(wallet.view(self.owner)['balance'],9988)
+        self.assertEqual(wallet.view(self.owner)['spent'],12)
     def test_insufficient_credit_does_not_start_or_overdraw(self):
         with patch.dict('os.environ',{'MEDIX_INITIAL_CARE_POINTS':'0'}):
             with self.assertRaises(wallet.CarePointsError):wallet.reserve('no-credit',self.turn,{})

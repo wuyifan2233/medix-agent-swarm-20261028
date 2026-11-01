@@ -28,7 +28,7 @@ except ImportError:
     ENTROPY_ENABLED = False
 
 # 加载上层目录的config.py
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from config import MEM0_CONFIG
 except ImportError:

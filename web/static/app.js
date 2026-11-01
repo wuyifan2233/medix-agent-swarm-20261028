@@ -19,18 +19,6 @@ window.addEventListener('medix-auth-change', event => renderAccount(event.detail
 window.addEventListener('medix-auth-error', event => toast(event.detail));
 MedixAuth.ready.then(renderAccount).catch(() => {});
 state.caseId = '';
-async function refreshCases(selected = state.caseId) {
-  await MedixAuth.ready;
-  if (!MedixAuth.user) return;
-  const owner=MedixAuth.user.id;
-  const response = await MedixAuth.fetch('/api/cases');
-  if (!response.ok) return;
-  const data = await response.json();
-  if (MedixAuth.user?.id !== owner) return;
-  $('caseContext').replaceChildren(new Option('新对话，不关联历史',''));
-  data.cases.forEach(item => $('caseContext').add(new Option(`${item.name} · ${item.records} 条记录`,item.id)));
-  $('caseContext').value=selected;
-}
 const icon = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const escapeText = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -299,6 +287,16 @@ document.addEventListener('drop', event => { event.preventDefault(); dragDepth =
 function richText(value) {
   const lines = String(value).split('\n');
   const inline = text => escapeText(text.trim()).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Keep plain-text section labels readable when the model omits Markdown emphasis.
+  const paragraph = text => {
+    if (text.includes('**')) return inline(text);
+    const label = text.match(/^(\d+[.、]\s*)([^：:。！？!?]{1,24})([：:])/) ||
+      text.match(/^()((?:下一步|先给结论|建议重点观察和记录|建议重点记录|注意事项|建议|结论))([：:])/);
+    if (label) return inline(label[1]) + (label[1].endsWith(' ') ? ' ' : '') +
+      '<strong>' + inline(label[2] + label[3]) + '</strong>' + inline(text.slice(label[0].length));
+    if (/^[^：:。！？!?]{2,24}[：:]$/.test(text)) return '<strong>' + inline(text) + '</strong>';
+    return inline(text);
+  };
   const cells = line => line.trim().replace(/^\||\|$/g, '').split('|').map(inline);
   const output = [];
   for (let i = 0; i < lines.length; i++) {
@@ -316,7 +314,7 @@ function richText(value) {
       output.push(`<h4>${inline(line).replace(/^#{1,4}\s*/, '').replace(/^【|】$/g, '')}</h4>`);
     } else if (/^[-•]\s/.test(line)) {
       output.push(`<p class="list-line">${inline(line).replace(/^[-•]\s*/, '')}</p>`);
-    } else { output.push(`<p>${inline(line)}</p>`); }
+    } else { output.push(`<p>${paragraph(line)}</p>`); }
   }
   return output.join('');
 }
@@ -408,16 +406,27 @@ function userMessage(message, images) {
 }
 function pendingMessage() {
   const row = document.createElement('article'); row.className = 'message assistant';
-  row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真听你说</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
+  row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真思考</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
   $('messages').append(row); scrollDown(); return row;
 }
 window.addEventListener('resize', () => document.querySelectorAll('.citation-preview:popover-open').forEach(card => card.hidePopover()));
 function citationPreview(trigger, source) {
-  showEvidence(source);
+  const message = trigger.closest('.message.assistant');
+  const card = [...(message?.querySelectorAll('.source-card') || [])]
+    .find(item => item.dataset.citation === String(source.citation));
+  if (!card) return;
+  const section = card.closest('details');
+  if (section) section.open = true;
+  message.querySelectorAll('.source-card-highlight').forEach(item => item.classList.remove('source-card-highlight'));
+  card.classList.add('source-card-highlight');
+  card.focus({preventScroll: true});
+  card.scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center'});
+  clearTimeout(card.highlightTimer);
+  card.highlightTimer = setTimeout(() => card.classList.remove('source-card-highlight'), 2400);
 }
 
 function resultMessage(row, result, userText, jobId, autoPlayback = true) {
-  if (result.case_id) {state.caseId=result.case_id; refreshCases().catch(()=>{});}
+  if (result.case_id) {state.caseId=result.case_id;}
   if (result.case_changes?.length) {
     document.querySelectorAll('.message.assistant').forEach(previous => {
       if (previous === row || !previous.caseRefs || previous.dataset.caseStale) return;
@@ -456,7 +465,7 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
     const block=document.createElement('details');block.className='observations case-evidence';
     const summary=document.createElement('summary');summary.textContent=`本次结合的病例资料 · ${result.case_sources.length} 条`;
     block.append(summary);
-    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}，v${source.revision}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
+    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
     main.append(block);
   }
   renderMemory(main, result);
@@ -482,7 +491,10 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   }
   if (result.sources.length) {
     const block = document.createElement('details'); block.className = 'sources'; block.open = false;
-    const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个`;
+    const citedIds = new Set([...result.answer.matchAll(/\[(\d+(?:\s*[,，]\s*\d+)*)\]/g)].flatMap(match => match[1].split(/[,，]/).map(Number)));
+    const citedCount = result.sources.filter(source => citedIds.has(source.citation)).length;
+    const articleCount = new Set(result.sources.map(source => source.file || source.url || source.id)).size;
+    const summary = document.createElement('summary'); summary.textContent = `全部检索片段 · ${result.sources.length} 个 · ${articleCount} 篇资料 · 正文引用 ${citedCount} 个片段`;
     const grid = document.createElement('div'); grid.className = 'source-grid';
     result.sources.forEach(source => {
       grid.append(createSourceCard(source));
@@ -490,7 +502,7 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   }
   if (result.tools.length) {
     const chips = document.createElement('div'); chips.className = 'pending-steps';
-    [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
+    [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label === 'scheduled_reminder' ? '定时提醒' : tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
   }
   const playbackEpoch = authEpoch, playbackToken = state.speechToken;
   if (autoPlayback && $('autoSpeak').checked) setTimeout(() => {
@@ -531,9 +543,7 @@ async function submit(message, images, retryRow, requestId = crypto.randomUUID()
 $('chatForm').onsubmit = event => { event.preventDefault(); submit($('message').value.trim(), [...state.images]); };
 $('newChat').onclick = () => { if (state.busy) return; cancelVoiceInput(); stopSpeaking(); state.chatId = crypto.randomUUID(); state.images = []; state.count = 0; $('messages').replaceChildren(); $('messages').classList.remove('active'); $('welcome').hidden = false; $('chatTitle').textContent = '新的健康对话'; $('message').value = ''; document.body.classList.remove('chatting'); closeSidebar(); renderAttachments(); $('conversation').scrollTop = 0; $('message').focus(); };
 const resetChat = $('newChat').onclick;
-$('newChat').onclick = () => {if(state.busy)return; resetChat();state.caseId='';$('caseContext').value='';};
-$('caseContext').onchange = () => {const selected=$('caseContext').value;resetChat();state.caseId=selected;$('caseContext').value=selected;};
-refreshCases().catch(()=>{});
+$('newChat').onclick = () => {if(state.busy)return; resetChat();state.caseId='';};
 document.querySelectorAll('[data-example]').forEach(button => button.onclick = async () => {
   if (state.busy) return;
   const example = button.dataset.example;
@@ -548,6 +558,7 @@ async function refreshHealth() {
   try {
     const response = await fetch('/api/health'); if (!response.ok) throw new Error(); const data = await response.json(); state.health = data;
     $('modelState').textContent = data.model_configured ? '已配置' : '待配置'; $('modelDot').className = `status-dot ${data.model_configured ? 'ready' : 'error'}`;
+    $('kbState').title = data.knowledge === 'error' ? (data.error || '知识库初始化失败，未自动降级。') : '';
     $('kbState').textContent = data.knowledge === 'ready' ? `${data.knowledge_backend === 'mini' ? '文本后备 · ' : ''}${data.documents} 个片段` : data.knowledge === 'error' ? '初始化失败' : '准备中'; $('kbDot').className = `status-dot ${data.knowledge === 'ready' ? 'ready' : data.knowledge === 'error' ? 'error' : ''}`;
     if (!data.memory_configured) $('memoryHelp').textContent = '服务端未配置 Mem0 Key，当前仅使用本次对话的上下文。'; updateComposer();
     if (data.knowledge === 'loading') setTimeout(refreshHealth, 3000);
@@ -583,10 +594,24 @@ function fillQuestion(text) {
   closeSidebar();
   $('message').focus();
 }
+$('medicationReminder').onclick = () => {
+  const panel = $('robotReminders'); panel.open = true;
+  if (window.matchMedia('(max-width: 800px)').matches) {
+    $('sidebar').classList.add('open'); $('sidebar').inert = false;
+    $('sidebarBackdrop').hidden = false;
+    $('menuButton').setAttribute('aria-expanded', 'true');
+  }
+  const heading = $('robotReminderHeading');
+  heading.focus({preventScroll:true});
+  heading.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
+  panel.classList.add('reminder-highlight');
+  clearTimeout(panel.highlightTimer);
+  panel.highlightTimer=setTimeout(()=>panel.classList.remove('reminder-highlight'),2600);
+};
 document.querySelectorAll('[data-prompt]').forEach(button => button.onclick = () => {
   const prompts = {
     symptom: '我最近有些不舒服。请先问我症状、持续时间和相关情况，帮我一起梳理需要关注的信息。',
-    medicine: '我有一个用药疑问。请先确认药品名称、剂量、服用目的和我的相关情况，再帮我了解注意事项。'
+    diet: '给我安排一顿健康早餐，请结合我的个人档案和已确认的健康记忆；缺少必要信息时请先询问。'
   };
   fillQuestion(prompts[button.dataset.prompt]);
 });
@@ -595,7 +620,7 @@ document.querySelectorAll('[data-action]').forEach(button => button.onclick = ()
   closeSidebar();
   if (action === 'upload') {
     if (state.busy) return;
-    if (!$('message').value.trim()) fillQuestion('请帮我读懂这张报告，准确说明可见的指标、单位，以及还需要补充哪些信息。');
+    if (!$('message').value.trim()) fillQuestion('这是我的病历，帮我分析');
     $('fileInput').click();
     return;
   }
@@ -630,10 +655,9 @@ $('questionChips').onclick = event => {
 const audienceLabels = {general:'一般健康科普',adults:'成人',children:'儿童',older_adults:'老年人',pregnancy_lactation:'孕哺期',unspecified:'人群未注明'};
 const evidenceKindLabels = {popular_science:'健康科普，非核准药品说明书',clinical_guideline:'指南或专业规范（请核对版本）',local_reference:'本地参考资料，机构来源未核验',medical_encyclopedia:'专业平台疾病资料，非政府发布',drug_reference:'专业平台药物资料，非具体制剂核准说明书'};
 function sourceUrl(source) {
-  try {
-    const url = new URL(source.url);
-    return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
-  } catch { return ''; }
+  const file = source?.file;
+  return typeof file === 'string' && /^[A-Za-z0-9_-]+\.(md|txt)$/.test(file)
+    ? '/knowledge/source/' + encodeURIComponent(file) : '';
 }
 function showEvidence(source) {
   const url = source && sourceUrl(source);
@@ -644,6 +668,8 @@ function createSourceCard(source) {
   const url = sourceUrl(source);
   const card = document.createElement(url ? 'a' : 'article');
   card.className = 'source-card';
+  card.dataset.citation = String(source.citation);
+  card.tabIndex = 0;
   if (url) {
     card.href = url; card.target = '_blank'; card.rel = 'noopener noreferrer';
     card.setAttribute('aria-label', `查看原文：${source.title || '医学资料'}（新标签页）`);
@@ -713,8 +739,7 @@ $('refreshPrompts').onclick = () => {
   });
 };
 
-window.addEventListener("medix-auth-change",()=>refreshCases().catch(()=>{}));
-window.addEventListener("medix-signout",()=>{state.caseId="";$("caseContext").replaceChildren(new Option("新对话，不关联历史",""));});
+window.addEventListener("medix-signout",()=>{state.caseId="";});
 
 async function changeMemory(id, action, demo, container) {
   try {
@@ -733,6 +758,7 @@ async function changeMemory(id, action, demo, container) {
   } catch (error) { toast(error.message); }
 }
 function memoryCard(record, demo, candidate=false, library=false) {
+  if (record.kind === 'user_query_and_ai_summary') return exchangeMemoryCard({...record, query:record.content}, library);
   const card = document.createElement('div'); card.className = 'memory-card';
   card.dataset.memoryId = record.id; card.memoryRecord = record; card.memoryOptions = {demo, candidate, library};
   const title = document.createElement('strong');
@@ -759,11 +785,16 @@ function renderMemory(main, result) {
   if (result.demo) { const note = document.createElement('div'); note.className = 'demo-banner'; note.textContent = '虚构交互演示：使用真实的本机存储、关联与纠正逻辑；回答为预置文案，未调用医疗模型，不写入你的正式记忆。'; main.append(note); }
   const references = result.memory_references || [];
   const candidates = result.memory_candidates || [];
-  references.forEach(record => main.append(memoryCard(record, result.demo)));
-  candidates.forEach(record => main.append(memoryCard(record, result.demo, true)));
-  const statuses = {saved:'已保存本次健康描述到 Mem0，并核验原文',skipped:'模型判断本次无需新增长期记忆',error:'本次记忆读写未完全成功，请稍后重试'};
+  if (references.length || candidates.length) {
+    const block = document.createElement('details'); block.className = 'observations case-evidence memory-evidence';
+    const summary = document.createElement('summary'); summary.textContent = `本次结合的记忆 · ${references.length + candidates.length} 条`;
+    block.append(summary);
+    references.forEach(record => block.append(memoryCard(record, result.demo)));
+    candidates.forEach(record => block.append(memoryCard(record, result.demo, true)));
+    main.append(block);
+  }
+  const statuses = {saved:'已保存本次健康描述到 Mem0，并核验原文',skipped:'本次无需新增记忆',error:'本次记忆读写未完全成功，请稍后重试'};
   if (result.memory_status && statuses[result.memory_status]) {
-    if (result.memory_status === 'skipped' && result.memory_decision?.reason) statuses.skipped += '：' + result.memory_decision.reason;
     if (result.memory_status === 'skipped' && result.patient_resolution) {
       const subject = result.patient_resolution.subject;
       if (['unknown','multiple'].includes(subject)) statuses.skipped = '人物尚未明确，本次未读取或保存个人记忆';
@@ -772,22 +803,104 @@ function renderMemory(main, result) {
       if (result.patient_resolution.method === 'unavailable') statuses.skipped = '自动记忆判断暂未完成，本次未读取或保存个人记忆';
     }
     const note = document.createElement('div'); note.className = 'memory-status'; note.textContent = statuses[result.memory_status] + (result.memory_error ? ' · ' + result.memory_error : '');
-    if (result.memory_enabled && result.patient_resolution?.patient !== 'other' && !references.length && !candidates.length && result.memory_status !== 'error') note.textContent += ' · 未发现相关的健康记忆';
+    if (result.memory_enabled && result.patient_resolution?.patient !== 'other' && !references.length && !candidates.length && result.memory_status !== 'error' && result.memory_status !== 'skipped') note.textContent += ' · 未发现相关的健康记忆';
     if (result.memory_saved) { const detail = document.createElement('details'); const title = document.createElement('summary'); title.textContent = '查看本次保存内容'; const text = document.createElement('p'); text.textContent = `${result.memory_saved.patient}：${result.memory_saved.content}`; detail.append(title,text); note.append(detail); }
     main.append(note);
   }
 }
-async function openMemoryLibrary(family=false) {
+function exchangeMemoryCard(record, collapsible=true) {
+  const card = document.createElement(collapsible ? 'details' : 'article');
+  card.className = collapsible ? 'observations case-evidence exchange-memory-card' : 'exchange-memory-card exchange-memory-full';
+  const date = document.createElement('small');
+  const stamp = new Date(record.created);
+  date.textContent = `${({self:'本人', father:'父亲', mother:'母亲'})[record.patient] || '人物待确认'} · ${Number.isNaN(stamp.getTime()) ? '' : stamp.toLocaleString()}${record.edited_at ? ' · 已编辑' : ''}`;
+  const title = document.createElement(collapsible ? 'summary' : 'h3'); title.textContent = record.query;
+  const content = document.createElement('div'); content.className = 'exchange-memory-content';
+  const label = document.createElement('strong'); label.textContent = '回答摘要 · AI 建议';
+  const visibleSummary = String(record.answer_summary || '').replace(/[（(]\s*摘录摘要，\s*完整上下文及其余限制请查看原回答。\s*[）)]/g, '').trim();
+  const answer = document.createElement('p'); answer.className = 'exchange-memory-preview'; answer.textContent = visibleSummary;
+  const actions = document.createElement('div'); actions.className = 'memory-edit-actions';
+  const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '编辑';
+  const outdated = document.createElement('button'); outdated.type = 'button'; outdated.textContent = '信息已过时';
+  const error = document.createElement('p'); error.className = 'exchange-memory-error'; error.setAttribute('role','status');
+  actions.append(edit,outdated); content.append(date,label,answer,actions,error); card.append(title,content);
+  async function submit(body) {
+    const response = await MedixAuth.fetch(`/api/memory-exchanges/${encodeURIComponent(record.id)}`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...body, expected_revision:record.revision})
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || '操作未完成，请重试');
+    return result;
+  }
+  edit.onclick = () => {
+    if (card.querySelector('form')) return;
+    const form = document.createElement('form'); form.className = 'exchange-memory-form';
+    const queryLabel = document.createElement('label'); queryLabel.textContent = '问题 / 个人描述';
+    const query = document.createElement('textarea'); query.value = record.query; query.required = true; query.maxLength = 16000; query.rows = 3; queryLabel.append(query);
+    const summaryLabel = document.createElement('label'); summaryLabel.textContent = '回答摘要（编辑仅影响记忆）';
+    const summary = document.createElement('textarea'); summary.value = visibleSummary; summary.required = true; summary.maxLength = 8000; summary.rows = 7; summaryLabel.append(summary);
+    const buttons = document.createElement('div'); buttons.className = 'memory-edit-actions';
+    const save = document.createElement('button'); save.type = 'submit'; save.textContent = '保存修改';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消';
+    buttons.append(cancel,save); form.append(queryLabel,summaryLabel,buttons); content.insertBefore(form,error);
+    actions.hidden = true; label.hidden = answer.hidden = true;
+    cancel.onclick = () => { form.remove(); actions.hidden = false; label.hidden = answer.hidden = false; error.textContent = ''; };
+    form.onsubmit = async event => {
+      event.preventDefault(); save.disabled = cancel.disabled = true; error.textContent = '';
+      try { const result = await submit({action:'edit', query:query.value, answer_summary:summary.value}); const updated = exchangeMemoryCard(result.record, collapsible); if (collapsible) updated.open = true; card.replaceWith(updated); }
+      catch (e) { error.textContent = e.message; save.disabled = cancel.disabled = false; }
+    };
+    query.focus();
+  };
+  outdated.onclick = async () => {
+    if (!window.confirm('将从 Mem0 删除这条过时记忆，无法撤销。原聊天记录不受影响。确定删除吗？')) return;
+    edit.disabled = outdated.disabled = true; error.textContent = '';
+    try {
+      await submit({action:'outdated'}); const parent = card.parentElement; card.remove();
+      if (parent && !parent.querySelector('.exchange-memory-card')) {
+        const empty = document.createElement('p'); empty.className = 'memory-empty'; empty.textContent = '暂时没有已保存的问答记录。'; parent.append(empty);
+      }
+    } catch (e) { error.textContent = e.message; edit.disabled = outdated.disabled = false; }
+  };
+  return card;
+}
+
+async function openMemoryLibrary(family=false, person=null) {
   if (!await MedixAuth.requireLogin()) return;
-  closeSidebar(); $('dialogTitle').textContent = family ? '亲友健康记忆 · Mem0' : state.demo ? '我的虚构演示记忆' : '我的健康记忆 · Mem0'; $('dialogContent').replaceChildren(); $('infoDialog').showModal();
+  closeSidebar(); $('dialogTitle').textContent = family ? `${person === 'father' ? '父亲' : person === 'mother' ? '母亲' : '亲友'}健康记忆 · Mem0` : state.demo ? '我的虚构演示记忆' : '我的健康记忆 · Mem0'; $('dialogContent').replaceChildren(); $('infoDialog').showModal();
   const demo = !!state.demo;
   const loading = document.createElement('p'); loading.textContent = demo ? '正在读取演示记忆…' : '正在从 Mem0 读取记忆…'; $('dialogContent').append(loading);
   try {
+    if (!demo) {
+      const response = await MedixAuth.fetch(`/api/memory-exchanges?scope=${family ? (person || 'family') : 'self'}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || '无法读取已保存的问答');
+      loading.remove();
+      const note = document.createElement('p');
+      note.textContent = '当前账号最近 100 条已保存问答。新对话先判断长期价值，有价值才保存问题原文和回答摘要。摘要为 AI 建议，不代表已确认的健康事实。';
+      $('dialogContent').append(note);
+      if (!data.exchanges.length) {
+        const empty = document.createElement('p'); empty.className = 'memory-empty';
+        empty.textContent = '暂时没有已保存的问答记录。'; $('dialogContent').append(empty);
+      }
+      if (family) {
+        for (const [subject, name] of [['father','父亲'], ['mother','母亲']].filter(([subject]) => !person || person === subject)) {
+          const section = document.createElement('section');
+          const heading = document.createElement('h3'); heading.textContent = `${name}的健康记忆`; section.append(heading);
+          const records = data.exchanges.filter(record => record.patient === subject);
+          if (!records.length) { const empty = document.createElement('p'); empty.textContent = `暂无${name}的长期记忆`; section.append(empty); }
+          records.forEach(record => section.append(exchangeMemoryCard(record))); $('dialogContent').append(section);
+        }
+      } else {
+        for (const record of data.exchanges) $('dialogContent').append(exchangeMemoryCard(record));
+      }
+      return;
+    }
     const response = await MedixAuth.fetch(`/api/memories?demo=${demo}&scope=${family ? 'family' : 'self'}`); const data = await response.json();
     if (!response.ok) throw new Error(data.detail || '无法加载记忆');
     loading.remove();
     const note = document.createElement('p'); note.textContent = family ? '按人物分别查看父亲、母亲的健康原文。模型会结合描述与本轮上下文判断人物。其他亲友暂不自动保存，避免混淆。点击记录可查看完整原文。' : '显示本人的最近 100 条记录（包含已停用）。点击记录可查看原文。历史描述不等于确诊或当前状态；记忆可随时编辑、停用或删除。'; note.textContent += demo ? ' 当前为本机虚构演示。' : ' 新记录保存于 Mem0；本机旧记录单独标明且不会自动上传。'; $('dialogContent').append(note);
-    const groups = family ? [['father','父亲'],['mother','母亲']] : [['self','本人']];
+    const groups = family ? [['father','父亲'],['mother','母亲']].filter(([subject]) => !person || subject === person) : [['self','本人']];
     for (const [patient,label] of groups) {
       const records = data.memories.filter(record => record.patient === patient);
       let target = $('dialogContent');
@@ -812,7 +925,8 @@ async function openMemoryLibrary(family=false) {
   } catch(error) { $('dialogContent').textContent = error.message; }
 }
 $('memoryLibrary').onclick = () => openMemoryLibrary(false);
-$('familyMemory').onclick = () => openMemoryLibrary(true);
+$('fatherMemory').onclick = () => openMemoryLibrary(true, 'father');
+$('motherMemory').onclick = () => openMemoryLibrary(true, 'mother');
 
 function updateFamilySummary(group) {
   const summary = summarizeFamily(group.records);
@@ -1257,7 +1371,7 @@ function streamTurn(jobId,row,message,epoch,after=0) {
       }
       if(data.type==='draft_clear' && row.dataset.streamCall===data.call_id)renderDraft(row,'');
       if(data.type==='delta' && row.dataset.streamCall===data.call_id){renderDraft(row,data.text,true);scrollDown();}
-      if(data.type==='usage'){appendUsage(row.querySelector('.message-main'),data.usage);refreshWallet().catch(()=>{});}
+      if(data.type==='usage'){refreshWallet().catch(()=>{});}
       if(data.type==='done') {
         source.close();clearTimeout(outage);state.eventSource=null;
         if(data.status==='completed' && data.result)resultMessage(row,data.result,message,jobId);
@@ -1314,7 +1428,7 @@ async function openConversation(id) {
   const data=await response.json();
   if(epoch!==authEpoch)return;
   if(!response.ok)throw new Error(data.detail || '会话加载失败。');
-  resetChat();state.caseId='';$('caseContext').value='';state.chatId=id;state.count=data.turns.length;rememberActiveChat();
+  resetChat();state.caseId='';state.chatId=id;state.count=data.turns.length;rememberActiveChat();
   $('chatTitle').textContent=data.title;
   $('welcome').hidden=true;$('messages').classList.add('active');document.body.classList.add('chatting');
   let totalRequests=0,totalTokens=0;
@@ -1372,25 +1486,17 @@ async function refreshWallet(){
   const owner=MedixAuth.user.id;const response=await MedixAuth.fetch('/api/wallet');
   if(!response.ok)return;const wallet=await response.json();if(MedixAuth.user?.id!==owner)return;
   state.wallet=wallet;$('careWallet').hidden=false;
-  refreshAccountUsage(owner);
+  refreshAccountUsage(owner, wallet);
   $('walletAmount').textContent=formatPoints(wallet.available)+' 点';
   $('walletHeld').hidden=!wallet.held;
   $('walletHeld').textContent=wallet.held?`另有 ${formatPoints(wallet.held)} 点待核对结算。`:'';
   $('walletRules').textContent=`每个账户初始赠送 ${formatPoints(wallet.initial)} 关怀点。${formatPoints(wallet.points_per_cny)} 点对应 ¥1 模型消耗，按本轮全部模型调用扣除，精确到 0.001 点。`;
 }
-async function refreshAccountUsage(owner) {
-  try {
-    const response=await MedixAuth.fetch('/api/usage');
-    if(!response.ok)throw new Error();
-    const usage=await response.json();
-    if(MedixAuth.user?.id!==owner)return;
-    const total=usage.input_tokens+usage.output_tokens;
-    $('careBalance').textContent=new Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(total)+' Token';
-    $('careBalance').title='当前保留会话的已知 Token 用量';
-    $('accountTokenUsage').textContent=`当前保留会话：输入 ${formatPoints(usage.input_tokens)} · 输出 ${formatPoints(usage.output_tokens)} Token${usage.unknown_requests?' · 部分请求用量待核对':''}`;
-  } catch {
-    if(MedixAuth.user?.id===owner){$('careBalance').textContent='查看用量';$('accountTokenUsage').textContent='Token 用量暂时无法加载，请稍后重试。';}
-  }
+function refreshAccountUsage(owner, wallet) {
+  if (MedixAuth.user?.id !== owner) return;
+  $('careBalance').textContent = formatPoints(wallet.spent) + ' 关怀点';
+  $('careBalance').title = '累计已结算消耗，包含已删除对话';
+  $('accountTokenUsage').textContent = `累计消耗 ${formatPoints(wallet.spent)} 关怀点${wallet.held ? ' · 另有额度待核对结算' : ''}`;
 }
 let walletHistoryOffset=0, walletHistoryEpoch=0;
 function walletElement(tag,className,text){
@@ -1398,7 +1504,7 @@ function walletElement(tag,className,text){
 }
 function walletAgentName(agent){
   return ({'stage:patient':'人物判断','stage:case':'病例整理','stage:agents':'任务路由','stage:vision':'图片读取','stage:presentation':'回答整理','stage:answer':'原文阅读','stage:memory':'记忆核对','stage:patient_resolve':'人物判断','stage:case_prepare':'病例整理','stage:route':'任务路由',
-    'reply_presentation':'回答排版','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
+    'reply_presentation':'回答排版','report_answer_repair':'报告解读校验','stage:initial':'流程准备','stage:synthesize':'回答整理','general':'健康咨询助手',
     'consultation_agent':'健康咨询助手','diagnostic_agent':'诊断分析助手','research_agent':'医学研究助手','lead_synthesis':'协作汇总助手','evidence_reader':'原文阅读助手','health_consultant':'健康咨询助手','general_practitioner':'健康咨询助手'})[agent] || (agent?.startsWith('stage:')?'流程处理':agent || '助手');
 }
 function participatingAssistants(calls,fallback=[]){
@@ -1419,11 +1525,6 @@ function walletRecord(entry){
   amount.append(walletElement('span','',entry.held_points>0?'有额度待结算':'关怀点'));summary.append(amount,walletElement('span','wallet-record-chevron','⌄'));record.append(summary);
   const content=walletElement('div','wallet-record-body');
   if(entry.deleted){content.append(walletElement('p','wallet-record-note','该对话已删除，用量明细已清理。已结算的关怀点保留记录。'));record.append(content);return record;}
-  const metrics=walletElement('div','wallet-metrics');
-  for(const [label,value] of [['输入 Token',entry.input_tokens],['输出 Token',entry.output_tokens],['缓存命中',entry.cache_hit_tokens]]){
-    const metric=walletElement('div','');metric.append(walletElement('span','',label),walletElement('strong','',formatPoints(value)));metrics.append(metric);
-  }
-  content.append(metrics);
   const assistantLine=`${assistants.length?'参与助手：'+assistants.join('、'):'本轮仅有流程处理'} · 助手调用 ${entry.assistant_requests} 次 · 模型请求 ${entry.requests} 次`;
   content.append(walletElement('p','wallet-call-caption',assistantLine));
   const groups=new Map();
@@ -1434,7 +1535,7 @@ function walletRecord(entry){
   }
   const list=walletElement('div','wallet-call-list');
   for(const group of groups.values()){
-    const row=walletElement('div','wallet-call-row');const identity=walletElement('div','');identity.append(walletElement('strong','',walletAgentName(group.agent)),walletElement('span','',`${group.calls} 次调用 · ${formatPoints(group.input)} 输入 / ${formatPoints(group.output)} 输出${group.unknown?' · 用量待核对':''}`));
+    const row=walletElement('div','wallet-call-row');const identity=walletElement('div','');identity.append(walletElement('strong','',walletAgentName(group.agent)),walletElement('span','',`${group.calls} 次调用${group.unknown?' · 消耗待核对':''}`));
     row.append(identity,walletElement('span','wallet-call-points',`${formatPoints(group.points)} 点`));list.append(row);
   }
   content.append(list);
@@ -1465,7 +1566,7 @@ $('walletMore').onclick=()=>loadWalletHistory(walletHistoryOffset===0);
 $('careWallet').onclick=()=>{refreshWallet().catch(()=>{});loadWalletHistory(true);walletTab('usage');loadRecharge();$('walletDialog').showModal();};
 $('walletClose').onclick=()=>$('walletDialog').close();
 window.addEventListener('medix-auth-change',()=>refreshWallet().catch(()=>{}));
-window.addEventListener('medix-signout',()=>{walletHistoryEpoch++;rechargeEpoch++;rechargeRequest=null;rechargePlans=[];selectedRecharge=null;$('rechargePlans').replaceChildren();$('walletOrders').replaceChildren();$('rechargeFeedback').textContent='';$('walletHistory').replaceChildren();$('careWallet').hidden=true;$('careBalance').textContent='—';$('accountTokenUsage').textContent='正在读取 Token 用量…';$('walletDialog').close();$('conversationDialog').close();});
+window.addEventListener('medix-signout',()=>{walletHistoryEpoch++;rechargeEpoch++;rechargeRequest=null;rechargePlans=[];selectedRecharge=null;$('rechargePlans').replaceChildren();$('walletOrders').replaceChildren();$('rechargeFeedback').textContent='';$('walletHistory').replaceChildren();$('careWallet').hidden=true;$('careBalance').textContent='—';$('accountTokenUsage').textContent='正在读取关怀点消耗…';$('walletDialog').close();$('conversationDialog').close();});
 MedixAuth.ready.then(()=>refreshWallet()).catch(()=>{});
 async function loadSavedConversations() {
   if(!MedixAuth.user)return;

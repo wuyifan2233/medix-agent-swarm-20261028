@@ -64,7 +64,7 @@ class RoutingPipelineTests(unittest.TestCase):
         self.scope=account_clients();self.fixture=self.scope.__enter__()
     def tearDown(self): self.scope.__exit__(None,None,None)
 
-    def analyze(self,question,kind,subject='self',index=0,remember=False,snapshot=None,chat_id=None,case_questions=None):
+    def analyze(self,question,kind,subject='self',index=0,remember=False,snapshot=None,chat_id=None,case_questions=None,case_context=None):
         import web.app as web
         from config import LLM_CONFIG
         owner=self.fixture.users[index].id
@@ -75,15 +75,24 @@ class RoutingPipelineTests(unittest.TestCase):
         coordinator.llm_client=NS(client=NS(close=AsyncMock()))
         coordinator.process=AsyncMock(return_value={'answer':'当前请求已处理','agent_id':'consultation_agent'})
         memory=Mock();memory.related.return_value=[]
-        kb=Mock();kb.retrieve.return_value={'status':'needs_information','hits':[],'trace':{},'message':'医学资料不足'}
+        kb=Mock();kb.retrieve.return_value={'status':'no_results' if case_context else 'needs_information','hits':[],'trace':{},'message':'医学资料不足'}
         with patch.dict(os.environ,{'MEDIX_KB_MODE':'evidence'}),patch.dict(LLM_CONFIG,{'api_key':'mock'}), \
              patch('web.request_routing.classify_request',AsyncMock(return_value={'kind':kind,'subject':subject})), \
              patch('knowledge.get_knowledge_base',return_value=kb) as getkb, \
-             patch('web.app.prepare_context',AsyncMock(return_value={'case_id':'','facts':[],'context':'','sources':[],'index_ready':True,'outcome':{'changes':[],'questions':case_questions or [],'switched':False},'warnings':[]})) as cases, \
+             patch('web.app.prepare_context',AsyncMock(return_value={'case_id':'case-fixture' if case_context else '','facts':[],'context':case_context or '','sources':[],'index_ready':True,'outcome':{'changes':[],'questions':case_questions or [],'switched':False},'warnings':[]})) as cases, \
              patch('swarm.SwarmCoordinator',return_value=coordinator), \
              patch('web.app.get_web_memory',return_value=memory):
             asyncio.run(web.analyze(job,payload,'web-'+owner+'-'+payload['chat_id'],owner))
         return job,coordinator,memory,kb,getkb,cases
+
+    def test_case_history_stays_in_analysis_not_public_retrieval(self):
+        question='最近总是睡不好，应该先观察和记录哪些情况？'
+        history='历史血液检验记录，项目及数值。'*100
+        job,coordinator,memory,kb,*_=self.analyze(question,'medical',case_context=history)
+        kb.retrieve.assert_called_once_with(question)
+        self.assertIn(history,coordinator.process.call_args.args[0])
+        self.assertEqual(job['result']['retrieval']['query'],question)
+        self.assertEqual(job['result']['sources'],[])
 
     def test_identity_memory_and_actions_do_not_require_medical_coverage(self):
         for question,kind in [('我是谁','personal'),('还记得我之前说过什么吗','personal'),

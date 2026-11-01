@@ -24,12 +24,16 @@
   <label>日常安排与执行偏好 <span>选填 · 最多200字</span><textarea name="daily_context" maxlength="200" rows="3" placeholder="例如：工作日时间紧，希望建议拆成每次5分钟可完成的步骤。疾病、过敏和用药请在对话中说明。"></textarea></label></section>
   <footer><button type="submit" id="rpSave">保存回答偏好</button><button type="button" id="rpReset">恢复默认并关闭偏好</button></footer></form><p id="rpStatus" role="status" aria-live="polite"></p>`;
   document.body.append(dialog);
+  const autoRead=document.getElementById("autoReadPreference");
+  dialog.querySelector(".rp-voice-options").before(autoRead);
+  autoRead.hidden=false;
+
   const form=dialog.querySelector('form'),status=dialog.querySelector('#rpStatus');
   let revision=0,epoch=0,actor=null,busy=false,loaded=false,catalog=null,catalogRequest=0;
   const preview=dialog.querySelector('#rpVoicePreview');
   const defaults={enabled:false,nickname:'',tone:'neutral',detail:'standard',format:'summary_first',terminology:'plain',communication_note:'',daily_context:'',voice_profile:'child'};
   function render(data){for(const [key,value] of Object.entries({...defaults,...data})){const node=form.elements.namedItem(key);if(!node)continue;if(node.type==='checkbox')node.checked=value;else node.value=value;}}
-  function lock(value){busy=value;form.querySelectorAll('input,select,textarea,button').forEach(node=>{node.disabled=value;});}
+  function lock(value){busy=value;form.querySelectorAll('input:not(#autoSpeak),select,textarea,button').forEach(node=>{node.disabled=value;});}
   form.addEventListener('change',()=>{window.MedixVoice?.stopPreview();});
   preview.onclick=()=>window.MedixVoice?.preview(form.elements.namedItem('voice_profile').value,form.elements.namedItem('tone').value,preview);
   async function refreshVoices(){
@@ -57,14 +61,14 @@
   async function persist(data){
     if(!loaded)return;
     const mine=epoch;lock(true);status.textContent='正在保存…';
-    try{const result=await request({method:'PUT',body:JSON.stringify({expected_revision:revision,data})});revision=result.revision;render(result.data);window.MedixVoice?.stop();refreshVoices();status.textContent=data.enabled?'已启用 v'+result.revision+'，文字偏好从下次提问生效，声音从下次播报生效。':'已恢复默认并关闭偏好。';}
+    try{const result=await request({method:'PUT',body:JSON.stringify({expected_revision:revision,data})});revision=result.revision;render(result.data);window.MedixVoice?.stop();refreshVoices();status.textContent=data.enabled?'已启用，文字偏好从下次提问生效，声音从下次播报生效。':'已恢复默认并关闭偏好。';}
     catch(error){if(mine===epoch)status.textContent=error.message;}
     finally{if(mine===epoch)lock(false);}
   }
   open.onclick=async()=>{
     if(!await MedixAuth.requireLogin())return;
     actor=MedixAuth.user.id;loaded=false;const mine=epoch;dialog.showModal();lock(true);status.textContent='正在读取当前账号的偏好…';
-    try{const result=await request();revision=result.revision;loaded=true;refreshVoices();render(result.data);status.textContent=result.data.enabled?'已启用 v'+result.revision+'；修改后请保存，声音从下次播报生效。':'当前未启用，保存后将自动启用。';}
+    try{const result=await request();revision=result.revision;loaded=true;refreshVoices();render(result.data);status.textContent=result.data.enabled?'已启用；修改后请保存，声音从下次播报生效。':'当前未启用，保存后将自动启用。';}
     catch(error){if(mine===epoch)status.textContent=error.message;return;}
     finally{if(mine===epoch)lock(!loaded);}
   };
