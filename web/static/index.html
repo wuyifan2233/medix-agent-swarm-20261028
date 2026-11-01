@@ -2,11 +2,14 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6374ed"><meta name="description" content="MediX 健康助手，陪你读懂报告、梳理健康问题。"><title>MediX · 你的 AI 健康伙伴</title>
-<link rel="icon" href="/assets/medix-mascot-cutout.png"><link rel="stylesheet" href="/assets/style.css?v=source-direct-1"><link rel="stylesheet" href="/assets/auth-modal.css?v=10"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/source-highlights.js" defer></script><script src="/assets/family-summary.js" defer></script><script src="/assets/source-citations.js?v=2" defer></script><script src="/assets/app.js?v=registration-baseline-1" defer></script><script src="/assets/password-policy.js?v=5" defer></script><script src="/assets/login.js?v=11" defer></script>
-<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=5"><script src="/assets/profile-menu.js?v=13" defer></script><link rel="stylesheet" href="/assets/settings.css?v=22"><script src="/assets/avatar-crop.js?v=1" defer></script><script src="/assets/settings.js?v=13" defer></script><script src="/assets/sms-login.js?v=10" defer></script><script src="/assets/password-reset.js?v=5" defer></script><script src="/assets/phone-register.js?v=6" defer></script><script src="/assets/account-delete.js?v=4" defer></script><script src="/assets/security-overview.js?v=3" defer></script><script src="/assets/phone-change.js?v=1" defer></script><script src="/assets/form-validation.js?v=3" defer></script><script src="/assets/nickname.js?v=1" defer></script><script src="/assets/avatar-picker.js?v=1" defer></script><link rel="stylesheet" href="/assets/health-profile.css"><link rel="stylesheet" href="/assets/profile-evolution.css"><link rel="stylesheet" href="/assets/conversation-picker.css"><link rel="stylesheet" href="/assets/profile-theme.css?v=baseline1"><link rel="stylesheet" href="/assets/reply-preferences.css?v=voice1"><script src="/assets/registration-profile.js?v=7" defer></script><script src="/assets/reply-preferences.js?v=save-enable-1" defer></script><link rel="stylesheet" href="/assets/channels.css"></head>
+<link rel="icon" href="/assets/medix-mascot-cutout.png"><link rel="stylesheet" href="/assets/style.css?v=question-type-20261101"><link rel="stylesheet" href="/assets/auth-modal.css?v=10"><script src="/assets/auth.js?v=3" defer></script><script src="/assets/source-highlights.js" defer></script><script src="/assets/family-summary.js" defer></script><script src="/assets/source-citations.js?v=2" defer></script><script src="/assets/app.js?v=reminder-label-20261101" defer></script><script src="/assets/password-policy.js?v=5" defer></script><script src="/assets/login.js?v=11" defer></script>
+<link rel="stylesheet" href="/assets/password-policy.css?v=4"><link rel="stylesheet" href="/assets/profile-menu.css?v=5"><script src="/assets/profile-menu.js?v=13" defer></script><link rel="stylesheet" href="/assets/settings.css?v=22"><script src="/assets/avatar-crop.js?v=1" defer></script><script src="/assets/settings.js?v=13" defer></script><script src="/assets/sms-login.js?v=10" defer></script><script src="/assets/password-reset.js?v=5" defer></script><script src="/assets/phone-register.js?v=6" defer></script><script src="/assets/account-delete.js?v=4" defer></script><script src="/assets/security-overview.js?v=3" defer></script><script src="/assets/phone-change.js?v=1" defer></script><script src="/assets/form-validation.js?v=3" defer></script><script src="/assets/nickname.js?v=1" defer></script><script src="/assets/avatar-picker.js?v=1" defer></script><link rel="stylesheet" href="/assets/health-profile.css"><link rel="stylesheet" href="/assets/profile-evolution.css"><link rel="stylesheet" href="/assets/conversation-picker.css"><link rel="stylesheet" href="/assets/profile-theme.css?v=baseline1"><link rel="stylesheet" href="/assets/reply-preferences.css?v=welcome-spacing-20261101"><script src="/assets/registration-profile.js?v=7" defer></script><script src="/assets/reply-preferences.js?v=remove-preference-hint-20261101" defer></script><link rel="stylesheet" href="/assets/channels.css"></head>
 
 <body>
 <svg class="sprite" aria-hidden="true"><defs>
+<symbol id="i-alarm" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M5 3 2 6m17-3 3 3M6 20l-2 2m14-2 2 2"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h6m4 0h6M4 17h10m4 0h2"/><circle cx="12" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M6 3h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H9l-6 3V6a3 3 0 0 1 3-3Z"/><path d="M7 8h10M7 12h10M7 16h6"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11a9 9 0 0 1-9 9H5l-3 2 1.6-5.5A9 9 0 1 1 21 11Z"/><path d="M8 10h8M8 14h5"/></symbol>
 <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></symbol>
@@ -34,7 +37,7 @@
 <a class="brand" href="/" aria-label="MediX 首页"><span class="brand-mark mascot-mark"><img src="/assets/medix-mascot-cutout.png" alt=""></span><span>MediX<small>你的 AI 健康伙伴</small></span></a>
 <div class="sidebar-scroll">
 <button class="new-chat" id="newChat"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>新建对话</span></button>
-<p class="nav-caption">我的健康助手</p>
+
 <nav class="primary-nav" aria-label="快捷功能">
 <button class="nav-item active" id="chatNav" aria-current="page"><svg><use href="#i-chat"/></svg><span>健康咨询</span><span class="nav-indicator"></span></button>
 </nav>
@@ -49,7 +52,7 @@
 <button class="nav-item" id="motherMemory" type="button">母亲健康记忆</button>
 </div></details>
 </div></details>
-<details class="channel-panel memory-nav" id="robotReminders"><summary class="nav-item" id="robotReminderHeading"><svg aria-hidden="true"><use href="#i-chat"/></svg><span>聊天机器人提醒</span><span class="memory-nav-chevron" aria-hidden="true">›</span></summary><p class="channel-limit">本机每个渠道仅供一个 MediX 账号连接，QQ需回复绑定码确认。</p><div class="conversation-heading">定时提醒<span id="reminderCount"></span></div>
+<details class="channel-panel memory-nav" id="robotReminders"><summary class="nav-item" id="robotReminderHeading"><svg aria-hidden="true"><use href="#i-alarm"/></svg><span>聊天机器人提醒</span><span class="memory-nav-chevron" aria-hidden="true">›</span></summary><p class="channel-limit">本机每个渠道仅供一个 MediX 账号连接，QQ需回复绑定码确认。</p><div class="conversation-heading">定时提醒<span id="reminderCount"></span></div>
 <div id="reminderList" class="reminder-list" aria-live="polite"></div>
 <p id="reminderEmpty" class="reminder-empty">还没有即将到来的提醒</p>
 <div class="wechat-card" id="wechatCard">
@@ -75,7 +78,7 @@
 <button type="button" id="wechatLogout" hidden>断开</button>
 </div>
 </div>
-</details><div class="conversation-heading">历史对话</div>
+</details><div class="conversation-heading conversation-history-heading"><svg aria-hidden="true"><use href="#i-history"/></svg><span>历史对话</span></div>
 <span id="chatTitle" hidden>新的健康对话</span>
 <div id="conversationList" class="conversation-list" aria-label="历史会话"></div>
 <div class="care-note"><span class="care-note-icon"><svg><use href="#i-spark"/></svg></span><strong>小问题，也值得好好聊</strong><p>从身体的小变化，到每天的好习惯，<br>我们一起慢慢梳理。</p></div>
@@ -89,11 +92,11 @@
 </div>
 </aside>
 <main>
-<header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar"><svg><use href="#i-menu"/></svg></button><span class="workspace-title">健康咨询</span><span class="version">AI 助手</span></div><div class="topbar-right"><span class="top-status"><span></span>文字、图片都可以问</span><button id="topLoginButton" class="top-login topbar-action" type="button">登录</button></div></header>
+<header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menuButton" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar"><svg><use href="#i-menu"/></svg></button><span class="workspace-title">健康咨询</span><span class="version">AI 助手</span></div><div class="topbar-right"><div class="top-brand-note"><span>多模态、个性化、全场景的AI健康伙伴MediX</span><small>AI六组 倾力制作</small></div><button id="topLoginButton" class="top-login topbar-action" type="button">登录</button></div></header>
 <div class="conversation" id="conversation">
 <section class="welcome" id="welcome">
-<div class="hero"><div class="hero-copy"><div class="eyebrow"><span></span>让关心，随时在身边</div><h1>你好，我是 <span>MediX</span><br>今天有什么想问的？</h1><p class="welcome-description">身体的小疑问，报告里的看不懂。<br>说给我听，我们一起找到更清楚的答案。</p></div><div class="hero-art" aria-hidden="true"><span class="art-orbit orbit-one"></span><span class="art-orbit orbit-two"></span><span class="art-spark spark-one">✦</span><span class="art-spark spark-two">＋</span><img src="/assets/medix-mascot-cutout.png" alt="" class="companion"><span class="hello-bubble">Hi，今天也要照顾好自己</span></div></div>
-<div class="section-heading"><h2>从这里开始聊</h2><span>你关心的，都可以问问</span></div>
+<div class="hero"><div class="hero-copy"><h1>你好，我是 <span>MediX</span><br>今天有什么想问的？</h1><p class="welcome-description">身体的小疑问，报告里的看不懂。<br>说给我听，我们一起找到更清楚的答案。</p></div><div class="hero-art" aria-hidden="true"><span class="art-orbit orbit-one"></span><span class="art-orbit orbit-two"></span><span class="art-spark spark-one">✦</span><span class="art-spark spark-two">＋</span><img src="/assets/medix-mascot-cutout.png" alt="" class="companion"><span class="hello-bubble">Hi，今天也要照顾好自己</span></div></div>
+<div class="section-heading"><h2>从这里开始聊</h2></div>
 <div class="suggestions">
 <button class="suggestion card-consult" data-prompt="symptom"><span class="example-icon blue"><svg><use href="#i-heart"/></svg></span><div><strong>身体有点不舒服</strong><small>梳理症状，了解该关注什么</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
 <button class="suggestion card-report" data-action="upload"><span class="example-icon lilac"><svg><use href="#i-image"/></svg></span><div><strong>帮我读懂报告</strong><small>上传检查报告、记录或截图</small></div><svg class="card-arrow"><use href="#i-chevron"/></svg></button>
@@ -113,12 +116,12 @@
   <div class="voice-record-actions" id="voiceRecordActions"><span class="voice-live-dot"></span><span id="voiceElapsed">00:00</span><button type="button" class="voice-stop" id="stopVoice"><svg><use href="#i-stop"/></svg>结束录音</button></div>
 </div>
 <label class="sr-only" for="message">输入健康问题</label><textarea id="message" placeholder="有健康问题，尽管问我…" rows="2" maxlength="8000"></textarea>
-<div class="composer-bottom"><div class="compose-left"><button type="button" class="voice-btn" id="voiceButton" aria-label="语音输入" title="语音输入，识别后可编辑"><svg><use href="#i-mic"/></svg><span>语音输入</span></button><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button><span id="attachHint">说一说，或上传报告</span></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="button" id="stopGeneration" class="stop-generation" hidden>停止生成</button><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
+<div class="composer-bottom"><div class="compose-left"><button type="button" class="voice-btn" id="voiceButton" aria-label="语音输入" title="语音输入，识别后可编辑"><svg><use href="#i-mic"/></svg><span>语音输入</span></button><button type="button" class="attach-btn" id="attachButton" aria-label="上传图片" title="上传 PNG、JPG、WebP 图片"><svg><use href="#i-image"/></svg><span>上传图片</span></button></div><div class="compose-right"><small>Enter 发送 · Shift + Enter 换行</small><button type="button" id="stopGeneration" class="stop-generation" hidden>停止生成</button><button type="submit" id="sendButton" class="send-button" aria-label="发送问题" disabled><svg><use href="#i-arrow"/></svg></button></div></div>
 <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></form>
-<p class="disclaimer"><svg><use href="#i-shield"/></svg>AI 回答仅供参考，不能替代医生诊断。紧急不适请及时就医。</p>
+<p class="disclaimer"><svg><use href="#i-shield"/></svg>AI 回答仅供参考，不能替代医生诊断。如有不适请及时就医。</p>
 </div>
 </main></div>
-<div class="memory-option audio-option" id="autoReadPreference" hidden><label for="autoSpeak"><span><svg><use href="#i-volume"/></svg>回答自动朗读</span><input type="checkbox" id="autoSpeak" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p id="voicePreferenceSummary">朗读内容由微软云端合成。</p></div>
+<div class="memory-option audio-option" id="autoReadPreference" hidden><label for="autoSpeak"><span><svg><use href="#i-volume"/></svg>回答自动朗读</span><input type="checkbox" id="autoSpeak" role="switch"><span class="switch-track" aria-hidden="true"></span></label><p id="voicePreferenceSummary">可在回答偏好中设置声音。</p></div>
 <dialog id="infoDialog" class="info-dialog" aria-labelledby="dialogTitle"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-book"/></svg></span><button id="closeDialog" class="icon-button" aria-label="关闭说明"><svg><use href="#i-close"/></svg></button></div><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div><button id="dialogDone" class="dialog-done">知道了</button></dialog>
 <dialog id="sourceDialog" class="info-dialog source-dialog" aria-labelledby="sourceTitle"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-book"/></svg></span><button id="closeSource" class="icon-button" aria-label="关闭原始资料"><svg><use href="#i-close"/></svg></button></div><h2 id="sourceTitle"></h2><div id="sourceContent" class="dialog-content"></div><button id="sourceDone" class="dialog-done">返回</button></dialog>
 <dialog id="memoryEditDialog" class="info-dialog memory-edit-dialog" aria-labelledby="memoryEditTitle"><form id="memoryEditForm"><div class="dialog-heading"><span class="dialog-badge"><svg><use href="#i-spark"/></svg></span><button type="button" id="closeMemoryEdit" class="icon-button" aria-label="关闭记忆编辑"><svg><use href="#i-close"/></svg></button></div><h2 id="memoryEditTitle">编辑健康记忆</h2><p id="memoryEditHelp"></p><label class="memory-edit-label" for="memoryEditContent">记忆内容</label><textarea id="memoryEditContent" required maxlength="8000" rows="6"></textarea><label class="memory-edit-label" for="memoryEditObservations">图片读取文字（如有）</label><textarea id="memoryEditObservations" maxlength="16000" rows="3"></textarea><p id="memoryEditError" role="alert"></p><div class="memory-edit-actions"><button type="button" id="cancelMemoryEdit">取消</button><button type="submit" id="saveMemoryEdit">保存并覆盖原记忆</button></div></form></dialog>

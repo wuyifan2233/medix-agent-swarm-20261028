@@ -1,5 +1,6 @@
 """Small, explicit intent and applicability rules for this demo corpus."""
 import re
+import jieba
 
 ALIASES={'扑热息痛':'对乙酰氨基酚','拉肚子':'腹泻','流行性感冒':'流感','血压高':'高血压','血糖高':'糖尿病'}
 DRUGS=('对乙酰氨基酚','布洛芬','氯雷他定','口服补液盐','阿司匹林','阿莫西林')
@@ -22,6 +23,43 @@ DRUGS=tuple(dict.fromkeys(DRUGS+_drugs))
 TOPICS=tuple(dict.fromkeys(TOPICS+_topics))
 
 
+SLEEP_TERMS=('睡眠','睡不好','睡不着','失眠','入睡','早醒','夜醒')
+NECK_TERMS=('肩颈','颈肩','颈部','颈椎','脖子','肩膀','肩部','肩周')
+NECK_HABITS=('久坐','低头','姿势','坐姿','习惯','工位','电脑','工作','调整','放松','缓解')
+NECK_ADVICE=('姿势','坐姿','久坐','低头','休息','锻炼','拉伸','预防','电脑','工作','枕头')
+QUERY_FILLER={'怎么','怎样','如何','什么','哪些','为什么','可以','应该','需要','注意','日常','调整','习惯','情况','问题','最近','总是','感觉','不舒服','帮我','一下','一段','一个','推荐','建议','方法','快速','记录','观察','健康','身体','资料','内容','知识','还有','每天','是否','进行','现在','时候'}
+
+def directly_relevant(query, row):
+    title=row.get('metadata',{}).get('title','')
+    content=row.get('content','')
+    body=content.removeprefix(title).strip()
+    # A title/credit alone does not supply supporting evidence.
+    if not body or re.fullmatch(r'(?:审核|作者|来源|编辑|审校)[：:].*',body):
+        return False
+    if any(term in query for term in SLEEP_TERMS):
+        return any(term in title for term in SLEEP_TERMS) and any(term in body for term in SLEEP_TERMS)
+    if any(term in query for term in NECK_TERMS):
+        if not any(term in title or term in body for term in NECK_TERMS):
+            return False
+        if any(term in query for term in NECK_HABITS):
+            trauma=('损伤','外伤','骨折','急救','受伤')
+            if any(term in title for term in trauma) and not any(term in query for term in trauma):
+                return False
+            if not any(term in body for term in NECK_ADVICE):
+                return False
+        return True
+    # Known disease names must be central to the source, not incidental body tags.
+    subjects={term for term in TOPICS if len(term)>=2 and term not in QUERY_FILLER
+              and term not in ('饮食','运动','水果','测量','主食','食盐','用药','症状','治疗') and term in query}
+    if subjects:
+        return any(term in title for term in subjects)
+    # For unregistered wording, check actual candidate text after dense recall.
+    # No fixed corpus topic is required; generic request words are not evidence.
+    anchors={term.lower() for term in jieba.cut(query) if len(term)>=2
+             and term not in QUERY_FILLER and not term.isdigit()}
+    return bool(anchors) and any(term in (title+' '+body).lower() for term in anchors)
+
+
 def normalize_query(query):
     for old,new in ALIASES.items():query=query.replace(old,new)
     return query.strip()
@@ -30,7 +68,7 @@ def normalize_query(query):
 def contextualize_query(query,history):
     """Only inherit a user's explicit topic for an elliptical follow-up."""
     query=normalize_query(query)
-    if any(t in query for t in TOPICS):return query,False
+    if any(t in query for t in (*TOPICS,*SLEEP_TERMS,*NECK_TERMS)):return query,False
     if re.match(r'^(那|那么|这个|这种|它|还有|应该|需要|要注意|怎么|可以|能不能|为什么)',query) and len(query)<100:
         for message in reversed(history[-6:]):
             if message.get('role')!='user':continue

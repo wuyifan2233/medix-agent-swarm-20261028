@@ -287,6 +287,16 @@ document.addEventListener('drop', event => { event.preventDefault(); dragDepth =
 function richText(value) {
   const lines = String(value).split('\n');
   const inline = text => escapeText(text.trim()).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Keep plain-text section labels readable when the model omits Markdown emphasis.
+  const paragraph = text => {
+    if (text.includes('**')) return inline(text);
+    const label = text.match(/^(\d+[.、]\s*)([^：:。！？!?]{1,24})([：:])/) ||
+      text.match(/^()((?:下一步|先给结论|建议重点观察和记录|建议重点记录|注意事项|建议|结论))([：:])/);
+    if (label) return inline(label[1]) + (label[1].endsWith(' ') ? ' ' : '') +
+      '<strong>' + inline(label[2] + label[3]) + '</strong>' + inline(text.slice(label[0].length));
+    if (/^[^：:。！？!?]{2,24}[：:]$/.test(text)) return '<strong>' + inline(text) + '</strong>';
+    return inline(text);
+  };
   const cells = line => line.trim().replace(/^\||\|$/g, '').split('|').map(inline);
   const output = [];
   for (let i = 0; i < lines.length; i++) {
@@ -304,7 +314,7 @@ function richText(value) {
       output.push(`<h4>${inline(line).replace(/^#{1,4}\s*/, '').replace(/^【|】$/g, '')}</h4>`);
     } else if (/^[-•]\s/.test(line)) {
       output.push(`<p class="list-line">${inline(line).replace(/^[-•]\s*/, '')}</p>`);
-    } else { output.push(`<p>${inline(line)}</p>`); }
+    } else { output.push(`<p>${paragraph(line)}</p>`); }
   }
   return output.join('');
 }
@@ -396,7 +406,7 @@ function userMessage(message, images) {
 }
 function pendingMessage() {
   const row = document.createElement('article'); row.className = 'message assistant';
-  row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真听你说</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
+  row.innerHTML = `<div class="message-avatar">${icon('heart')}</div><div class="message-main"><div class="message-label">MediX <small>正在认真思考</small></div><div class="process"><span class="spinner"></span><span class="phase-label">正在提交问题</span></div><div class="pending-steps"></div></div>`;
   $('messages').append(row); scrollDown(); return row;
 }
 window.addEventListener('resize', () => document.querySelectorAll('.citation-preview:popover-open').forEach(card => card.hidePopover()));
@@ -455,7 +465,7 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
     const block=document.createElement('details');block.className='observations case-evidence';
     const summary=document.createElement('summary');summary.textContent=`本次结合的病例资料 · ${result.case_sources.length} 条`;
     block.append(summary);
-    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}，v${source.revision}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
+    result.case_sources.forEach(source=>{const p=document.createElement('p');p.textContent=`${source.date||'日期未提供'} · ${source.name}：${source.value} ${source.unit}（${source.origin}${source.certainty==='uncertain'?'，待核实':''}）`;block.append(p);});
     main.append(block);
   }
   renderMemory(main, result);
@@ -492,7 +502,7 @@ function resultMessage(row, result, userText, jobId, autoPlayback = true) {
   }
   if (result.tools.length) {
     const chips = document.createElement('div'); chips.className = 'pending-steps';
-    [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
+    [...new Set(result.tools.map(tool => `${tool.status === 'failed' ? '未完成 · ' : '✓ '}${tool.label === 'scheduled_reminder' ? '定时提醒' : tool.label}`))].forEach(text => { const chip = document.createElement('span'); chip.className = 'step-chip'; chip.textContent = text; chips.append(chip); }); main.append(chips);
   }
   const playbackEpoch = authEpoch, playbackToken = state.speechToken;
   if (autoPlayback && $('autoSpeak').checked) setTimeout(() => {
@@ -748,7 +758,7 @@ async function changeMemory(id, action, demo, container) {
   } catch (error) { toast(error.message); }
 }
 function memoryCard(record, demo, candidate=false, library=false) {
-  if (record.kind === 'user_query_and_ai_summary') return exchangeMemoryCard({...record, query:record.content});
+  if (record.kind === 'user_query_and_ai_summary') return exchangeMemoryCard({...record, query:record.content}, library);
   const card = document.createElement('div'); card.className = 'memory-card';
   card.dataset.memoryId = record.id; card.memoryRecord = record; card.memoryOptions = {demo, candidate, library};
   const title = document.createElement('strong');
@@ -775,11 +785,16 @@ function renderMemory(main, result) {
   if (result.demo) { const note = document.createElement('div'); note.className = 'demo-banner'; note.textContent = '虚构交互演示：使用真实的本机存储、关联与纠正逻辑；回答为预置文案，未调用医疗模型，不写入你的正式记忆。'; main.append(note); }
   const references = result.memory_references || [];
   const candidates = result.memory_candidates || [];
-  references.forEach(record => main.append(memoryCard(record, result.demo)));
-  candidates.forEach(record => main.append(memoryCard(record, result.demo, true)));
-  const statuses = {saved:'已保存本次健康描述到 Mem0，并核验原文',skipped:'模型判断本次无需新增长期记忆',error:'本次记忆读写未完全成功，请稍后重试'};
+  if (references.length || candidates.length) {
+    const block = document.createElement('details'); block.className = 'observations case-evidence memory-evidence';
+    const summary = document.createElement('summary'); summary.textContent = `本次结合的记忆 · ${references.length + candidates.length} 条`;
+    block.append(summary);
+    references.forEach(record => block.append(memoryCard(record, result.demo)));
+    candidates.forEach(record => block.append(memoryCard(record, result.demo, true)));
+    main.append(block);
+  }
+  const statuses = {saved:'已保存本次健康描述到 Mem0，并核验原文',skipped:'本次无需新增记忆',error:'本次记忆读写未完全成功，请稍后重试'};
   if (result.memory_status && statuses[result.memory_status]) {
-    if (result.memory_status === 'skipped' && result.memory_decision?.reason) statuses.skipped += '：' + result.memory_decision.reason;
     if (result.memory_status === 'skipped' && result.patient_resolution) {
       const subject = result.patient_resolution.subject;
       if (['unknown','multiple'].includes(subject)) statuses.skipped = '人物尚未明确，本次未读取或保存个人记忆';
@@ -788,24 +803,27 @@ function renderMemory(main, result) {
       if (result.patient_resolution.method === 'unavailable') statuses.skipped = '自动记忆判断暂未完成，本次未读取或保存个人记忆';
     }
     const note = document.createElement('div'); note.className = 'memory-status'; note.textContent = statuses[result.memory_status] + (result.memory_error ? ' · ' + result.memory_error : '');
-    if (result.memory_enabled && result.patient_resolution?.patient !== 'other' && !references.length && !candidates.length && result.memory_status !== 'error') note.textContent += ' · 未发现相关的健康记忆';
+    if (result.memory_enabled && result.patient_resolution?.patient !== 'other' && !references.length && !candidates.length && result.memory_status !== 'error' && result.memory_status !== 'skipped') note.textContent += ' · 未发现相关的健康记忆';
     if (result.memory_saved) { const detail = document.createElement('details'); const title = document.createElement('summary'); title.textContent = '查看本次保存内容'; const text = document.createElement('p'); text.textContent = `${result.memory_saved.patient}：${result.memory_saved.content}`; detail.append(title,text); note.append(detail); }
     main.append(note);
   }
 }
-function exchangeMemoryCard(record) {
-  const card = document.createElement('article'); card.className = 'exchange-memory-card';
+function exchangeMemoryCard(record, collapsible=true) {
+  const card = document.createElement(collapsible ? 'details' : 'article');
+  card.className = collapsible ? 'observations case-evidence exchange-memory-card' : 'exchange-memory-card exchange-memory-full';
   const date = document.createElement('small');
   const stamp = new Date(record.created);
   date.textContent = `${({self:'本人', father:'父亲', mother:'母亲'})[record.patient] || '人物待确认'} · ${Number.isNaN(stamp.getTime()) ? '' : stamp.toLocaleString()}${record.edited_at ? ' · 已编辑' : ''}`;
-  const title = document.createElement('h3'); title.textContent = record.query;
+  const title = document.createElement(collapsible ? 'summary' : 'h3'); title.textContent = record.query;
+  const content = document.createElement('div'); content.className = 'exchange-memory-content';
   const label = document.createElement('strong'); label.textContent = '回答摘要 · AI 建议';
-  const answer = document.createElement('p'); answer.textContent = record.answer_summary;
+  const visibleSummary = String(record.answer_summary || '').replace(/[（(]\s*摘录摘要，\s*完整上下文及其余限制请查看原回答。\s*[）)]/g, '').trim();
+  const answer = document.createElement('p'); answer.className = 'exchange-memory-preview'; answer.textContent = visibleSummary;
   const actions = document.createElement('div'); actions.className = 'memory-edit-actions';
   const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '编辑';
   const outdated = document.createElement('button'); outdated.type = 'button'; outdated.textContent = '信息已过时';
   const error = document.createElement('p'); error.className = 'exchange-memory-error'; error.setAttribute('role','status');
-  actions.append(edit,outdated); card.append(date,title,label,answer,actions,error);
+  actions.append(edit,outdated); content.append(date,label,answer,actions,error); card.append(title,content);
   async function submit(body) {
     const response = await MedixAuth.fetch(`/api/memory-exchanges/${encodeURIComponent(record.id)}`, {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...body, expected_revision:record.revision})
@@ -820,16 +838,16 @@ function exchangeMemoryCard(record) {
     const queryLabel = document.createElement('label'); queryLabel.textContent = '问题 / 个人描述';
     const query = document.createElement('textarea'); query.value = record.query; query.required = true; query.maxLength = 16000; query.rows = 3; queryLabel.append(query);
     const summaryLabel = document.createElement('label'); summaryLabel.textContent = '回答摘要（编辑仅影响记忆）';
-    const summary = document.createElement('textarea'); summary.value = record.answer_summary; summary.required = true; summary.maxLength = 8000; summary.rows = 7; summaryLabel.append(summary);
+    const summary = document.createElement('textarea'); summary.value = visibleSummary; summary.required = true; summary.maxLength = 8000; summary.rows = 7; summaryLabel.append(summary);
     const buttons = document.createElement('div'); buttons.className = 'memory-edit-actions';
     const save = document.createElement('button'); save.type = 'submit'; save.textContent = '保存修改';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消';
-    buttons.append(cancel,save); form.append(queryLabel,summaryLabel,buttons); card.insertBefore(form,error);
-    actions.hidden = true; title.hidden = label.hidden = answer.hidden = true;
-    cancel.onclick = () => { form.remove(); actions.hidden = false; title.hidden = label.hidden = answer.hidden = false; error.textContent = ''; };
+    buttons.append(cancel,save); form.append(queryLabel,summaryLabel,buttons); content.insertBefore(form,error);
+    actions.hidden = true; label.hidden = answer.hidden = true;
+    cancel.onclick = () => { form.remove(); actions.hidden = false; label.hidden = answer.hidden = false; error.textContent = ''; };
     form.onsubmit = async event => {
       event.preventDefault(); save.disabled = cancel.disabled = true; error.textContent = '';
-      try { const result = await submit({action:'edit', query:query.value, answer_summary:summary.value}); card.replaceWith(exchangeMemoryCard(result.record)); }
+      try { const result = await submit({action:'edit', query:query.value, answer_summary:summary.value}); const updated = exchangeMemoryCard(result.record, collapsible); if (collapsible) updated.open = true; card.replaceWith(updated); }
       catch (e) { error.textContent = e.message; save.disabled = cancel.disabled = false; }
     };
     query.focus();
@@ -1353,7 +1371,7 @@ function streamTurn(jobId,row,message,epoch,after=0) {
       }
       if(data.type==='draft_clear' && row.dataset.streamCall===data.call_id)renderDraft(row,'');
       if(data.type==='delta' && row.dataset.streamCall===data.call_id){renderDraft(row,data.text,true);scrollDown();}
-      if(data.type==='usage'){appendUsage(row.querySelector('.message-main'),data.usage);refreshWallet().catch(()=>{});}
+      if(data.type==='usage'){refreshWallet().catch(()=>{});}
       if(data.type==='done') {
         source.close();clearTimeout(outage);state.eventSource=null;
         if(data.status==='completed' && data.result)resultMessage(row,data.result,message,jobId);

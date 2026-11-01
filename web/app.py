@@ -612,7 +612,8 @@ async def analyze(job, payload, session_id, memory_user_id):
         from knowledge.evidence import evidence_sources, validate_citations
         from knowledge.query_policy import contextualize_query,evidence_links
         evidence_query,rewritten=contextualize_query(question,previous.get('history',[]))
-        retrieval=kb.retrieve((evidence_query+'\n'+observed)[:4000])
+        # Patient records remain in the analysis prompt, never in the public search query.
+        retrieval=kb.retrieve(evidence_query[:4000])
         if retrieval['status']=='error':raise RuntimeError(retrieval['message'])
         retrieval['trace'].update(query=evidence_query,context_rewritten=rewritten)
         hits=retrieval['hits']

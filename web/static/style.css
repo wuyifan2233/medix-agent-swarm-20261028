@@ -211,3 +211,43 @@ main{min-height:0;overflow:hidden}
 }
 
 .conversation-list .conversation-item{font-size:14px;line-height:1.6}
+
+.exchange-memory-card.case-evidence{padding:0;margin:10px 0;border-radius:10px;background:#f8f9ff;border:1px solid #e8ebf5;box-shadow:none}.exchange-memory-card>summary{padding:12px 14px;cursor:pointer;color:#8496c4;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.exchange-memory-card>summary:hover{background:#f0f3ff;border-radius:10px}.exchange-memory-card[open]>summary{border-bottom:1px solid #e8ebf5}.exchange-memory-content{padding:14px}.exchange-memory-content>small{display:block;margin-bottom:16px}.exchange-memory-content>.exchange-memory-preview{white-space:pre-wrap;color:#425370;font-size:14px;line-height:1.8;margin:12px 0}.exchange-memory-content>.exchange-memory-error:empty{display:none}
+
+.memory-evidence>.exchange-memory-full{margin:12px 0;padding:14px;background:#fff;box-shadow:none;border-radius:10px}.memory-evidence>.exchange-memory-full>h3{margin:0 0 12px;font-size:14px;line-height:1.7}.memory-evidence .exchange-memory-content{padding:0}
+
+/* Unified navigation, composer and viewport-fit welcome. */
+:root{--sidebar-muted:#99a2b7}
+.service-heading{color:var(--sidebar-muted)}
+
+
+.primary-nav{margin-top:18px}
+.top-brand-note{position:relative;display:flex;align-items:center;color:#8290aa;font-size:12px;line-height:1.5}
+.top-brand-note small{position:absolute;right:0;top:calc(100% + 2px);white-space:nowrap;font-size:11px;color:#99a2b7}
+.compose-left #voiceButton,.compose-left #attachButton,.compose-left #rpOpen{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:6px 10px;border:1px solid #e3e8f6;border-radius:9px;background:#f7f9ff;color:#7e8eb5;font-size:12px;font-weight:400;white-space:nowrap}
+.compose-left #voiceButton svg,.compose-left #attachButton svg,.compose-left #rpOpen svg{width:17px;height:17px;stroke-width:1.65}
+.compose-left #voiceButton:hover,.compose-left #attachButton:hover,.compose-left #rpOpen:hover{background:#eef1ff;border-color:#cdd6f8;color:#6875d9}
+.compose-left #voiceButton.recording{color:#b65e78;background:#fff0f4}
+html,body{height:100%;overflow:hidden}
+.app-shell{min-height:0;height:100dvh}
+@media(max-width:1000px){#attachHint{display:none}.top-brand-note{font-size:10px;max-width:300px}.topbar{gap:10px}}
+@media(max-width:700px){.top-brand-note{max-width:210px;font-size:9px}.top-brand-note small{font-size:9px}.topbar-right{gap:8px}.compose-left{gap:5px}.compose-left #voiceButton,.compose-left #attachButton,.compose-left #rpOpen{font-size:10px;padding:5px 7px;height:32px}}
+
+/* Keep the original welcome proportions; do not stretch empty space above the composer. */
+@media(min-width:701px){
+ .conversation:has(#welcome:not([hidden])){flex:0 1 auto;min-height:0;overflow:hidden}
+ .conversation:has(#welcome:not([hidden])) .welcome{padding-top:0;padding-bottom:10px}
+ .conversation:has(#welcome:not([hidden])) .messages:empty{display:none}
+ main:has(#welcome:not([hidden])) .composer-region{padding-top:10px}
+}
+
+.sidebar-scroll .conversation-history-heading{font-family:inherit;font-size:13px;font-weight:500;color:#79668f;line-height:normal;padding-left:15px;letter-spacing:normal;justify-content:flex-start;align-items:center;gap:10px}
+
+.conversation-history-heading svg{width:17px;height:17px;flex-shrink:0;stroke-width:1.7}
+
+.sidebar-scroll .conversation-history-heading>span{font:inherit;color:inherit;letter-spacing:inherit}
+
+/* Use the same type size for saved questions and their chat bubbles. */
+:root{--question-font-size:14px}
+.conversation-list .conversation-item,.user-bubble{font-size:var(--question-font-size)}
+@media(max-width:700px){:root{--question-font-size:12px}}

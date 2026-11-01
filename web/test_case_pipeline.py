@@ -79,14 +79,15 @@ class PipelineTests(unittest.TestCase):
         store.apply_changes('owner', 'chat', case, 'correction', proposal, '更正项目0为900', '')
         self.assertEqual(next(f for f in store.current_facts('owner', case) if f['id'] == old['id'])['data']['value'], '900')
 
-    def test_failed_index_still_selects_old_requested_record_and_warns(self):
+    def test_failed_index_selects_old_record_without_exposing_backend_status(self):
         case = self.seed()
         with patch('web.case_context.propose_changes', AsyncMock(return_value={'operations': []})), \
              patch('web.case_context.retrieve', side_effect=RuntimeError('synthetic failure')):
             result = asyncio.run(prepare_context('owner', 'chat', case, 'lookup', '项目0是多少', '', object()))
         self.assertFalse(result['index_ready'])
         self.assertIn('项目0', [f['data']['name'] for f in result['facts']])
-        self.assertTrue(any('语义检索暂不可用' in warning for warning in result['warnings']))
+        self.assertFalse(any('语义检索暂不可用' in warning for warning in result['warnings']))
+        self.assertNotIn('语义检索暂不可用', result['context'])
 
     def test_more_than_40_image_fields_are_extracted_in_batches(self):
         rows = [f'项目{i}【结果】{1000+i}【单位】mmol/L【参考】0-10' for i in range(55)]
@@ -169,9 +170,9 @@ class PipelineTests(unittest.TestCase):
             from core.chat_runtime import hold_visible_draft
             self.assertFalse(hold_visible_draft.get())
             self.assertFalse(job['result']['case_index_ready'])
-            self.assertTrue(job['result']['data_warnings'])
+            self.assertFalse(any('语义检索暂不可用' in warning for warning in job['result']['data_warnings']))
             self.assertEqual(job['result']['extraction_check']['unmatched_rows'], 0)
-            self.assertIn('语义检索暂不可用', captured[0])
+            self.assertNotIn('语义检索暂不可用', captured[0])
         finally:
             contexts.pop('synthetic-session', None)
 

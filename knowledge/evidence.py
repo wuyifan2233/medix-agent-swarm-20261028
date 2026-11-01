@@ -14,7 +14,7 @@ from knowledge.embeddings import create_embedder, normalize_vectors
 from knowledge.reranking import create_reranker, rerank_candidates
 from knowledge.bootstrap import validate_target
 from knowledge.corpus import LOCAL, CHUNK_VERSION, chunk_document, cached_chunks, digest, load_corpus
-from knowledge.query_policy import normalize_query, insufficient_medication, requested_audience, applicability, knowledge_gap, TOPICS
+from knowledge.query_policy import normalize_query, insufficient_medication, requested_audience, applicability, knowledge_gap, TOPICS, SLEEP_TERMS, directly_relevant
 
 def similarity_threshold():
     from runtime_settings import load_setting
@@ -107,7 +107,6 @@ class EvidenceKnowledgeBase:
             self.lexical = BM25Okapi([tokens(r['content']) for r in self.rows])
             self.by_id = {r['id']:r for r in self.rows}
             self.documents = docs
-            self.scope_terms = set(t for doc in docs for t in doc['metadata']['topics']) | {'用药','抗生素','咳嗽','补液盐','退热','退烧','低血糖','胰岛素'}
             self._initialized = True
             (LOCAL/'index.json').write_text(json.dumps({'version':self.version,'database':self.db_path,'documents':len(docs),'chunks':len(self.rows),'embedding':self.embedding_model.identity,'chunk_version':CHUNK_VERSION},ensure_ascii=False,indent=2),encoding='utf-8')
 
@@ -125,10 +124,7 @@ class EvidenceKnowledgeBase:
         trace = {'min_similarity':min_similarity,'vector_candidates':0,'keyword_candidates':0,'merged_candidates':0,'selected':0,'version':self.version,'audience':audience,'knowledge_gap':gap,'rerank':{'status':'skipped' if self.reranker else 'disabled'}}
         if insufficient_medication(query):
             return {'status':'needs_information','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库提供健康及药物参考资料，不能据此确定个人用药、剂量或联合用药。请提供具体制剂、规格、年龄、相关病史及当前用药，并咨询医生或药师。'}
-        # Explicit topic coverage still bounds retrieval after corpus expansion.
-        # Dense similarity alone does not establish medical relevance.
-        if not any(term in query for term in self.scope_terms):
-            return {'status':'no_results','hits':[],'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':'当前知识库资料不足，该问题不在本批资料明确覆盖的主题内。'}
+        # Natural-language questions reach retrieval before relevance filtering.
         try:
             with self._lock:
                 vector = self.embedding_model.encode_query(query)
@@ -147,10 +143,13 @@ class EvidenceKnowledgeBase:
                     for rank,cid in enumerate(ids,1):ranks[cid]=ranks.get(cid,0)+1/(60+rank)
                 ranked = sorted(ranks,key=lambda cid:(-ranks[cid],cid))
                 subjects={term for term in TOPICS if len(term)>=2 and term not in ('血压','血糖','饮食','运动','水果','健康科普','测量','主食','食盐','用药','症状','治疗') and term in query}
-                hits=[];seen=set();audience_excluded=0;per_document={}
+                hits=[];seen=set();audience_excluded=0;per_document={};relevance_excluded=0
                 for cid in ranked:
                     row=self.by_id[cid]
                     if similarities.get(cid,-1)<min_similarity or row['content'] in seen:continue
+                    if not directly_relevant(query,row):
+                        relevance_excluded+=1
+                        continue
                     if subjects and not subjects.intersection(row['metadata']['topics']):continue
                     # Bulk society tags inferred from body mentions are too broad.
                     if subjects and row['metadata']['doc_id'].startswith('cma_') and not any(t in row['metadata']['title'] for t in subjects):continue
@@ -165,11 +164,11 @@ class EvidenceKnowledgeBase:
                         continue
                     seen.add(row['content'])
                     doc_id=row['metadata']['doc_id']
-                    if per_document.get(doc_id,0)>=2:continue
+                    if per_document.get(doc_id,0)>=1:continue
                     per_document[doc_id]=per_document.get(doc_id,0)+1
                     hits.append({**row,'score':similarities[cid],'rrf_score':ranks[cid],'applicability':suitability})
                 hits,trace['rerank']=rerank_candidates(self.reranker,query,hits,top_k)
-                trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits),audience_excluded=audience_excluded)
+                trace.update(vector_candidates=len(dense),keyword_candidates=len(sparse),merged_candidates=len(ranks),selected=len(hits),audience_excluded=audience_excluded,relevance_excluded=relevance_excluded)
                 message=gap['message'] if gap else ''
                 if not hits and not message:message='当前没有适合所述人群的相关资料。' if audience_excluded else '当前知识库资料不足，未找到足够相关的证据。'
                 return {'status':'ok' if hits else 'no_results','hits':hits,'trace':{**trace,'elapsed_ms':round((time.perf_counter()-started)*1000,1)},'message':message}
