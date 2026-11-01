@@ -13,7 +13,7 @@
   <label>术语程度<select name="terminology"><option value="plain">通俗易懂</option><option value="professional">可使用专业术语</option></select></label></div></section>
   <section class="rp-voice-section" aria-labelledby="rpVoiceTitle"><div class="rp-voice-heading"><h3 id="rpVoiceTitle">个性化声音</h3></div>
   <fieldset class="rp-voice-options"><legend class="sr-only">选择播报语音包</legend>
-  <label class="rp-voice-card"><input type="radio" name="voice_profile" value="child"><span><strong>默认</strong><small>清亮童音，亲切自然</small></span></label>
+  <label class="rp-voice-card"><input type="radio" name="voice_profile" value="child" checked><span><strong>默认</strong><small>清亮童音，亲切自然</small></span></label>
   <label class="rp-voice-card"><input type="radio" name="voice_profile" value="auto"><span><strong>跟随沟通语气</strong><small>随你的表达偏好自动切换</small></span></label>
   <label class="rp-voice-card"><input type="radio" name="voice_profile" value="gentle"><span><strong>柔和女声</strong><small data-voice-description="gentle">柔和女声，节奏稍慢</small></span></label>
   <label class="rp-voice-card"><input type="radio" name="voice_profile" value="clear"><span><strong>明亮男声</strong><small data-voice-description="clear">明亮男声，节奏自然</small></span></label>
@@ -32,7 +32,7 @@
   let revision=0,epoch=0,actor=null,busy=false,loaded=false,catalog=null,catalogRequest=0;
   const preview=dialog.querySelector('#rpVoicePreview');
   const defaults={enabled:false,nickname:'',tone:'neutral',detail:'standard',format:'summary_first',terminology:'plain',communication_note:'',daily_context:'',voice_profile:'child'};
-  function render(data){for(const [key,value] of Object.entries({...defaults,...data})){const node=form.elements.namedItem(key);if(!node)continue;if(node.type==='checkbox')node.checked=value;else node.value=value;}}
+  function render(data){const values={...defaults,...data};if(!values.enabled)values.voice_profile=defaults.voice_profile;for(const [key,value] of Object.entries(values)){const node=form.elements.namedItem(key);if(!node)continue;if(node.type==='checkbox')node.checked=value;else node.value=value;}}
   function lock(value){busy=value;form.querySelectorAll('input:not(#autoSpeak),select,textarea,button').forEach(node=>{node.disabled=value;});}
   form.addEventListener('change',()=>{window.MedixVoice?.stopPreview();});
   preview.onclick=()=>window.MedixVoice?.preview(form.elements.namedItem('voice_profile').value,form.elements.namedItem('tone').value,preview);
